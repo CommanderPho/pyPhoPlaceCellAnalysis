@@ -3630,12 +3630,7 @@ class FigureS8:
             _plot_kwargs['px_scatter_kwargs'] = {"size_max": 2.0, **_tbin_color_kwargs}
             _plot_kwargs['hist_kwargs'] = deepcopy(_tbin_hist_kwargs)
             _plot_kwargs['common_plot_kwargs'] = deepcopy(_tbin_color_kwargs)
-        if should_overlay_heuristic_filter:
-            _heuristic_color_kwargs = dict(color='heuristic_filter', color_discrete_map=cls._heuristic_filter_color_map, category_orders={'heuristic_filter': ['False', 'True']}, color_discrete_sequence=[cls._heuristic_filter_color_map['False'], cls._heuristic_filter_color_map['True']])
-            _plot_kwargs['px_scatter_kwargs'] = {"size_max": 2.0, **_heuristic_color_kwargs}
-            _plot_kwargs['hist_kwargs'] = deepcopy(_heuristic_color_kwargs)
-            _plot_kwargs['common_plot_kwargs'] = deepcopy(_heuristic_color_kwargs)
-            _plot_kwargs.pop('color_by_time_bin_size', None)  # heuristic overlay takes precedence over t-bin coloring
+        # should_overlay_heuristic_filter: grey background = full constrained df; foreground = heuristic-passing (via background_data_results_df)
 
         _out_figs_dict = {}
         _out_paths_dict = {}
@@ -3666,7 +3661,13 @@ class FigureS8:
                 _out_paths_dict[k] = {}
 
             for group_key, group_df in cls._iter_split_plot_groups(source_df, split_by_column):
-                plot_df = cls._overlay_heuristic_filter_rows(group_df, additional_filter_predicates) if should_overlay_heuristic_filter else group_df
+                active_plot_kwargs = deepcopy(_plot_kwargs)
+                if should_overlay_heuristic_filter:
+                    passing_mask = additional_filter_predicates['is_heuristic_passing'](group_df).astype(bool)
+                    plot_df = cls._copy_df_preserving_context(group_df[passing_mask])
+                    active_plot_kwargs['background_data_results_df'] = group_df
+                else:
+                    plot_df = group_df
                 if store_debug_values and (k == 'Final'):
                     if split_by_column is not None:
                         _out_debug_dict.setdefault('groups', {})[group_key] = {'group_df': group_df, 'plot_df': plot_df, 'n_rows': len(group_df)}
@@ -3677,13 +3678,12 @@ class FigureS8:
                     context_kwargs[split_by_column] = group_key
                     print(f"\t{k} {split_by_column}={group_key}: {len(group_df)} rows")
                 data_context = deepcopy(source_df.attrs["data_context"]).overwriting_context(**context_kwargs)
-                active_plot_kwargs = deepcopy(_plot_kwargs)
                 if group_key is not None:
                     active_plot_kwargs['main_title'] = f"{main_title} | {group_key}"
                 n_unique_tbins: int = int(plot_df['time_bin_size'].nunique(dropna=True)) if ('time_bin_size' in plot_df.columns) else 0
                 effective_show_scatter_legend: bool = (not color_by_time_bin_size) if (show_scatter_legend is None) else bool(show_scatter_legend)
-                showlegend: bool = bool(effective_show_scatter_legend) and bool(should_overlay_heuristic_filter or (color_by_time_bin_size and (n_unique_tbins > 1)))
-                legend_title_text: str = 'Heuristic-Passing' if should_overlay_heuristic_filter else 'Time bin size (s)'
+                showlegend: bool = bool(effective_show_scatter_legend) and bool(color_by_time_bin_size and (n_unique_tbins > 1))
+                legend_title_text: str = 'Time bin size (s)'
                 new_fig, new_fig_context = cls._plot_formatted_pre_post_scatter(plot_df=plot_df, data_context=data_context, plot_kwargs=active_plot_kwargs, showlegend=showlegend, legend_title_text=legend_title_text)
                 if should_compute_or_annotate_stats and (k == 'Final'):
                     stats_by_label = {}
@@ -3796,7 +3796,8 @@ class FigureS8:
             _out_debug_dict['n_rows']['Final'] = len(active)
             if _out_debug_dict.get('plot_df') is None:
                 if should_overlay_heuristic_filter:
-                    _out_debug_dict['plot_df'] = cls._overlay_heuristic_filter_rows(active, additional_filter_predicates)
+                    passing_mask = additional_filter_predicates['is_heuristic_passing'](active).astype(bool)
+                    _out_debug_dict['plot_df'] = cls._copy_df_preserving_context(active[passing_mask])
                 else:
                     _out_debug_dict['plot_df'] = active
 
@@ -9105,7 +9106,8 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
             self.figure_widget.layout.dragmode = 'select'
             # self.figure_widget.layout.dragmode = 'lasso'
             
-            self._setup_hover_posterior_preview_widget()
+            if self.hover_posterior_data is not None:
+                self._setup_hover_posterior_preview_widget()
         else:
             print(f'self.is_figure_widget_mode is False, so no plotly widget will be displayed')            
 
@@ -9135,6 +9137,8 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
         FigureWidget.layout is Plotly layout, not ipywidgets CSS, so the figure must sit inside a real
         Box/HBox with pixel width. Do not host it in Output+display() — that view never paints here.
         """
+        if self.hover_posterior_data is None:
+            return
         decoder_names = list(self._HOVER_POSTERIOR_DECODER_NAMES)
         placeholder = np.zeros((8, 8), dtype=float)
         fig = go.FigureWidget().set_subplots(rows=len(decoder_names), cols=1, shared_xaxes=True, vertical_spacing=0.06, subplot_titles=decoder_names)
@@ -9142,9 +9146,7 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
             fig.add_heatmap(z=placeholder, showscale=False, name=decoder_name, colorscale='Gray', row=i + 1, col=1)
         ## END for i, decoder_name in enumerate(decoder_names)....
 
-        has_data: bool = (self.hover_posterior_data is not None)
-        title_text: str = 'Hover an epoch to preview posterior' if has_data else 'No posterior data loaded'
-        fig.update_layout(autosize=False, margin=dict(l=50, r=10, t=40, b=20), width=620, height=280, title=dict(text=title_text, font=dict(size=12)), dragmode=False, hovermode=False)
+        fig.update_layout(autosize=False, margin=dict(l=50, r=10, t=40, b=20), width=620, height=280, title=dict(text='Hover an epoch to preview posterior', font=dict(size=12)), dragmode=False, hovermode=False)
         fig.update_xaxes(showticklabels=False)
         fig.update_yaxes(showticklabels=False)
         self.hover_posterior_preview_figure_widget = fig
@@ -9808,9 +9810,11 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
                           ))
         ## END if self.figure_widget is not None...
 
-        if (self._hover_posterior_preview_box is None) and (self.hover_posterior_preview_figure_widget is None) and self.is_figure_widget_mode:
-            self._setup_hover_posterior_preview_widget()
-        preview_widget = self._hover_posterior_preview_box if self._hover_posterior_preview_box is not None else self.hover_posterior_preview_figure_widget
+        preview_widget = None
+        if self.hover_posterior_data is not None:
+            if (self._hover_posterior_preview_box is None) and (self.hover_posterior_preview_figure_widget is None) and self.is_figure_widget_mode:
+                self._setup_hover_posterior_preview_widget()
+            preview_widget = self._hover_posterior_preview_box if self._hover_posterior_preview_box is not None else self.hover_posterior_preview_figure_widget
         table_box = None
         if self.table_widget is not None:
             table_box = widgets.Box([self.table_widget], layout=widgets.Layout(overflow='auto', height='320px', min_width='200px', width='auto'))
