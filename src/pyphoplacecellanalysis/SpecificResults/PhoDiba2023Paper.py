@@ -75,6 +75,227 @@ import pandas as pd
 from neuropy.utils.mixins.indexing_helpers import get_dict_subset
 
 
+
+# ==================================================================================================================================================================================================================================================================================== #
+# 2026-11-05 - Hierarchical Session Inventory (displaying counts of time bins/PBEs for each animal/session/etc.                                                                                                                                                                        #
+# ==================================================================================================================================================================================================================================================================================== #
+from typing import Dict, Literal, Optional, Tuple
+
+import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+
+from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionIdentityDataframeAccessor  # for `df.across_session_identity.split_session_key_col_to_fmt_animal_exper_cols(...)`
+
+
+@metadata_attributes(short_name=None, tags=['figure', 'session', 'inventory'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-11-05 13:08', related_items=[])
+class HierarchicalSessionInventory:
+    """ Hierarchical Session Inventory (displaying counts of time bins/PBEs for each animal/session/etc.
+
+    Usage:
+
+        from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import HierarchicalSessionInventory
+
+        counts_df, fig = HierarchicalSessionInventory.build_original_df_dict_hierarchy_inventory_figure_separated(
+            original_df_dict=dict(
+                all_sessions_ripple_df=all_sessions_ripple_df,
+                all_sessions_ripple_time_bin_df=all_sessions_ripple_time_bin_df,
+                all_sessions_laps_df=all_sessions_laps_df,
+                all_sessions_laps_time_bin_df=all_sessions_laps_time_bin_df,
+            ),
+            layout_width=1800,
+            layout_height=1400,
+        )
+        fig.show()
+    """
+
+
+    _ORIGINAL_DF_DICT_EPOCH_KIND_TO_KEYS: Dict[str, Tuple[str, str]] = {
+        'Laps': ('all_sessions_laps_df', 'all_sessions_laps_time_bin_df'),
+        'PBEs': ('all_sessions_ripple_df', 'all_sessions_ripple_time_bin_df'),
+    }
+
+
+    @classmethod
+    def _hierarchy_group_row_counts(cls, df: pd.DataFrame, group_cols: list[str]) -> pd.DataFrame:
+        missing = [c for c in group_cols if c not in df.columns]
+        if len(missing) > 0:
+            raise KeyError(f'Missing columns {missing}. Available: {list(df.columns)}')
+        return df.groupby(group_cols, dropna=False).size().reset_index(name='n')
+
+
+    @classmethod
+    def _build_original_df_dict_hierarchy_counts_df(cls, original_df_dict: Dict[str, pd.DataFrame], *, animal_col: str = 'animal', session_col: str = 'session_name', condition_col: str = 'pre_post_delta_category', epoch_kind_col: str = 'epoch_kind') -> pd.DataFrame:
+        group_cols = [animal_col, session_col, condition_col]
+        path_cols = group_cols + [epoch_kind_col]
+        leaf_parts: list[pd.DataFrame] = []
+
+        for epoch_kind, (events_key, tbin_key) in cls._ORIGINAL_DF_DICT_EPOCH_KIND_TO_KEYS.items():
+            if events_key not in original_df_dict or tbin_key not in original_df_dict:
+                raise KeyError(
+                    f'original_df_dict must contain {events_key!r} and {tbin_key!r}; '
+                    f'got keys: {list(original_df_dict.keys())}'
+                )
+            n_events = cls._hierarchy_group_row_counts(original_df_dict[events_key], group_cols).rename(columns={'n': 'n_total_events'})
+            n_time_bins = cls._hierarchy_group_row_counts(original_df_dict[tbin_key], group_cols).rename(columns={'n': 'n_time_bins'})
+            merged = n_events.merge(n_time_bins, on=group_cols, how='outer')
+            merged[['n_total_events', 'n_time_bins']] = merged[['n_total_events', 'n_time_bins']].fillna(0).astype(int)
+            merged[epoch_kind_col] = epoch_kind
+            leaf_parts.append(merged)
+
+        counts_df = pd.concat(leaf_parts, ignore_index=True)
+        counts_df['_session_short'] = counts_df[session_col].astype(str).str.replace(
+            r'^.*_(\d{2}-\d{2}_\d{2}-\d{2})$', r'\1', regex=True,
+        )
+        counts_df = counts_df.sort_values([animal_col, session_col, condition_col, epoch_kind_col]).reset_index(drop=True)
+        return counts_df, path_cols
+
+
+    @classmethod
+    def build_original_df_dict_hierarchy_inventory_figure(cls, original_df_dict: Dict[str, pd.DataFrame], *, animal_col: str = 'animal', session_col: str = 'session_name', condition_col: str = 'pre_post_delta_category', epoch_kind_col: str = 'epoch_kind', chart: Literal['icicle', 'treemap', 'facet_bars'] = 'icicle', layout_width: int = 1680, layout_height: int = 1680, title: Optional[str] = 'Original data hierarchy — time bins & events') -> Tuple[pd.DataFrame, go.Figure]:
+        """Hierarchical inventory: animal → session → pre/post → Laps|PBEs.
+
+        Returns ``(counts_df, fig)``. Prefer ``chart='icicle'`` (default) or ``'facet_bars'`` for readable labels.
+        """
+        original_df_dict = {k:df.rename(columns={'session_name': 'session_key'}, inplace=False).across_session_identity.split_session_key_col_to_fmt_animal_exper_cols(session_key_col='session_key') for k, df in original_df_dict.items()}
+
+        counts_df, path_cols = cls._build_original_df_dict_hierarchy_counts_df(original_df_dict, animal_col=animal_col, session_col=session_col, condition_col=condition_col, epoch_kind_col=epoch_kind_col)
+
+        # Icicle/treemap path: short session labels so tiles are legible
+        icicle_path_cols = [animal_col, '_session_short', condition_col, epoch_kind_col]
+
+        if chart == 'facet_bars':
+            counts_df['leaf_label'] = (
+                counts_df['_session_short'].astype(str) + ' | '
+                + counts_df[condition_col].astype(str) + ' | '
+                + counts_df[epoch_kind_col].astype(str)
+            )
+            animals = sorted(counts_df[animal_col].astype(str).unique())
+            fig = make_subplots(
+                rows=2, cols=len(animals),
+                subplot_titles=[f'{a} — time_bins' for a in animals] + [f'{a} — events' for a in animals],
+                horizontal_spacing=0.06,
+                vertical_spacing=0.08,
+            )
+            bar_height = max(28, min(42, layout_height // max(len(counts_df) // len(animals), 1)))
+            for col_idx, animal in enumerate(animals, start=1):
+                sub = counts_df[counts_df[animal_col].astype(str) == animal]
+                y = sub['leaf_label']
+                fig.add_trace(
+                    go.Bar(x=sub['n_time_bins'], y=y, orientation='h', name=f'{animal} bins', showlegend=False,
+                        text=sub['n_time_bins'], textposition='outside'),
+                    row=1, col=col_idx,
+                )
+                fig.add_trace(
+                    go.Bar(x=sub['n_total_events'], y=y, orientation='h', name=f'{animal} events', showlegend=False,
+                        text=sub['n_total_events'], textposition='outside'),
+                    row=2, col=col_idx,
+                )
+            fig.update_yaxes(autorange='reversed', tickfont=dict(size=10))
+            fig.update_xaxes(tickfont=dict(size=10))
+            fig.update_layout(
+                title=title,
+                width=layout_width,
+                height=layout_height,
+                barmode='overlay',
+                margin=dict(l=220, r=40, t=80, b=40),
+            )
+            return counts_df, fig
+
+        plot_fn = px.icicle if chart == 'icicle' else px.treemap
+        fig_top = plot_fn(counts_df, path=icicle_path_cols, values='n_time_bins', color=animal_col)
+        fig_bot = plot_fn(counts_df, path=icicle_path_cols, values='n_total_events', color=animal_col)
+
+        fig = make_subplots(
+            rows=2, cols=1,
+            specs=[[{'type': 'domain'}], [{'type': 'domain'}]],
+            row_heights=[0.5, 0.5],
+            vertical_spacing=0.04,
+            subplot_titles=['# time_bins', '# total events'],
+        )
+        for row_idx, src_fig in ((1, fig_top), (2, fig_bot)):
+            trace = src_fig.data[0]
+            trace.texttemplate = '%{label}<br>%{value:,}'
+            trace.textfont = dict(size=11)
+            trace.hovertemplate = '%{currentPath}<br>count=%{value:,}<extra></extra>'
+            fig.add_trace(trace, row=row_idx, col=1)
+
+        fig.update_layout(
+            title=title,
+            width=layout_width,
+            height=layout_height,
+            font=dict(size=12),
+            margin=dict(t=90, l=10, r=10, b=10),
+        )
+        return counts_df, fig
+
+
+    @classmethod
+    def build_original_df_dict_hierarchy_inventory_figure_separated(cls, original_df_dict, *, layout_width: int = 1800, layout_height: int = 1400, title: str = 'Original data hierarchy — Laps and PBEs separated'):
+        counts_df, _path = cls._build_original_df_dict_hierarchy_counts_df(original_df_dict)
+        counts_df = counts_df.across_session_identity.split_session_key_col_to_fmt_animal_exper_cols(
+            session_key_col='session_name',
+        )
+        counts_df['leaf_label'] = (
+            counts_df['session_name'].astype(str) + ' | '
+            + counts_df['pre_post_delta_category'].astype(str)
+        )
+
+        panels = [
+            ('Laps', 'n_time_bins', 'Laps — # time_bins'),
+            ('PBEs', 'n_time_bins', 'PBEs — # time_bins'),
+            ('Laps', 'n_total_events', 'Laps — # events'),
+            ('PBEs', 'n_total_events', 'PBEs — # events'),
+        ]
+        animals = sorted(counts_df['animal'].astype(str).unique())
+
+        fig = make_subplots(
+            rows=2, cols=2,
+            subplot_titles=[p[2] for p in panels],
+            horizontal_spacing=0.06,
+            vertical_spacing=0.10,
+        )
+
+        for plot_idx, (epoch_kind, value_col, _st) in enumerate(panels, start=1):
+            row, col = ((plot_idx - 1) // 2) + 1, ((plot_idx - 1) % 2) + 1
+            sub = counts_df[counts_df['epoch_kind'] == epoch_kind].sort_values(
+                ['animal', 'session_name', 'pre_post_delta_category'],
+            )
+            for animal in animals:
+                a = sub[sub['animal'].astype(str) == animal]
+                if len(a) == 0:
+                    continue
+                fig.add_trace(
+                    go.Bar(
+                        x=a[value_col],
+                        y=a['leaf_label'],
+                        orientation='h',
+                        name=f'{epoch_kind} {animal}',
+                        legendgroup=animal,
+                        showlegend=(plot_idx == 1),
+                        text=a[value_col],
+                        textposition='outside',
+                        marker=dict(opacity=0.85),
+                    ),
+                    row=row, col=col,
+                )
+            fig.update_yaxes(autorange='reversed', tickfont=dict(size=9), row=row, col=col)
+            fig.update_xaxes(title=value_col, row=row, col=col)
+
+        fig.update_layout(
+            title=title,
+            width=layout_width,
+            height=layout_height,
+            barmode='group',  # gor01 / pin01 / vvp01 side-by-side per leaf
+            margin=dict(l=260, r=60, t=100, b=40),
+        )
+        return counts_df, fig
+
+
+
+
+
 # ==================================================================================================================================================================================================================================================================================== #
 # 2026-10-29 - Loading Exported score Shuffles                                                                                                                                                                                                                                         #
 # ==================================================================================================================================================================================================================================================================================== #
