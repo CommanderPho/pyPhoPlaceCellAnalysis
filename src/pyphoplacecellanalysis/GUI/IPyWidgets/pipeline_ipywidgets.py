@@ -1019,7 +1019,8 @@ class PipelinePickleFileSelectorWidget:
 
 
     def _build_load_save_callbacks(self, global_data_root_parent_path: Path, active_data_mode_name: str, basedir: Path, saving_mode, force_reload: bool,
-                                extended_computations_include_includelist: List[str], force_recompute_override_computations_includelist: Optional[List[str]]=None):
+                                extended_computations_include_includelist: List[str], force_recompute_override_computations_includelist: Optional[List[str]]=None,
+                                computation_functions_name_includelist: Optional[List[str]]=None, epoch_name_includelist=None):
         """ Called to provide the widget with everything needed to actually load the pipeline, which is required before the "Load" button is enabled.
         
         
@@ -1027,10 +1028,29 @@ class PipelinePickleFileSelectorWidget:
 															 extended_computations_include_includelist=extended_computations_include_includelist, force_recompute_override_computations_includelist=force_recompute_override_computations_includelist)
 
         """
-        from pyphoplacecellanalysis.General.Batch.NonInteractiveProcessing import batch_extended_computations, batch_evaluate_required_computations
+        from pyphoplacecellanalysis.General.Batch.NonInteractiveProcessing import batch_load_session, batch_extended_computations, batch_evaluate_required_computations
         from neuropy.core.session.Formats.BaseDataSessionFormats import DataSessionFormatRegistryHolder # for batch_load_session
         from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import NeuropyPipeline, PipelineSavingScheme # for batch_load_session
         from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import _get_custom_filenames_from_computation_metadata
+        from pyphoplacecellanalysis.General.Pipeline.Stages.Computation import ComputedPipelineStage
+
+        _default_computation_functions_name_includelist: List[str] = computation_functions_name_includelist or ['lap_direction_determination', 'pf_computation', 'firing_rate_trends', 'position_decoding']
+
+        def _subfn_pipeline_needs_local_batch_load(curr_active_pipeline: NeuropyPipeline) -> bool:
+            if curr_active_pipeline is None:
+                return True
+            if not isinstance(curr_active_pipeline.stage, ComputedPipelineStage):
+                return True
+            filtered_sessions = curr_active_pipeline.stage.filtered_sessions
+            return (filtered_sessions is None) or (len(filtered_sessions) == 0)
+
+        def _subfn_run_batch_local_pipeline_load(active_pickle_filename: str, override_parameters_flat_keypaths_dict: Optional[dict], *, skip_save_on_initial_load: bool) -> NeuropyPipeline:
+            update_global_variable_fn = self.on_update_global_variable_callback
+            return batch_load_session(global_data_root_parent_path, active_data_mode_name, basedir, epoch_name_includelist=epoch_name_includelist,
+                                      computation_functions_name_includelist=_default_computation_functions_name_includelist,
+                                      saving_mode=saving_mode, force_reload=force_reload, skip_extended_batch_computations=True, skip_save_on_initial_load=skip_save_on_initial_load,
+                                      active_pickle_filename=active_pickle_filename, override_parameters_flat_keypaths_dict=override_parameters_flat_keypaths_dict,
+                                      update_global_variable_fn=update_global_variable_fn, fail_on_exception=True, debug_print=False)
 
         def _subfn_load():
             """ captures: everything in calling context!
@@ -1079,8 +1099,20 @@ class PipelinePickleFileSelectorWidget:
             Captures: active_data_mode_name
             """
             get_global_variable_fn = self.on_get_global_variable_callback
+            update_global_variable_fn = self.on_update_global_variable_callback
             assert get_global_variable_fn is not None
+            assert update_global_variable_fn is not None
             curr_active_pipeline = get_global_variable_fn('curr_active_pipeline')
+            if curr_active_pipeline is None:
+                raise RuntimeError('curr_active_pipeline is None. Run _subfn_compute_new() first to load or rebuild the session.')
+            if _subfn_pipeline_needs_local_batch_load(curr_active_pipeline):
+                print('_subfn_compute(): running batch_load_session(...) for local filtering/computations before extended batch computations...')
+                custom_suffix: str = self.build_custom_suffix_from_modified_widget_parameters()
+                active_pickle_filename: str = f'loadedSessPickle{custom_suffix}.pkl'
+                override_parameters_flat_keypaths_dict = deepcopy(self.current_parameter_values)
+                skip_save_on_initial_load: bool = (PipelineSavingScheme.init(saving_mode).value == PipelineSavingScheme.SKIP_SAVING.value)
+                curr_active_pipeline = _subfn_run_batch_local_pipeline_load(active_pickle_filename, override_parameters_flat_keypaths_dict, skip_save_on_initial_load=skip_save_on_initial_load)
+                update_global_variable_fn('curr_active_pipeline', curr_active_pipeline)
             
             # Reload computation functions and perform computations
             curr_active_pipeline.reload_default_computation_functions()
@@ -1112,19 +1144,12 @@ class PipelinePickleFileSelectorWidget:
             print(f'\tcustom_suffix: "{custom_suffix}"')
             active_pickle_filename: str = f'loadedSessPickle{custom_suffix}.pkl'
             
-            # From `General.Batch.NonInteractiveProcessing.known_data_session_type_properties_dict`
-            known_data_session_type_properties_dict = DataSessionFormatRegistryHolder.get_registry_known_data_session_type_dict(override_parameters_flat_keypaths_dict=override_parameters_flat_keypaths_dict)
-            active_data_session_types_registered_classes_dict = DataSessionFormatRegistryHolder.get_registry_data_session_type_class_name_dict()
-
-            active_data_mode_registered_class = active_data_session_types_registered_classes_dict[active_data_mode_name]
-            active_data_mode_type_properties = known_data_session_type_properties_dict[active_data_mode_name]
             skip_save_on_initial_load: bool = True
             # skip_save_on_initial_load: bool = False
-            print(f'\tinitial loading...')
+            print(f'\tinitial loading (batch_load_session local computations)...')
             
-            ## Begin main run of the pipeline (load or execute):
-            curr_active_pipeline = NeuropyPipeline.try_init_from_saved_pickle_or_reload_if_needed(active_data_mode_name, active_data_mode_type_properties,
-                override_basepath=Path(basedir), force_reload=force_reload, active_pickle_filename=active_pickle_filename, skip_save_on_initial_load=skip_save_on_initial_load, override_parameters_flat_keypaths_dict=override_parameters_flat_keypaths_dict)
+            ## Begin main run of the pipeline (load, filter, and run local computation functions):
+            curr_active_pipeline = _subfn_run_batch_local_pipeline_load(active_pickle_filename, override_parameters_flat_keypaths_dict, skip_save_on_initial_load=skip_save_on_initial_load)
             print(f'\tinitial load done.')
             curr_active_pipeline.update_parameters(override_parameters_flat_keypaths_dict=override_parameters_flat_keypaths_dict) # should already be updated, but try it again anyway.
 
