@@ -79,10 +79,9 @@ from neuropy.utils.mixins.indexing_helpers import get_dict_subset
 # ==================================================================================================================================================================================================================================================================================== #
 # 2026-11-05 - Hierarchical Session Inventory (displaying counts of time bins/PBEs for each animal/session/etc.                                                                                                                                                                        #
 # ==================================================================================================================================================================================================================================================================================== #
-from typing import Dict, Literal, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import pandas as pd
-import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
@@ -97,24 +96,33 @@ class HierarchicalSessionInventory:
 
         from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import HierarchicalSessionInventory
 
-        counts_df, fig = HierarchicalSessionInventory.build_original_df_dict_hierarchy_inventory_figure_separated(
+        counts_df, fig = HierarchicalSessionInventory.build_original_df_dict_hierarchy_inventory_figure(
             original_df_dict=dict(
                 all_sessions_ripple_df=all_sessions_ripple_df,
                 all_sessions_ripple_time_bin_df=all_sessions_ripple_time_bin_df,
                 all_sessions_laps_df=all_sessions_laps_df,
                 all_sessions_laps_time_bin_df=all_sessions_laps_time_bin_df,
             ),
-            layout_width=1800,
-            layout_height=1400,
         )
         fig.show()
     """
 
-
+    _TREE_DEPTH_NAMES: Tuple[str, ...] = ('animal', 'session', 'pre/post', 'Laps | PBEs')
     _ORIGINAL_DF_DICT_EPOCH_KIND_TO_KEYS: Dict[str, Tuple[str, str]] = {
         'Laps': ('all_sessions_laps_df', 'all_sessions_laps_time_bin_df'),
         'PBEs': ('all_sessions_ripple_df', 'all_sessions_ripple_time_bin_df'),
     }
+    _EPOCH_KIND_ORDER: Tuple[str, ...] = ('Laps', 'PBEs')
+    _EDGE_COLOR: str = '#444444'
+    _NODE_COLORS: Tuple[str, ...] = ('#1f77b4', '#ff7f0e', '#2ca02c', '#d62728')
+
+
+    @classmethod
+    def _prepare_original_df_dict_for_inventory(cls, original_df_dict: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
+        return {
+            k: df.rename(columns={'session_name': 'session_key'}, inplace=False).across_session_identity.split_session_key_col_to_fmt_animal_exper_cols(session_key_col='session_key')
+            for k, df in original_df_dict.items()
+        }
 
 
     @classmethod
@@ -126,7 +134,7 @@ class HierarchicalSessionInventory:
 
 
     @classmethod
-    def _build_original_df_dict_hierarchy_counts_df(cls, original_df_dict: Dict[str, pd.DataFrame], *, animal_col: str = 'animal', session_col: str = 'session_name', condition_col: str = 'pre_post_delta_category', epoch_kind_col: str = 'epoch_kind') -> pd.DataFrame:
+    def _build_original_df_dict_hierarchy_counts_df(cls, original_df_dict: Dict[str, pd.DataFrame], *, animal_col: str = 'animal', session_col: str = 'session_name', condition_col: str = 'pre_post_delta_category', epoch_kind_col: str = 'epoch_kind') -> Tuple[pd.DataFrame, List[str]]:
         group_cols = [animal_col, session_col, condition_col]
         path_cols = group_cols + [epoch_kind_col]
         leaf_parts: list[pd.DataFrame] = []
@@ -148,149 +156,230 @@ class HierarchicalSessionInventory:
         counts_df['_session_short'] = counts_df[session_col].astype(str).str.replace(
             r'^.*_(\d{2}-\d{2}_\d{2}-\d{2})$', r'\1', regex=True,
         )
+        counts_df['_session_tree_label'] = counts_df['_session_short'].where(
+            counts_df['_session_short'].astype(str) != counts_df[session_col].astype(str),
+            counts_df[session_col].astype(str),
+        )
         counts_df = counts_df.sort_values([animal_col, session_col, condition_col, epoch_kind_col]).reset_index(drop=True)
         return counts_df, path_cols
 
 
     @classmethod
-    def build_original_df_dict_hierarchy_inventory_figure(cls, original_df_dict: Dict[str, pd.DataFrame], *, animal_col: str = 'animal', session_col: str = 'session_name', condition_col: str = 'pre_post_delta_category', epoch_kind_col: str = 'epoch_kind', chart: Literal['icicle', 'treemap', 'facet_bars'] = 'icicle', layout_width: int = 1680, layout_height: int = 1680, title: Optional[str] = 'Original data hierarchy — time bins & events') -> Tuple[pd.DataFrame, go.Figure]:
-        """Hierarchical inventory: animal → session → pre/post → Laps|PBEs.
+    def _format_leaf_count_line(cls, epoch_kind: str, n_time_bins: int, n_total_events: int) -> str:
+        return f'{epoch_kind}<br># time_bins: {int(n_time_bins):,}<br># events: {int(n_total_events):,}'
 
-        Returns ``(counts_df, fig)``. Prefer ``chart='icicle'`` (default) or ``'facet_bars'`` for readable labels.
-        """
-        original_df_dict = {k:df.rename(columns={'session_name': 'session_key'}, inplace=False).across_session_identity.split_session_key_col_to_fmt_animal_exper_cols(session_key_col='session_key') for k, df in original_df_dict.items()}
 
-        counts_df, path_cols = cls._build_original_df_dict_hierarchy_counts_df(original_df_dict, animal_col=animal_col, session_col=session_col, condition_col=condition_col, epoch_kind_col=epoch_kind_col)
+    @classmethod
+    def _build_animal_hierarchy_tree(cls, counts_df: pd.DataFrame, animal: str, *, animal_col: str, condition_col: str, epoch_kind_col: str) -> Tuple[Dict[str, Dict[str, Any]], Dict[str, List[str]], Optional[str], int]:
+        """Build animal → session → pre/post → Laps|PBEs tree; return nodes, children_map, root_id, n_leaves."""
+        sub = counts_df[counts_df[animal_col].astype(str) == str(animal)]
+        leaf_specs: List[Dict[str, Any]] = []
+        for sess in sorted(sub['_session_tree_label'].astype(str).unique()):
+            sess_df = sub[sub['_session_tree_label'].astype(str) == sess]
+            for cond in sorted(sess_df[condition_col].astype(str).unique()):
+                cond_df = sess_df[sess_df[condition_col].astype(str) == cond]
+                for epoch_kind in cls._EPOCH_KIND_ORDER:
+                    ek_df = cond_df[cond_df[epoch_kind_col].astype(str) == epoch_kind]
+                    if len(ek_df) == 0:
+                        continue
+                    row = ek_df.iloc[0]
+                    leaf_specs.append({
+                        'session': sess,
+                        'condition': cond,
+                        'epoch_kind': epoch_kind,
+                        'n_time_bins': int(row['n_time_bins']),
+                        'n_total_events': int(row['n_total_events']),
+                    })
+                ## END for epoch_kind in cls._EPOCH_KIND_ORDER...
+            ## END for cond in sorted(sess_df[condition_col].astype(str).unique())...
+        ## END for sess in sorted(sub['_session_tree_label'].astype(str).unique())...
 
-        # Icicle/treemap path: short session labels so tiles are legible
-        icicle_path_cols = [animal_col, '_session_short', condition_col, epoch_kind_col]
+        n_leaves = len(leaf_specs)
+        if n_leaves == 0:
+            return {}, {}, None, 0
 
-        if chart == 'facet_bars':
-            counts_df['leaf_label'] = (
-                counts_df['_session_short'].astype(str) + ' | '
-                + counts_df[condition_col].astype(str) + ' | '
-                + counts_df[epoch_kind_col].astype(str)
+        nodes_by_id: Dict[str, Dict[str, Any]] = {}
+        children_map: Dict[str, List[str]] = {}
+
+        def _ensure_node(node_id: str, label: str, depth: int, *, is_leaf: bool) -> None:
+            if node_id not in nodes_by_id:
+                nodes_by_id[node_id] = {'id': node_id, 'label': label, 'depth': depth, 'y': 0.0, 'is_leaf': is_leaf, 'x': float(depth)}
+
+        def _link(parent_id: str, child_id: str) -> None:
+            children_map.setdefault(parent_id, [])
+            if child_id not in children_map[parent_id]:
+                children_map[parent_id].append(child_id)
+
+        animal_id = f'a|{animal}'
+        _ensure_node(animal_id, str(animal), 0, is_leaf=False)
+        ordered_leaf_ids: List[str] = []
+        for leaf_idx, spec in enumerate(leaf_specs):
+            sess_id = f'{animal_id}|s|{spec["session"]}'
+            cond_id = f'{sess_id}|c|{spec["condition"]}'
+            leaf_id = f'{cond_id}|e|{spec["epoch_kind"]}'
+            ordered_leaf_ids.append(leaf_id)
+            _ensure_node(sess_id, spec['session'], 1, is_leaf=False)
+            _ensure_node(cond_id, spec['condition'], 2, is_leaf=False)
+            _ensure_node(leaf_id, cls._format_leaf_count_line(spec['epoch_kind'], spec['n_time_bins'], spec['n_total_events']), 3, is_leaf=True)
+            _link(animal_id, sess_id)
+            _link(sess_id, cond_id)
+            _link(cond_id, leaf_id)
+        ## END for leaf_idx, spec in enumerate(leaf_specs)...
+
+        for leaf_idx, leaf_id in enumerate(ordered_leaf_ids):
+            nodes_by_id[leaf_id]['y'] = float(leaf_idx)
+        ## END for leaf_idx, leaf_id in enumerate(ordered_leaf_ids)...
+
+        def _assign_internal_y(node_id: str) -> float:
+            child_ids = children_map.get(node_id, [])
+            if len(child_ids) == 0:
+                return float(nodes_by_id[node_id]['y'])
+            child_ys = [_assign_internal_y(cid) for cid in child_ids]
+            y = float(sum(child_ys) / len(child_ys))
+            nodes_by_id[node_id]['y'] = y
+            return y
+
+        _assign_internal_y(animal_id)
+        return nodes_by_id, children_map, animal_id, n_leaves
+
+
+    @classmethod
+    def _add_orthogonal_tree_to_figure(cls, fig: go.Figure, nodes_by_id: Dict[str, Dict[str, Any]], children_map: Dict[str, List[str]], *, row: int, col: int, n_leaves: int, panel_title: str) -> None:
+        """Draw a rectangular cladogram (orthogonal elbows + node markers + equal-sized leaf labels) on one subplot."""
+        edge_x: List[Optional[float]] = []
+        edge_y: List[Optional[float]] = []
+        for parent_id, child_ids in children_map.items():
+            parent = nodes_by_id[parent_id]
+            xp = float(parent['x'])
+            child_ys = [float(nodes_by_id[cid]['y']) for cid in child_ids]
+            if len(child_ys) == 0:
+                continue
+            # Vertical stem at parent depth spanning child y's
+            edge_x.extend([xp, xp, None])
+            edge_y.extend([min(child_ys), max(child_ys), None])
+            for child_id in child_ids:
+                child = nodes_by_id[child_id]
+                xc = float(child['x'])
+                yc = float(child['y'])
+                # Horizontal elbow into child
+                edge_x.extend([xp, xc, None])
+                edge_y.extend([yc, yc, None])
+            ## END for child_id in child_ids...
+        ## END for parent_id, child_ids in children_map.items()...
+
+        fig.add_trace(
+            go.Scatter(
+                x=edge_x, y=edge_y, mode='lines',
+                line=dict(color=cls._EDGE_COLOR, width=1.6),
+                hoverinfo='skip', showlegend=False,
+            ),
+            row=row, col=col,
+        )
+
+        for depth in range(4):
+            depth_nodes = [n for n in nodes_by_id.values() if int(n['depth']) == depth]
+            if len(depth_nodes) == 0:
+                continue
+            xs = [float(n['x']) for n in depth_nodes]
+            ys = [float(n['y']) for n in depth_nodes]
+            texts = [str(n['label']) for n in depth_nodes]
+            is_leaf_depth = (depth == 3)
+            fig.add_trace(
+                go.Scatter(
+                    x=xs, y=ys, mode='markers+text' if (not is_leaf_depth) else 'markers',
+                    marker=dict(size=10 if depth == 0 else 7, color=cls._NODE_COLORS[depth], line=dict(width=1, color='white')),
+                    text=texts if (not is_leaf_depth) else None,
+                    textposition='top center' if depth == 0 else 'middle left',
+                    textfont=dict(size=11 if depth == 0 else 9),
+                    hovertext=texts,
+                    hoverinfo='text',
+                    showlegend=False,
+                    name=cls._TREE_DEPTH_NAMES[depth],
+                ),
+                row=row, col=col,
             )
-            animals = sorted(counts_df[animal_col].astype(str).unique())
-            fig = make_subplots(
-                rows=2, cols=len(animals),
-                subplot_titles=[f'{a} — time_bins' for a in animals] + [f'{a} — events' for a in animals],
-                horizontal_spacing=0.06,
-                vertical_spacing=0.08,
-            )
-            bar_height = max(28, min(42, layout_height // max(len(counts_df) // len(animals), 1)))
-            for col_idx, animal in enumerate(animals, start=1):
-                sub = counts_df[counts_df[animal_col].astype(str) == animal]
-                y = sub['leaf_label']
-                fig.add_trace(
-                    go.Bar(x=sub['n_time_bins'], y=y, orientation='h', name=f'{animal} bins', showlegend=False,
-                        text=sub['n_time_bins'], textposition='outside'),
-                    row=1, col=col_idx,
-                )
-                fig.add_trace(
-                    go.Bar(x=sub['n_total_events'], y=y, orientation='h', name=f'{animal} events', showlegend=False,
-                        text=sub['n_total_events'], textposition='outside'),
-                    row=2, col=col_idx,
-                )
-            fig.update_yaxes(autorange='reversed', tickfont=dict(size=10))
-            fig.update_xaxes(tickfont=dict(size=10))
-            fig.update_layout(
-                title=title,
-                width=layout_width,
-                height=layout_height,
-                barmode='overlay',
-                margin=dict(l=220, r=40, t=80, b=40),
-            )
-            return counts_df, fig
+            if is_leaf_depth:
+                for n in depth_nodes:
+                    fig.add_annotation(
+                        x=float(n['x']) + 0.18, y=float(n['y']),
+                        text=str(n['label']),
+                        showarrow=False, xanchor='left', yanchor='middle', align='left',
+                        font=dict(size=10, family='Consolas, Courier New, monospace'),
+                        bgcolor='rgba(255,255,255,0.95)', bordercolor='#888888', borderwidth=1, borderpad=4,
+                        row=row, col=col,
+                    )
+                ## END for n in depth_nodes...
+        ## END for depth in range(4)...
 
-        plot_fn = px.icicle if chart == 'icicle' else px.treemap
-        fig_top = plot_fn(counts_df, path=icicle_path_cols, values='n_time_bins', color=animal_col)
-        fig_bot = plot_fn(counts_df, path=icicle_path_cols, values='n_total_events', color=animal_col)
+        for depth_idx, depth_name in enumerate(cls._TREE_DEPTH_NAMES):
+            fig.add_annotation(
+                x=float(depth_idx), y=-1.15, text=f'<i>{depth_name}</i>',
+                showarrow=False, xanchor='center', yanchor='top',
+                font=dict(size=9, color='#666666'),
+                row=row, col=col,
+            )
+        ## END for depth_idx, depth_name in enumerate(cls._TREE_DEPTH_NAMES)...
+
+        fig.update_xaxes(visible=False, range=[-0.35, 5.4], row=row, col=col)
+        fig.update_yaxes(visible=False, range=[float(n_leaves) - 0.4, -1.55], autorange=False, row=row, col=col)
+
+
+    @classmethod
+    def build_original_df_dict_hierarchy_inventory_figure(cls, original_df_dict: Dict[str, pd.DataFrame], *, animal_col: str = 'animal', session_col: str = 'session_name', condition_col: str = 'pre_post_delta_category', epoch_kind_col: str = 'epoch_kind', layout_width: Optional[int] = None, layout_height: Optional[int] = None, title: Optional[str] = 'Original data hierarchy — time bins & events') -> Tuple[pd.DataFrame, go.Figure]:
+        """Plotly rectangular cladogram: animal → session → pre/post → Laps|PBEs (orthogonal edges, equal leaf spacing)."""
+        prepared = cls._prepare_original_df_dict_for_inventory(original_df_dict)
+        counts_df, _path_cols = cls._build_original_df_dict_hierarchy_counts_df(
+            prepared, animal_col=animal_col, session_col=session_col, condition_col=condition_col, epoch_kind_col=epoch_kind_col,
+        )
+        animals = sorted(counts_df[animal_col].astype(str).unique())
+        animal_panels: List[Tuple[str, Dict[str, Dict[str, Any]], Dict[str, List[str]], int]] = []
+        max_leaves = 0
+        for animal in animals:
+            nodes_by_id, children_map, root_id, n_leaves = cls._build_animal_hierarchy_tree(
+                counts_df, animal, animal_col=animal_col, condition_col=condition_col, epoch_kind_col=epoch_kind_col,
+            )
+            if n_leaves == 0 or root_id is None:
+                continue
+            max_leaves = max(max_leaves, n_leaves)
+            animal_panels.append((animal, nodes_by_id, children_map, n_leaves))
+        ## END for animal in animals...
+
+        if len(animal_panels) == 0:
+            raise ValueError('No hierarchical inventory leaves to plot (empty counts after grouping).')
+
+        n_panels = len(animal_panels)
+        if layout_height is None:
+            layout_height = int(max(640, 140 + (max_leaves * 28)))
+        if layout_width is None:
+            layout_width = int(max(1100, n_panels * 520))
 
         fig = make_subplots(
-            rows=2, cols=1,
-            specs=[[{'type': 'domain'}], [{'type': 'domain'}]],
-            row_heights=[0.5, 0.5],
-            vertical_spacing=0.04,
-            subplot_titles=['# time_bins', '# total events'],
+            rows=1, cols=n_panels,
+            subplot_titles=[p[0] for p in animal_panels],
+            horizontal_spacing=0.04,
         )
-        for row_idx, src_fig in ((1, fig_top), (2, fig_bot)):
-            trace = src_fig.data[0]
-            trace.texttemplate = '%{label}<br>%{value:,}'
-            trace.textfont = dict(size=11)
-            trace.hovertemplate = '%{currentPath}<br>count=%{value:,}<extra></extra>'
-            fig.add_trace(trace, row=row_idx, col=1)
+        for col_idx, (animal_name, nodes_by_id, children_map, n_leaves) in enumerate(animal_panels, start=1):
+            cls._add_orthogonal_tree_to_figure(
+                fig, nodes_by_id, children_map, row=1, col=col_idx, n_leaves=n_leaves, panel_title=animal_name,
+            )
+        ## END for col_idx, (animal_name, nodes_by_id, children_map, n_leaves) in enumerate(animal_panels, start=1)...
 
         fig.update_layout(
-            title=title,
+            title=dict(text=title, x=0.5, xanchor='center'),
             width=layout_width,
             height=layout_height,
-            font=dict(size=12),
-            margin=dict(t=90, l=10, r=10, b=10),
+            margin=dict(l=30, r=30, t=70, b=40),
+            plot_bgcolor='white',
+            paper_bgcolor='white',
+            showlegend=False,
         )
         return counts_df, fig
 
 
     @classmethod
-    def build_original_df_dict_hierarchy_inventory_figure_separated(cls, original_df_dict, *, layout_width: int = 1800, layout_height: int = 1400, title: str = 'Original data hierarchy — Laps and PBEs separated'):
-        counts_df, _path = cls._build_original_df_dict_hierarchy_counts_df(original_df_dict)
-        counts_df = counts_df.across_session_identity.split_session_key_col_to_fmt_animal_exper_cols(
-            session_key_col='session_name',
-        )
-        counts_df['leaf_label'] = (
-            counts_df['session_name'].astype(str) + ' | '
-            + counts_df['pre_post_delta_category'].astype(str)
-        )
-
-        panels = [
-            ('Laps', 'n_time_bins', 'Laps — # time_bins'),
-            ('PBEs', 'n_time_bins', 'PBEs — # time_bins'),
-            ('Laps', 'n_total_events', 'Laps — # events'),
-            ('PBEs', 'n_total_events', 'PBEs — # events'),
-        ]
-        animals = sorted(counts_df['animal'].astype(str).unique())
-
-        fig = make_subplots(
-            rows=2, cols=2,
-            subplot_titles=[p[2] for p in panels],
-            horizontal_spacing=0.06,
-            vertical_spacing=0.10,
-        )
-
-        for plot_idx, (epoch_kind, value_col, _st) in enumerate(panels, start=1):
-            row, col = ((plot_idx - 1) // 2) + 1, ((plot_idx - 1) % 2) + 1
-            sub = counts_df[counts_df['epoch_kind'] == epoch_kind].sort_values(
-                ['animal', 'session_name', 'pre_post_delta_category'],
-            )
-            for animal in animals:
-                a = sub[sub['animal'].astype(str) == animal]
-                if len(a) == 0:
-                    continue
-                fig.add_trace(
-                    go.Bar(
-                        x=a[value_col],
-                        y=a['leaf_label'],
-                        orientation='h',
-                        name=f'{epoch_kind} {animal}',
-                        legendgroup=animal,
-                        showlegend=(plot_idx == 1),
-                        text=a[value_col],
-                        textposition='outside',
-                        marker=dict(opacity=0.85),
-                    ),
-                    row=row, col=col,
-                )
-            fig.update_yaxes(autorange='reversed', tickfont=dict(size=9), row=row, col=col)
-            fig.update_xaxes(title=value_col, row=row, col=col)
-
-        fig.update_layout(
-            title=title,
-            width=layout_width,
-            height=layout_height,
-            barmode='group',  # gor01 / pin01 / vvp01 side-by-side per leaf
-            margin=dict(l=260, r=60, t=100, b=40),
-        )
-        return counts_df, fig
+    def build_original_df_dict_hierarchy_inventory_figure_separated(cls, original_df_dict: Dict[str, pd.DataFrame], **kwargs) -> Tuple[pd.DataFrame, go.Figure]:
+        """Alias for :meth:`build_original_df_dict_hierarchy_inventory_figure` (Laps/PBEs are separate leaf branches)."""
+        return cls.build_original_df_dict_hierarchy_inventory_figure(original_df_dict, **kwargs)
 
 
 
@@ -9049,6 +9138,11 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
         assert self.active_plot_df_name in list(self._pre_predicate_df_dict.keys()), f"self.active_plot_df_name: '{self.active_plot_df_name}' not in list(self._pre_predicate_df_dict.keys()): {list(self._pre_predicate_df_dict.keys())}"
         return self._pre_predicate_df_dict[self.active_plot_df_name]
 
+    @property
+    def pre_predicate_df_dict(self) -> Dict[str, pd.DataFrame]:
+        """The dict of dfs post initial filtering but before the optional predicates are applied."""
+        if self._pre_predicate_df_dict is not None:
+            return deepcopy(self._pre_predicate_df_dict)
 
     @property
     def pre_predicate_baseline_predicate_names(self) -> Set[str]:
