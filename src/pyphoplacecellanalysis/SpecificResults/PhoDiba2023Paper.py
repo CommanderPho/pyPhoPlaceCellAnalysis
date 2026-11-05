@@ -11115,6 +11115,32 @@ class PhoPublicationFigureHelper:
         )
 
 
+    @classmethod
+    def build_figure3_fri_index_title_flexitext(cls, title_font_size: Optional[float] = None) -> str:
+        """Flexitext title for Fig 3a (long|short firing rate indices). NBSP between runs for SVG export."""
+        _nbsp = '\u00a0'
+        if title_font_size is None:
+            title_font_size = float(cls.artboard3_fig3_style['sizes']['track_title'])
+        long_c = cls.artboard3_fig3_style['colors']['long']
+        short_c = cls.artboard3_fig3_style['colors']['short']
+        return (f'<size:{title_font_size}><color:{long_c}, weight:bold>long ($L$)</>|<color:{short_c}, weight:bold>short($S$)</>{_nbsp}'
+                f'<weight:bold>firing rate indices</></>')
+
+
+    @classmethod
+    def build_figure3_track_laps_pbes_title_flexitext(cls, track_key: str) -> str:
+        """Flexitext title for Fig 3b panels (long|short laps|PBEs rate). NBSP between runs for SVG export."""
+        _nbsp = '\u00a0'
+        track_key = 'short' if ('short' in str(track_key).lower()) else 'long'
+        style = cls.artboard3_fig3_style
+        track_color = style['colors'][track_key]
+        title_body_color = style['colors']['title_body']
+        track_title_size = style['sizes']['track_title']
+        title_body_size = style['sizes']['title_body']
+        return (f'<size:{track_title_size}><color:{track_color}, weight:bold>{track_key}</></>'
+                f'<size:{title_body_size}><color:{title_body_color}>{_nbsp}laps|PBEs{_nbsp}</><weight:bold>rate</></>')
+
+
 
 
 

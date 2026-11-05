@@ -2573,9 +2573,8 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
             ## Only include the footer label when not for publication
             footer_text_obj = flexitext((text_formatter.left_margin*0.1), (text_formatter.bottom_margin*0.25), text_formatter._build_footer_string(active_context=active_context), va="top", xycoords="figure fraction")
         else:
-            ## Publication Mode
-            ## Smaller fonts for publication -- Originally 18, now 9
-            flexitext(text_formatter.left_margin, text_formatter.top_margin, '<size:9><color:royalblue, weight:bold>long ($L$)</>|<color:crimson, weight:bold>short($S$)</> <weight:bold>firing rate indices</></>', va="bottom", xycoords="figure fraction")
+            ## Publication Mode — NBSP between flexitext runs (SVG export; same as Fig 2 titles)
+            flexitext(text_formatter.left_margin, text_formatter.top_margin, PhoPublicationFigureHelper.build_figure3_fri_index_title_flexitext(), va="bottom", xycoords="figure fraction")
     elif omit_outside_axes_elements:
         pad_x, pad_y = _subfn_marker_pad_figure_fraction(fig, scatter_plot)
         fig.subplots_adjust(top=1.0, left=pad_x, right=1.0, bottom=pad_y)
@@ -3475,13 +3474,8 @@ def _plot_single_track_firing_rate_compare(laps_frs_dict, replays_frs_dict, acti
                 ## Only include the footer label when not for publication
                 footer_text_obj = flexitext((text_formatter.left_margin*0.1), (text_formatter.bottom_margin*0.25), text_formatter._build_footer_string(active_context=active_context), va="top", xycoords="figure fraction")
             else:
-                ## Publication Mode — Artboard 3.pdf title: colored track name + #231F20 body
-                track_key = 'short' if ('short' in str(track_name).lower()) else 'long'
-                track_color = artboard3_style['colors'][track_key]
-                title_body_color = artboard3_style['colors']['title_body']
-                track_title_size = artboard3_style['sizes']['track_title']
-                title_body_size = artboard3_style['sizes']['title_body']
-                flexitext(text_formatter.left_margin, text_formatter.top_margin, f'<size:{track_title_size}><color:{track_color}, weight:bold>{track_key}</></><size:{title_body_size}><color:{title_body_color}> laps|PBEs </><weight:bold>rate</></>', va="bottom", xycoords="figure fraction")
+                ## Publication Mode — Artboard 3.pdf title; NBSP between flexitext runs (SVG export; same as Fig 2)
+                flexitext(text_formatter.left_margin, text_formatter.top_margin, PhoPublicationFigureHelper.build_figure3_track_laps_pbes_title_flexitext(track_name), va="bottom", xycoords="figure fraction")
         elif omit_outside_axes_elements:
             fig.subplots_adjust(top=1.0, left=0.0, right=1.0, bottom=0.0)
 

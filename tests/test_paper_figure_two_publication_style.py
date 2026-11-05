@@ -75,5 +75,17 @@ class TestPaperFigureTwoPublicationStyle(unittest.TestCase):
         self.assertEqual(style.create_plot_kwargs(), {})
 
 
+class TestFigure3PublicationFlexitext(unittest.TestCase):
+
+    def test_figure3_title_strings_use_nbsp_between_runs(self):
+        nbsp = '\u00a0'
+        fri = PhoPublicationFigureHelper.build_figure3_fri_index_title_flexitext()
+        laps_pbes = PhoPublicationFigureHelper.build_figure3_track_laps_pbes_title_flexitext('short')
+        self.assertIn(nbsp, fri)
+        self.assertIn(f'short($S$)</>{nbsp}', fri)
+        self.assertIn(nbsp, laps_pbes)
+        self.assertIn(f'{nbsp}laps|PBEs{nbsp}', laps_pbes)
+
+
 if __name__ == '__main__':
     unittest.main()
