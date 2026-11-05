@@ -8619,6 +8619,16 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
 
         _build_filter_changed_plotly_plotting_callback_fn = DataFrameFilter._build_plot_callback(earliest_delta_aligned_t_start=earliest_delta_aligned_t_start, latest_delta_aligned_t_end=latest_delta_aligned_t_end, save_plotly=save_plotly, resolution_multiplier=resolution_multiplier)
 
+        extra_controls_dict = {
+            'dropdown': [
+                dict(a_name='trained_compute_epochs', df_col_name='trained_compute_epochs', a_widget_label='TrainedComputeEpochs :', custom_initial_selection='laps'),
+                dict(a_name='decoder_identifier', df_col_name='decoder_identifier', a_widget_label='decoder_identifier:', custom_initial_selection='pseudo2D'),
+            ],
+            'selectMultiple': [
+                dict(a_name='masked_time_bin_fill_type', df_col_name='masked_time_bin_fill_type', a_widget_label='masked_time_bin_fill_type:', initial_selection_mode=InitialSelectionModeEnum.FIRST_SELECTED),
+            ],
+        }
+
         df_filter: DataFrameFilter = DataFrameFilter(
             all_sessions_ripple_df=all_sessions_ripple_df,
             all_sessions_ripple_time_bin_df=all_sessions_ripple_time_bin_df,
@@ -8631,7 +8641,10 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
             initially_is_checked={'high_wcorr': True, 'user_selected': True},
             on_filtered_dataframes_changed_callback_fns={'build_filter_changed_plotly_plotting_callback_fn': _build_filter_changed_plotly_plotting_callback_fn},
             active_plot_df_name='filtered_all_sessions_all_scores_ripple_df',
+            extra_controls_dict=extra_controls_dict,
         )
+
+        # Or build extras after init: df_filter.build_extra_dropdown_widget(...); df_filter.build_extra_selectMultiple_widget(...)
 
         # Set initial values: ________________________________________________________________________________________________ #
         df_filter.replay_name = replay_name # 'withNormalComputedReplays-frateThresh_5.0-qclu_[1, 2, 4, 6, 7, 9]'
@@ -8663,6 +8676,7 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
     initially_is_checked: Optional[Dict[str, bool]] = non_serialized_field(default=None) # {predicate_name: True/False}: True keys pre-check checkboxes AND define the grey pre-predicate baseline; unknown keys ignored
     on_filtered_dataframes_changed_callback_fns = non_serialized_field(default=Factory(dict)) # a list of callables that will be called when the filters are changed. 
     show_pre_predicate_background: bool = non_serialized_field(default=True) # when True, plot grey low-opacity pre-predicate (baseline) layer behind filtered scatter/hists
+    extra_controls_dict: Optional[Dict[str, List[Dict]]] = non_serialized_field(default=None) # {'dropdown'|'selectMultiple': [kwargs_dict, ...]} built in __attrs_post_init__ via build_extra_* widgets
     
     selected_points = non_serialized_field(default=Factory(dict))
 
@@ -8823,6 +8837,24 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
     # ==================================================================================================================== #
     # Initializers                                                                                                         #
     # ==================================================================================================================== #
+    def _apply_extra_controls_dict(self):
+        """Build dropdown/selectMultiple extras declared in `self.extra_controls_dict` via the matching `build_extra_*` methods."""
+        if not self.extra_controls_dict:
+            return
+        builders = {
+            'dropdown': self.build_extra_dropdown_widget,
+            'selectMultiple': self.build_extra_selectMultiple_widget,
+        }
+        for control_kind, kwargs_list in self.extra_controls_dict.items():
+            builder_fn = builders.get(control_kind, None)
+            if builder_fn is None:
+                raise ValueError(f'Unknown extra_controls_dict key {control_kind!r}. Expected one of {sorted(builders.keys())}.')
+            for kwargs in (kwargs_list or []):
+                builder_fn(**kwargs)
+            ## END for kwargs in (kwargs_list or [])...
+        ## END for control_kind, kwargs_list in self.extra_controls_dict.items()...
+
+
     def __attrs_post_init__(self):
         # This method runs after the generated __init__
         self._init_filtered_dataframes()
@@ -8830,6 +8862,7 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
             self.hover_posterior_data = PosteriorPlottingDatasource.from_loaded_containers(self.hover_posterior_data)
 
         self._setup_widgets()
+        self._apply_extra_controls_dict()
         # Initial filtering with default widget values
         if getattr(self, 'time_bin_size_widget', None) is not None:
             self.update_filtered_dataframes(self.replay_name_widget.value, self.time_bin_size_widget.value)
