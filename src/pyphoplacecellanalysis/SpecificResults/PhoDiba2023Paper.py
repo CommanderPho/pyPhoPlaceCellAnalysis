@@ -8673,7 +8673,7 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
     initially_is_checked: Optional[Dict[str, bool]] = non_serialized_field(default=None) # {predicate_name: True/False}: True keys pre-check checkboxes AND define the grey pre-predicate baseline; unknown keys ignored
     on_filtered_dataframes_changed_callback_fns = non_serialized_field(default=Factory(dict)) # a list of callables that will be called when the filters are changed. 
     show_pre_predicate_background: bool = non_serialized_field(default=True) # when True, plot grey low-opacity pre-predicate (baseline) layer behind filtered scatter/hists
-    _init_extra_controls_construction_dict: Optional[Dict[str, List[Dict]]] = non_serialized_field(default=None) # {'dropdown'|'selectMultiple': [kwargs_dict, ...]} built in __attrs_post_init__ via build_extra_* widgets
+    _init_extra_controls_construction_dict: Optional[Dict[str, List[Dict]]] = non_serialized_field(default=None, alias='extra_controls_dict') # init kwarg `extra_controls_dict=`; {'dropdown'|'selectMultiple': [kwargs_dict, ...]} built in __attrs_post_init__ via build_extra_* widgets
     # Init-only kwargs (alias matches post-hoc property names); applied to widgets after _setup_widgets
     _init_replay_name: Optional[str] = non_serialized_field(default=None, alias='replay_name')
     _init_time_bin_size: Optional[Union[float, int, List, Tuple]] = non_serialized_field(default=None, alias='time_bin_size')
@@ -8838,7 +8838,7 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
     # Initializers                                                                                                         #
     # ==================================================================================================================== #
     def _apply_extra_controls_dict(self):
-        """Build dropdown/selectMultiple extras declared in `self.extra_controls_dict` via the matching `build_extra_*` methods."""
+        """Build dropdown/selectMultiple extras declared via init `extra_controls_dict=` (`self._init_extra_controls_construction_dict`)."""
         if not self._init_extra_controls_construction_dict:
             return
         builders = {
@@ -8852,7 +8852,7 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
             for kwargs in (kwargs_list or []):
                 builder_fn(**kwargs)
             ## END for kwargs in (kwargs_list or [])...
-        ## END for control_kind, kwargs_list in self.extra_controls_dict.items()...
+        ## END for control_kind, kwargs_list in self._init_extra_controls_construction_dict.items()...
 
 
     def __attrs_post_init__(self):
