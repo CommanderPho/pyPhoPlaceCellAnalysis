@@ -8645,6 +8645,8 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
     _original_df_dict: Dict[str, Optional[pd.DataFrame]] = serialized_field()
     # Filtered DataFrames
     _filtered_df_dict: Dict[str, Optional[pd.DataFrame]] = serialized_field(default=Factory(dict))
+    # After replay/time_bin + initially_is_checked True predicates; before remaining enabled checkbox predicates
+    _pre_predicate_df_dict: Dict[str, Optional[pd.DataFrame]] = non_serialized_field(default=Factory(dict))
     
 
     active_plot_df_name: str = serialized_attribute_field(default='filtered_all_sessions_all_scores_ripple_df')
@@ -8657,8 +8659,9 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
     include_export_controls_and_table: bool = non_serialized_field(default=False) # when True, Copy/Save PNG includes filter-control + stats-table bands around the figure
 
     additional_filter_predicates = non_serialized_field(default=Factory(dict)) # a list of boolean predicates to be applied as filters
-    initially_is_checked: Optional[Dict[str, bool]] = non_serialized_field(default=None) # optional {predicate_name: True/False} to pre-check predicate checkboxes at init; unknown keys ignored
+    initially_is_checked: Optional[Dict[str, bool]] = non_serialized_field(default=None) # {predicate_name: True/False}: True keys pre-check checkboxes AND define the grey pre-predicate baseline; unknown keys ignored
     on_filtered_dataframes_changed_callback_fns = non_serialized_field(default=Factory(dict)) # a list of callables that will be called when the filters are changed. 
+    show_pre_predicate_background: bool = non_serialized_field(default=True) # when True, plot grey low-opacity pre-predicate (baseline) layer behind filtered scatter/hists
     
     selected_points = non_serialized_field(default=Factory(dict))
 
@@ -8671,6 +8674,7 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
     active_filter_predicate_selector_widget: CheckBoxListWidget = non_serialized_field(init=False)
     active_plot_df_name_selector_widget = non_serialized_field(init=False)
     active_plot_variable_name_widget = non_serialized_field(init=False)
+    show_pre_predicate_background_widget = non_serialized_field(init=False)
     custom_dynamic_filter_widgets_list: List = non_serialized_field(init=False, metadata={'desc': 'stores references to the widgets with knowledge of which properties to update to filter the dataframe.'})
     
     is_figure_widget_mode: bool = non_serialized_field(default=True)
@@ -8802,6 +8806,17 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
         return self.filtered_df_dict[self.active_plot_df_name]
 
 
+    @property
+    def pre_predicate_plot_df(self) -> pd.DataFrame:
+        """Active plot df after replay/time_bin + initially_is_checked True baseline predicates; before remaining enabled checkboxes."""
+        assert self.active_plot_df_name in list(self._pre_predicate_df_dict.keys()), f"self.active_plot_df_name: '{self.active_plot_df_name}' not in list(self._pre_predicate_df_dict.keys()): {list(self._pre_predicate_df_dict.keys())}"
+        return self._pre_predicate_df_dict[self.active_plot_df_name]
+
+
+    @property
+    def pre_predicate_baseline_predicate_names(self) -> Set[str]:
+        """Predicate names with True in `initially_is_checked` — always applied into the grey pre-predicate baseline."""
+        return {k for k, v in (self.initially_is_checked or {}).items() if bool(v)}
 
 
     # ==================================================================================================================== #
@@ -9060,6 +9075,16 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
             # disabled=False,
         # )
         self.active_filter_predicate_selector_widget.observe(self._on_widget_change, names='value')
+
+        self.show_pre_predicate_background_widget = widgets.Checkbox(
+            value=bool(self.show_pre_predicate_background),
+            description='Show pre-predicate background',
+            disabled=False,
+            indent=False,
+            layout=widgets.Layout(width='280px'),
+            style={'description_width': 'initial'},
+        )
+        self.show_pre_predicate_background_widget.observe(self._on_show_pre_predicate_background_change, names='value')
 
         # Use SelectMultiple widget for time_bin_size
         self.time_bin_size_widget = widgets.SelectMultiple(
@@ -9338,6 +9363,18 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
     def on_fig_layout_change(self, layout, *args):
         """Callback for when the figure's layout changes."""
         self.on_widget_update_filename()
+
+
+    def _on_show_pre_predicate_background_change(self, change):
+        """Toggle grey pre-predicate background layer; replot without re-filtering."""
+        self.show_pre_predicate_background = bool(change['new'])
+        for k, a_callback_fn in self.on_filtered_dataframes_changed_callback_fns.items():
+            try:
+                a_callback_fn(self)
+            except Exception as e:
+                print(f'WARNING: callback_fn[{k}] failed with error: {e}, skipping.')
+                raise
+        ## END for k, a_callback_fn in self.on_filtered_dataframes_changed_callback_fns.items()...
 
 
     @function_attributes(short_name=None, tags=['MAIN', 'update', 'filter'], input_requires=[], output_provides=[], uses=['_debounced_update'], used_by=[], creation_date='2025-03-27 12:20', related_items=[])
@@ -9759,7 +9796,8 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
             ),
             widgets.HBox([
                 self.active_plot_df_name_selector_widget, 
-                self.active_plot_variable_name_widget
+                self.active_plot_variable_name_widget,
+                self.show_pre_predicate_background_widget,
             ]),
         ]
 
@@ -10112,6 +10150,9 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
         for trace in traces:
             ttype = getattr(trace, 'type', None) or ''
             name = getattr(trace, 'name', None) or ''
+            legendgroup = getattr(trace, 'legendgroup', None) or ''
+            if legendgroup == '__pre_predicate_bg__' or str(name).startswith('__pre_predicate_bg__'):
+                continue
             if (ttype not in ('scatter', 'scattergl', '')) and (not str(name).startswith('trace_scatter')):
                 continue
             if ttype == 'histogram':
@@ -10197,6 +10238,17 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
             except Exception:
                 pass
 
+            ## Resolve optional grey pre-predicate series (replay/time_bin + initially_is_checked True baseline; post = active_plot_df)
+            background_data_results_df = None
+            if bool(getattr(df_filter, 'show_pre_predicate_background', True)):
+                try:
+                    bg_df = deepcopy(df_filter.pre_predicate_plot_df)
+                    if (len(bg_df) != n_filtered) or (not bg_df.index.equals(active_plot_df.index)):
+                        background_data_results_df = bg_df
+                except Exception:
+                    background_data_results_df = None
+            ## END if bool(getattr(df_filter, 'show_pre_predicate_background', True))...
+
             ## Empty-filter display mode: show a centered label instead of attempting a broken scatter redraw
             if df_filter.is_figure_widget_mode and (n_filtered == 0):
                 original_name: str = active_plot_df_name.removeprefix('filtered_')
@@ -10207,6 +10259,17 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
                 fig.layout.shapes = []
                 fig.data = []
                 PlotlyFigureContainer.update_subplot_title(fig, row=1, col=2, new_title=active_main_title)
+                if (background_data_results_df is not None) and (len(background_data_results_df) > 0) and (plot_variable_name in background_data_results_df.columns):
+                    # Still show grey pre-predicate series when checkbox predicates exclude all post-predicate rows
+                    empty_fg_kwargs = dict(extra_plot_kwargs) | dict(kwargs)
+                    empty_fg_kwargs.pop('background_data_results_df', None)
+                    empty_fg_kwargs.pop('should_save', None)
+                    fig, new_fig_context, _extras_output_dict, figure_out_paths = _new_perform_plot_pre_post_delta_scatter_with_embedded_context(
+                        concatenated_ripple_df=deepcopy(background_data_results_df).iloc[0:0],  # empty foreground
+                        is_dark_mode=False, should_save=False, extant_figure=fig,
+                        variable_name=plot_variable_name, main_title=active_main_title,
+                        background_data_results_df=background_data_results_df, **empty_fg_kwargs,
+                    )
                 fig.add_annotation(
                     text=f"<Filter excludes all {n_total}>",
                     xref="x2", yref="y2", x=0.5, y=0.5,
@@ -10230,6 +10293,8 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
                 # active_plot_kwargs = extra_plot_kwargs | {'legend_groups_to_hide': legend_groups_to_hide}
                 # active_plot_kwargs = active_plot_kwargs | kwargs
                 active_plot_kwargs = (extra_plot_kwargs | {'legend_groups_to_hide': legend_groups_to_hide, 'main_title': active_main_title} | kwargs)
+                if background_data_results_df is not None:
+                    active_plot_kwargs['background_data_results_df'] = background_data_results_df
                 plot_df: pd.DataFrame = deepcopy(active_plot_df)
                 enable_hover_posterior: bool = df_filter.hover_posterior_data is not None
                 if enable_hover_posterior:
@@ -10289,6 +10354,10 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
 
                     scatter_traces = list(fig.select_traces(selector=None, row=1, col=2))
                     for trace in scatter_traces:
+                        legendgroup = getattr(trace, 'legendgroup', None) or ''
+                        name = getattr(trace, 'name', None) or ''
+                        if legendgroup == '__pre_predicate_bg__' or str(name).startswith('__pre_predicate_bg__'):
+                            continue
                         trace.on_click(on_click)
                         trace.on_selection(df_filter.on_update_selected_scatter_points)
                     ## END for trace in scatter_traces....
@@ -10321,6 +10390,11 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
             filtered_df = deepcopy(df[df['is_filter_included']])
             # setattr(self, filtered_name, filtered_df) # instance-attributes method
             self._filtered_df_dict[filtered_name] = filtered_df # instance-dict method
+            # Until first filter update, pre-predicate == unfiltered copy
+            pre_predicate_df = deepcopy(filtered_df)
+            if 'data_context' in df.attrs:
+                pre_predicate_df.attrs['data_context'] = deepcopy(df.attrs['data_context'])
+            self._pre_predicate_df_dict[filtered_name] = pre_predicate_df
 
 
     def _build_single_predicates_row_changed_df(self, a_dict) -> pd.DataFrame:
@@ -10486,51 +10560,71 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
                     # self.step_by_step_predicate_filtered_row_counts_dict[filtered_name].update({'replay_name_AND_time_bin_size': len(df[df['is_filter_included']])})
                     # self.step_by_step_predicate_filtered_row_counts_dict[filtered_name].update({f"CUM_replay_name_AND_time_bin_size": len(df[df['is_filter_included']])}) ## CUM (cummulative)
 
-                    ## Apply predicates
-                    active_predicate_filter_name_modifier = []
+                    ## Grey baseline = replay/time_bin + True keys in initially_is_checked; colored series follows live checkboxes from the same post-replay/tbin mask
+                    baseline_predicate_names: Set[str] = self.pre_predicate_baseline_predicate_names
+                    active_grey_series_predicate_names: Set[str] = baseline_predicate_names.intersection(set(enabled_filter_predicate_list)) ## has to be both true now AND in the initial predicate list
+                    included_after_replay_tbin = df['is_filter_included'].to_numpy(copy=True)
+                    active_predicate_filter_name_modifiers = []
 
+                    def _subfn_apply_enabled_predicate(a_predicate_name: str, a_predicate_fn, *, record_counts: bool = True) -> None:
+                        """Apply one predicate onto df['is_filter_included']
+    
+                        CAPTURES: df, name, filtered_name, counts, debug_print, active_predicate_filter_name_modifiers, did_applying_predicate_fail_for_df_dict
+                        MODIFIES: df, counts, active_predicate_filter_name_modifiers, did_applying_predicate_fail_for_df_dict
+                        """
+                        did_predicate_fail: bool = False # whether an error was encountered when trying to evaluate this predicate for this df
+                        try:
+                            is_predicate_true = a_predicate_fn(df)
+                            did_predicate_fail = False
+                        except KeyError as e:
+                            if debug_print:
+                                print(f'NOTE: failed to apply predicate "{a_predicate_name}" to df: {name}')
+                            is_predicate_true = False
+                            did_predicate_fail = True
+                        except Exception as e:
+                            did_predicate_fail = True
+                            raise
+                        if did_predicate_fail:
+                            did_applying_predicate_fail_for_df_dict[filtered_name] = (did_applying_predicate_fail_for_df_dict[filtered_name] or did_predicate_fail)
+
+                        ## Updates the df['is_filter_included'] column based on the predicate
+
+                        df['is_filter_included'] = np.logical_and(df['is_filter_included'], is_predicate_true)
+                        if record_counts and (not did_predicate_fail):
+                            active_predicate_filter_name_modifiers.append(a_predicate_name)
+                            counts[a_predicate_name] = int(np.sum(is_predicate_true)) ## just predicate alone
+                            counts[f"CUM_{a_predicate_name}"] = int(df['is_filter_included'].sum()) ## CUM (cummulative)
+                    ## END def _subfn_apply_enabled_predicate...
+
+
+                    # Grey path: always apply initially_is_checked True baseline (do not pollute step-by-step counts for live checkboxes)
+                    for a_predicate_name, a_predicate_fn in self.additional_filter_predicates.items():
+                        if a_predicate_name in active_grey_series_predicate_names:
+                            _subfn_apply_enabled_predicate(a_predicate_name, a_predicate_fn, record_counts=False)
+                    ## END for a_predicate_name, a_predicate_fn in self.additional_filter_predicates.items()...
+
+                    pre_predicate_df = deepcopy(df[df['is_filter_included']])
+                    if 'data_context' in df.attrs:
+                        pre_predicate_df.attrs['data_context'] = deepcopy(df.attrs['data_context'])
+                    self._pre_predicate_df_dict[filtered_name] = pre_predicate_df
+
+                    # Colored path: reset to post-replay/tbin, then apply currently-enabled checkbox predicates (includes baseline if still checked)
+                    df['is_filter_included'] = included_after_replay_tbin ## reset, undoing the filter  above!?!
                     for a_predicate_name, a_predicate_fn in self.additional_filter_predicates.items():
                         if a_predicate_name in enabled_filter_predicate_list:
-                            did_predicate_fail: bool = False # whether an error was encountered when trying to evaluate this predicate for this df
-                            try:
-                                is_predicate_true = a_predicate_fn(df)
-                                did_predicate_fail = False
-                            except KeyError as e:
-                                if debug_print:
-                                    print(f'NOTE: failed to apply predicate "{a_predicate_name}" to df: {name}')                            
-                                is_predicate_true = False
-                                did_predicate_fail = True
-                            except Exception as e:
-                                did_predicate_fail = True
-                                raise
-                            if did_predicate_fail:
-                                did_applying_predicate_fail_for_df_dict[filtered_name] = (did_applying_predicate_fail_for_df_dict[filtered_name] or did_predicate_fail)
-
-                            df['is_filter_included'] = np.logical_and(df['is_filter_included'], is_predicate_true)
-                            if not did_predicate_fail:
-                                active_predicate_filter_name_modifier.append(a_predicate_name)
-
-                                # step_by_step_predicate_filtered_row_counts_dict[filtered_name].update({a_predicate_name: len(df[df['is_filter_included']])})
-                                counts[a_predicate_name] = int(np.sum(is_predicate_true)) ## just predicate alone
-                                counts[f"CUM_{a_predicate_name}"] = int(df['is_filter_included'].sum()) ## CUM (cummulative)
-
-
-                                # {a_filtered_df_name:{k:v for k, v in a_dict.items() if k.starts_with('CUM_')} for a_filtered_df_name, a_dict in self.step_by_step_predicate_filtered_row_counts_dict.items()}
-
-
+                            _subfn_apply_enabled_predicate(a_predicate_name, a_predicate_fn, record_counts=True)
                     ## END for a_predicate_name, a_predicate_fn in self.additional_filter_predicates.items()...
 
                     filtered_df = deepcopy(df[df['is_filter_included']])
                     counts['META_post_filters'] = len(filtered_df)
                     ## Individual predicates have no suffix, while cummulative (sequentially applied) predicate filters have a "CUM_" prefix, while overall/high-level total filters have a "META_" prefix.
 
-
                     ## update df metadata to indicate that it is filtered
                     df_context_dict = filtered_df.attrs['data_context'].to_dict() #  ## benedict dict
                     df_context_dict.pop('filter', None) ## remove old filter
-                    if len(active_predicate_filter_name_modifier) > 0:
-                        active_predicate_filter_name_modifier = '_'.join(active_predicate_filter_name_modifier) ## build string
-                        df_context_dict['filter'] = active_predicate_filter_name_modifier
+                    if len(active_predicate_filter_name_modifiers) > 0:
+                        active_predicate_filter_name_modifiers = '_'.join(active_predicate_filter_name_modifiers) ## build string
+                        df_context_dict['filter'] = active_predicate_filter_name_modifiers
                     filtered_df.attrs['data_context'] = IdentifyingContext.init_from_dict(df_context_dict) ## update
                     filtered_df.attrs['did_filter_predicate_fail'] = did_applying_predicate_fail_for_df_dict[filtered_name]
                     # setattr(self, filtered_name, filtered_df) # instance-attributes method

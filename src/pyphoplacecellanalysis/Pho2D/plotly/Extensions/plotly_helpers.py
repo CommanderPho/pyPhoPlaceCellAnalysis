@@ -722,6 +722,7 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
     `position_hist_bars_inside_data_range`: bool = False -- If True, the entirety of the histogram's outermost bars have their outer edges aligned with 0.0 and 1.0 respectively, meaning no portion of this goes outside the (0.0, 1.0) range. Otherwise they are centered.
         ## NOTE: this option does NOT affect the counts at all, only the display/formatting of the bars.
     `epoch_label_mode`: str = 'none' -- no Long/Short text (default); 'annotation_above' draws readable labels above the scatter; 'vrect' keeps tiny inset labels.
+    `background_data_results_df`: optional pre-predicate series drawn first as a grey low-opacity scatter+hists; `data_results_df` is the post-predicate foreground series.
 
     Usage:
 
@@ -746,6 +747,10 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
     use_latex_labels: bool = False
     debug_print = kwargs.get('debug_print', False)
     epoch_text_labels_kwargs = kwargs.pop('epoch_text_labels_kwargs', None)
+    background_data_results_df = kwargs.pop('background_data_results_df', None)
+    background_scatter_opacity: float = float(kwargs.pop('background_scatter_opacity', 0.2))
+    background_hist_opacity: float = float(kwargs.pop('background_hist_opacity', 0.25))
+    _PRE_PREDICATE_BG_LEGENDGROUP: str = '__pre_predicate_bg__'
     
     if use_latex_labels:
         pre_delta_label: str = r'"$\\text{Pre-}\Delta$"'
@@ -942,11 +947,11 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
     # Shared hist count magnitude: horizontal hist (y=variable) puts # Events (or density) on x — share that x-range only.
     # Does not touch figure y-limits (those stay at the existing update_yaxes(... [-0.05, 1.05] ...) below).
     hist_count_max: Optional[float] = None
+    _histnorm = hist_kwargs.get('histnorm', None) or common_plot_kwargs.get('histnorm', None)
     if should_set_hist_same_magnitude_axes:
         _hist_range_y = hist_kwargs.get('range_y', forced_range_y) or [0.0, 1.0]
         _hist_nbins: int = int(hist_kwargs.get('nbins', histogram_bins))
         _hist_count_bin_edges = np.linspace(float(_hist_range_y[0]), float(_hist_range_y[1]), _hist_nbins + 1)
-        _histnorm = hist_kwargs.get('histnorm', None) or common_plot_kwargs.get('histnorm', None)
 
         def _subfn_horizontal_hist_count_max(a_trace) -> float:
             """Max bar magnitude for a horizontal Histogram trace.
@@ -966,83 +971,171 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
                 return 0.0
             counts, _ = np.histogram(y_vals, bins=_hist_count_bin_edges)
             return float(np.max(counts)) if counts.size > 0 else 0.0
-
-
-    # Pre-Delta Histogram
-    # trace_name_prefix:str = 'trace_pre_delta_hist'
-    trace_name_prefix:str = ''
-    _tmp_pre_delta_fig = px.histogram(pre_delta_df, y=histogram_variable_name, **(common_plot_kwargs | hist_kwargs), title=pre_delta_label)
-    for a_trace in _tmp_pre_delta_fig.data:
-        # a_trace.ybins.start = 0.05
-        # a_trace.ybins.end = 0.95
-        # a_trace.ybins.size = 0.1
-        if position_hist_bars_inside_data_range:
-            a_trace.ybins.start = 0.0
-            a_trace.ybins.end = 1.0
-            a_trace.ybins.size = 1.0/float(histogram_bins) # 0.09090909090909091
-        
-        a_full_trace_name: str = '_'.join([v for v in [trace_name_prefix, a_trace.name] if (len(v)>0)]) ## build new trace name
-        
-        PlotlyFigureContainer.add_trace_with_legend_handling(
-            fig=fig, trace=a_trace, row=1, col=1, already_added_legend_entries=already_added_legend_entries, trace_name_prefix=trace_name_prefix
-        )
-
-        if should_set_hist_same_magnitude_axes:
-            a_count_max: float = _subfn_horizontal_hist_count_max(a_trace)
-            if (hist_count_max is None) or (a_count_max > hist_count_max):
-                hist_count_max = a_count_max
-
-
-    # Scatter Plot
-    trace_name_prefix:str = 'trace_scatter'
-    if out_scatter_fig is not None:
-        _tmp_scatter_fig = out_scatter_fig
-        for a_trace in _tmp_scatter_fig.data:
-            a_trace.marker.line.width = 0 
-            a_trace.marker.opacity = 0.5
-            a_full_trace_name: str = '_'.join([v for v in [trace_name_prefix, a_trace.name] if (len(v)>0)]) ## build new trace name
-            PlotlyFigureContainer.add_trace_with_legend_handling(
-                fig=fig, trace=a_trace, row=1, col=2, already_added_legend_entries=already_added_legend_entries, trace_name_prefix=trace_name_prefix
-            )
     else:
-        assert px_scatter_kwargs is not None
-        _tmp_scatter_fig = px.scatter(data_results_df, **(common_plot_kwargs | px_scatter_kwargs))
-        for i, a_trace in enumerate(_tmp_scatter_fig.data):
-            a_trace.marker.line.width = 0 
-            a_trace.marker.opacity = 0.5
-            a_full_trace_name: str = '_'.join([v for v in [trace_name_prefix, a_trace.name] if (len(v)>0)]) ## build new trace name
-            PlotlyFigureContainer.add_trace_with_legend_handling(
-                fig=fig, trace=a_trace, row=1, col=2, already_added_legend_entries=already_added_legend_entries, trace_name_prefix=trace_name_prefix
-            )
+        def _subfn_horizontal_hist_count_max(a_trace) -> float:
+            return 0.0
 
-    # Post-Delta Histogram
-    trace_name_prefix:str = 'trace_post_delta_hist'
-    _tmp_post_delta_fig = px.histogram(post_delta_df, y=histogram_variable_name, **(common_plot_kwargs | hist_kwargs), title=post_delta_label)
-    
-    for a_trace in _tmp_post_delta_fig.data:
-        # a_trace.ybins.start = 0.05
-        # a_trace.ybins.end = 0.95
-        # a_trace.ybins.size = 0.1
-        ## #TODO 2025-07-03 21:42: - [X] plotly histogram for data strictly between 0.0-1.0 has its outermost bins from -[0.5-0.5], ... [0.95, 1.05]. How can I fix this? 
+
+    def _subfn_update_hist_count_max(a_trace) -> None:
+        nonlocal hist_count_max
+        if not should_set_hist_same_magnitude_axes:
+            return
+        a_count_max: float = _subfn_horizontal_hist_count_max(a_trace)
+        if (hist_count_max is None) or (a_count_max > hist_count_max):
+            hist_count_max = a_count_max
+
+
+    def _subfn_update_hist_count_max_from_df(hist_df: pd.DataFrame) -> None:
+        """Use row values (not trace state) so shared x-ranges stay correct with bg+fg histogram layers."""
+        nonlocal hist_count_max
+        if (not should_set_hist_same_magnitude_axes) or _histnorm or (len(hist_df) == 0):
+            return
+        y_vals = pd.to_numeric(hist_df[histogram_variable_name], errors='coerce').to_numpy(dtype=float)
+        y_vals = y_vals[np.isfinite(y_vals)]
+        if y_vals.size == 0:
+            return
+        counts, _ = np.histogram(y_vals, bins=_hist_count_bin_edges)
+        if counts.size == 0:
+            return
+        a_count_max: float = float(np.max(counts))
+        if (hist_count_max is None) or (a_count_max > hist_count_max):
+            hist_count_max = a_count_max
+
+
+    def _subfn_px_histogram_kwargs(layer_common_plot_kwargs: Dict, layer_hist_kwargs: Dict) -> Dict:
+        """`barmode` is layout-only; drop it before px.histogram."""
+        merged_px_hist_kwargs = dict(layer_common_plot_kwargs) | dict(layer_hist_kwargs)
+        merged_px_hist_kwargs.pop('barmode', None)
+        return merged_px_hist_kwargs
+
+
+    def _subfn_add_pre_scatter_post_layers(layer_df: pd.DataFrame, *, layer_common_plot_kwargs: Dict, layer_hist_kwargs: Dict, layer_px_scatter_kwargs: Optional[Dict],
+                                           scatter_opacity: float, is_background: bool = False, layer_out_scatter_fig=None) -> None:
+        """Add pre-Δ hist, scatter, and post-Δ hist for one data layer. Background traces are greyed, no legend/hover."""
+        layer_df = layer_df.copy()
+        if len(layer_df) == 0:
+            return
+        layer_pre_delta_df = layer_df[layer_df['delta_aligned_start_t'] <= 0]
+        layer_post_delta_df = layer_df[layer_df['delta_aligned_start_t'] > 0]
+
+        def _subfn_finalize_layer_trace(a_trace, *, hist_opacity: Optional[float] = None, hist_panel: Optional[str] = None):
+            trace_type: str = getattr(a_trace, 'type', None) or ''
+            if (hist_panel is not None) and (trace_type == 'histogram'):
+                # Plotly defaults all marginal hists to bingroup='y', which merges pre/post panels when bg+fg layers are both present.
+                if is_background:
+                    a_trace.bingroup = f'{_PRE_PREDICATE_BG_LEGENDGROUP}_{hist_panel}'
+                else:
+                    a_trace.bingroup = f'__fg_hist__{hist_panel}'
+            if is_background:
+                a_trace.showlegend = False
+                a_trace.legendgroup = _PRE_PREDICATE_BG_LEGENDGROUP
+                a_trace.hoverinfo = 'skip'
+                if hist_opacity is not None:
+                    a_trace.opacity = hist_opacity
+                if trace_type == 'histogram':
+                    a_trace.marker.color = 'rgb(160,160,160)'
+                    a_trace.marker.line = dict(width=0)
+            ## END if is_background...
+
+
+        # Pre-Delta Histogram
+        trace_name_prefix: str = f'{_PRE_PREDICATE_BG_LEGENDGROUP}_pre_hist' if is_background else ''
+        _subfn_update_hist_count_max_from_df(layer_pre_delta_df)
+        _tmp_pre_delta_fig = px.histogram(layer_pre_delta_df, y=histogram_variable_name, **_subfn_px_histogram_kwargs(layer_common_plot_kwargs, layer_hist_kwargs), title=pre_delta_label)
+        for a_trace in _tmp_pre_delta_fig.data:
+            if position_hist_bars_inside_data_range:
+                a_trace.ybins.start = 0.0
+                a_trace.ybins.end = 1.0
+                a_trace.ybins.size = 1.0 / float(histogram_bins)
+            _subfn_finalize_layer_trace(a_trace, hist_opacity=background_hist_opacity if is_background else None, hist_panel='pre')
+            if is_background:
+                a_trace.name = trace_name_prefix
+                fig.add_trace(a_trace, row=1, col=1)
+            else:
+                PlotlyFigureContainer.add_trace_with_legend_handling(fig=fig, trace=a_trace, row=1, col=1, already_added_legend_entries=already_added_legend_entries, trace_name_prefix=trace_name_prefix)
+            _subfn_update_hist_count_max(a_trace)
+        ## END for a_trace in _tmp_pre_delta_fig.data...
+
+        # Scatter Plot
+        trace_name_prefix = f'{_PRE_PREDICATE_BG_LEGENDGROUP}_scatter' if is_background else 'trace_scatter'
+        if (not is_background) and (layer_out_scatter_fig is not None):
+            _tmp_scatter_fig = layer_out_scatter_fig
+        else:
+            assert layer_px_scatter_kwargs is not None
+            _tmp_scatter_fig = px.scatter(layer_df, **(layer_common_plot_kwargs | layer_px_scatter_kwargs))
+        for a_trace in _tmp_scatter_fig.data:
+            a_trace.marker.line.width = 0
+            a_trace.marker.opacity = scatter_opacity
+            _subfn_finalize_layer_trace(a_trace)
+            if is_background:
+                a_trace.name = trace_name_prefix
+                fig.add_trace(a_trace, row=1, col=2)
+            else:
+                PlotlyFigureContainer.add_trace_with_legend_handling(fig=fig, trace=a_trace, row=1, col=2, already_added_legend_entries=already_added_legend_entries, trace_name_prefix=trace_name_prefix)
+        ## END for a_trace in _tmp_scatter_fig.data...
+
+        # Post-Delta Histogram
+        #TODO 2025-07-03 21:42: - [X] plotly histogram for data strictly between 0.0-1.0 has its outermost bins from -[0.5-0.5], ... [0.95, 1.05]. How can I fix this?
         #TODO 2026-09-24 10:55: - [X] Does this affect the actual counts or just the display of the bars? There's fixed 11 bins in the hist, and the data can only possibly take on values from (0.0, 1.0) so the ranges
             # ((-0.5, 0.0) and (1.0, 1.05) are guaranteed to have no points in them. Does the above binning artificially reduce the counts in these extrema bins by only allowing for half the possible points?
                 ### CONCLUSION: No, this doesn't affect the actual counts, that comes from above.
-        if position_hist_bars_inside_data_range:
-            a_trace.ybins.start = 0.0
-            a_trace.ybins.end = 1.0
-            a_trace.ybins.size = 1.0/float(histogram_bins) # 0.09090909090909091
-            # print(f'a_trace.ybins: {a_trace.ybins}') # 0.09090909090909091
+        trace_name_prefix = f'{_PRE_PREDICATE_BG_LEGENDGROUP}_post_hist' if is_background else 'trace_post_delta_hist'
+        _subfn_update_hist_count_max_from_df(layer_post_delta_df)
+        _tmp_post_delta_fig = px.histogram(layer_post_delta_df, y=histogram_variable_name, **_subfn_px_histogram_kwargs(layer_common_plot_kwargs, layer_hist_kwargs), title=post_delta_label)
+        for a_trace in _tmp_post_delta_fig.data:
+            if position_hist_bars_inside_data_range:
+                a_trace.ybins.start = 0.0
+                a_trace.ybins.end = 1.0
+                a_trace.ybins.size = 1.0 / float(histogram_bins)
+            _subfn_finalize_layer_trace(a_trace, hist_opacity=background_hist_opacity if is_background else None, hist_panel='post')
+            if is_background:
+                a_trace.name = trace_name_prefix
+                fig.add_trace(a_trace, row=1, col=3)
+            else:
+                PlotlyFigureContainer.add_trace_with_legend_handling(fig=fig, trace=a_trace, row=1, col=3, already_added_legend_entries=already_added_legend_entries, trace_name_prefix=trace_name_prefix)
+            _subfn_update_hist_count_max(a_trace)
+        ## END for a_trace in _tmp_post_delta_fig.data...
+    ## END def _subfn_add_pre_scatter_post_layers...
 
-        a_full_trace_name: str = '_'.join([v for v in [trace_name_prefix, a_trace.name] if (len(v)>0)]) ## build new trace name
-        PlotlyFigureContainer.add_trace_with_legend_handling(
-            fig=fig, trace=a_trace, row=1, col=3, already_added_legend_entries=already_added_legend_entries, trace_name_prefix=trace_name_prefix
-        )
 
-        if should_set_hist_same_magnitude_axes:
-            a_count_max: float = _subfn_horizontal_hist_count_max(a_trace)
-            if (hist_count_max is None) or (a_count_max > hist_count_max):
-                hist_count_max = a_count_max
+    # Optional grey low-opacity pre-predicate series drawn first; foreground is post-predicate
+    should_draw_background: bool = False
+    if background_data_results_df is not None:
+        background_data_results_df = background_data_results_df.copy()
+        fg_index = data_results_df.index
+        bg_index = background_data_results_df.index
+        should_draw_background = (len(background_data_results_df) != len(data_results_df)) or (not fg_index.equals(bg_index))
+    ## END if background_data_results_df is not None...
 
+    if should_draw_background:
+        bg_df = background_data_results_df
+        bg_df['_pre_predicate_layer'] = 'background'
+        # Ensure required size column exists when foreground scatter used it
+        if ('size' in (px_scatter_kwargs or {})) and ((px_scatter_kwargs or {}).get('size') not in bg_df.columns):
+            size_col = px_scatter_kwargs['size']
+            if size_col in data_results_df.columns:
+                bg_df[size_col] = data_results_df[size_col].iloc[0] if len(data_results_df) > 0 else 1.0
+            else:
+                bg_df[size_col] = 1.0
+        bg_common_plot_kwargs = dict(color='_pre_predicate_layer', color_discrete_sequence=['rgb(160,160,160)'], category_orders={'_pre_predicate_layer': ['background']})
+        bg_hist_kwargs = dict(hist_kwargs) | dict(opacity=background_hist_opacity, color='_pre_predicate_layer', color_discrete_sequence=['rgb(160,160,160)'])
+        bg_px_scatter_kwargs = dict(px_scatter_kwargs or {})
+        # Drop foreground color/hover mappings so background stays single grey non-interactive series
+        for _drop_key in ('color', 'color_discrete_sequence', 'color_discrete_map', 'category_orders', 'custom_data', 'hover_data', 'hover_name'):
+            bg_px_scatter_kwargs.pop(_drop_key, None)
+        bg_px_scatter_kwargs = bg_px_scatter_kwargs | dict(color='_pre_predicate_layer', color_discrete_sequence=['rgb(160,160,160)'], category_orders={'_pre_predicate_layer': ['background']})
+        # Ensure required x/y present
+        if 'x' not in bg_px_scatter_kwargs:
+            bg_px_scatter_kwargs['x'] = 'delta_aligned_start_t'
+        if 'y' not in bg_px_scatter_kwargs:
+            bg_px_scatter_kwargs['y'] = histogram_variable_name
+        _subfn_add_pre_scatter_post_layers(bg_df, layer_common_plot_kwargs=bg_common_plot_kwargs, layer_hist_kwargs=bg_hist_kwargs, layer_px_scatter_kwargs=bg_px_scatter_kwargs,
+                                           scatter_opacity=background_scatter_opacity, is_background=True, layer_out_scatter_fig=None)
+    ## END if should_draw_background...
+
+    # Foreground (filtered) layer
+    _subfn_add_pre_scatter_post_layers(data_results_df, layer_common_plot_kwargs=common_plot_kwargs, layer_hist_kwargs=hist_kwargs, layer_px_scatter_kwargs=px_scatter_kwargs,
+                                       scatter_opacity=0.5, is_background=False, layer_out_scatter_fig=out_scatter_fig)
 
     # Update layouts and axes
     if forced_range_y is not None:
