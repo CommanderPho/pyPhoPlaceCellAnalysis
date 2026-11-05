@@ -8642,16 +8642,13 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
             on_filtered_dataframes_changed_callback_fns={'build_filter_changed_plotly_plotting_callback_fn': _build_filter_changed_plotly_plotting_callback_fn},
             active_plot_df_name='filtered_all_sessions_all_scores_ripple_df',
             extra_controls_dict=extra_controls_dict,
+            replay_name=replay_name,  # applied onto widgets in __attrs_post_init__
+            time_bin_size=time_bin_size,
         )
 
         # Or build extras after init: df_filter.build_extra_dropdown_widget(...); df_filter.build_extra_selectMultiple_widget(...)
+        # Or set selections post-hoc: df_filter.replay_name = ...; df_filter.time_bin_size = ...; df_filter.update_filters()
 
-        # Set initial values: ________________________________________________________________________________________________ #
-        df_filter.replay_name = replay_name # 'withNormalComputedReplays-frateThresh_5.0-qclu_[1, 2, 4, 6, 7, 9]'
-        # df_filter.time_bin_size = (time_bin_size, )
-        df_filter.time_bin_size = time_bin_size
-        # df_filter.time_bin_size = (0.025, 0.058)
-        df_filter.update_filters()
         df_filter.display()
 
     """
@@ -8676,7 +8673,10 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
     initially_is_checked: Optional[Dict[str, bool]] = non_serialized_field(default=None) # {predicate_name: True/False}: True keys pre-check checkboxes AND define the grey pre-predicate baseline; unknown keys ignored
     on_filtered_dataframes_changed_callback_fns = non_serialized_field(default=Factory(dict)) # a list of callables that will be called when the filters are changed. 
     show_pre_predicate_background: bool = non_serialized_field(default=True) # when True, plot grey low-opacity pre-predicate (baseline) layer behind filtered scatter/hists
-    extra_controls_dict: Optional[Dict[str, List[Dict]]] = non_serialized_field(default=None) # {'dropdown'|'selectMultiple': [kwargs_dict, ...]} built in __attrs_post_init__ via build_extra_* widgets
+    _init_extra_controls_construction_dict: Optional[Dict[str, List[Dict]]] = non_serialized_field(default=None) # {'dropdown'|'selectMultiple': [kwargs_dict, ...]} built in __attrs_post_init__ via build_extra_* widgets
+    # Init-only kwargs (alias matches post-hoc property names); applied to widgets after _setup_widgets
+    _init_replay_name: Optional[str] = non_serialized_field(default=None, alias='replay_name')
+    _init_time_bin_size: Optional[Union[float, int, List, Tuple]] = non_serialized_field(default=None, alias='time_bin_size')
     
     selected_points = non_serialized_field(default=Factory(dict))
 
@@ -8839,13 +8839,13 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
     # ==================================================================================================================== #
     def _apply_extra_controls_dict(self):
         """Build dropdown/selectMultiple extras declared in `self.extra_controls_dict` via the matching `build_extra_*` methods."""
-        if not self.extra_controls_dict:
+        if not self._init_extra_controls_construction_dict:
             return
         builders = {
             'dropdown': self.build_extra_dropdown_widget,
             'selectMultiple': self.build_extra_selectMultiple_widget,
         }
-        for control_kind, kwargs_list in self.extra_controls_dict.items():
+        for control_kind, kwargs_list in self._init_extra_controls_construction_dict.items():
             builder_fn = builders.get(control_kind, None)
             if builder_fn is None:
                 raise ValueError(f'Unknown extra_controls_dict key {control_kind!r}. Expected one of {sorted(builders.keys())}.')
@@ -8863,20 +8863,25 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
 
         self._setup_widgets()
         self._apply_extra_controls_dict()
-        # Initial filtering with default widget values
+
+        # Button widgets before first filter update / debounce (on_widget_update_filename needs filename_label)
+        if self.is_figure_widget_mode:
+            self._setup_widgets_buttons()
+
+        ## Apply init kwargs (replay_name= / time_bin_size=) onto widgets before first filter update
+        if self._init_replay_name is not None:
+            self.replay_name = self._init_replay_name
+        if self._init_time_bin_size is not None:
+            self.time_bin_size = self._init_time_bin_size
+        else:
+            ## default: first time_bin_size option
+            self.set_initial_selection(a_widget=self.time_bin_size_widget, initial_selection_mode=InitialSelectionModeEnum.FIRST_SELECTED)
+
+        # Initial filtering with default / init-kwarg widget values
         if getattr(self, 'time_bin_size_widget', None) is not None:
             self.update_filtered_dataframes(self.replay_name_widget.value, self.time_bin_size_widget.value)
         # else:
         #     self.update_filtered_dataframes(self.replay_name_widget.value)
-
-        # Button Widget Initialize ___________________________________________________________________________________________ #
-        # Set up the buttons after figure_widget is created
-        if self.is_figure_widget_mode:
-            self._setup_widgets_buttons()
-
-
-        ## set time_bin_size selections to the first value by default
-        initial_selection = self.set_initial_selection(a_widget=self.time_bin_size_widget, initial_selection_mode=InitialSelectionModeEnum.FIRST_SELECTED)
 
 
     
@@ -9389,7 +9394,8 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
                     stem = f"{date_prefix}{stem}"
 
             self.filename = f"{stem}.png"
-            self.filename_label.value = stem
+            if self.filename_label is not None:
+                self.filename_label.value = stem
 
             ## Sync the live Solara download widget filename trait
             if self.button_download is not None:
