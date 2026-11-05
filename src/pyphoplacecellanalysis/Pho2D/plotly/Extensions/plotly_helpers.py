@@ -748,8 +748,8 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
     debug_print = kwargs.get('debug_print', False)
     epoch_text_labels_kwargs = kwargs.pop('epoch_text_labels_kwargs', None)
     background_data_results_df = kwargs.pop('background_data_results_df', None)
-    background_scatter_opacity: float = float(kwargs.pop('background_scatter_opacity', 0.2))
-    background_hist_opacity: float = float(kwargs.pop('background_hist_opacity', 0.25))
+    background_scatter_opacity: float = float(kwargs.pop('background_scatter_opacity', 0.5))
+    background_hist_opacity: float = float(kwargs.pop('background_hist_opacity', 0.6))
     _PRE_PREDICATE_BG_LEGENDGROUP: str = '__pre_predicate_bg__'
     
     if use_latex_labels:
