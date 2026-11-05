@@ -3430,6 +3430,7 @@ class FigureS8:
             SVGHelpers.set_physical_size_inches(svg_save_path, width_in=cls.PUB_FIG_SIZE_INCHES['width'], height_in=cls.PUB_FIG_SIZE_INCHES['height'])
         if should_export_svg:
             _out_paths[f'{export_suffix}/svg'] = svg_save_path
+            print(f'\tsaved svg: "{svg_save_path.as_posix()}"')
 
         if should_export_pdf:
             pdf_save_path = figures_parent_folder.joinpath(f'{basename}.pdf')
@@ -3808,7 +3809,7 @@ class FigureS8:
     @function_attributes(short_name=None, tags=['main', 'figure', 'output'], input_requires=[], output_provides=[], uses=['cls._perform_plot_iteratively_constrained'], used_by=[], creation_date='2026-10-28 07:44', related_items=[])
     @classmethod
     def main(cls, df_filter, plotly_helpers: PlotlyHelpers, additional_filter_predicates: Dict, figures_parent_folder: Path, active_filter_constraints: Optional[Dict]=None, should_concatenate_figures: bool=False, enable_heuristic_filtered_outputs: bool = False, split_by_column: Optional[str] = None,
-            should_compute_stats: bool = True, enable_add_stats_to_figures: bool = False, debug_print: bool = True, store_debug_values: bool = False,
+            should_compute_stats: bool = True, enable_add_stats_to_figures: bool = False, debug_print: bool = False, store_debug_values: bool = False,
             color_by_time_bin_size: bool = False, enabled_granularities: Optional[Sequence[str]] = None, legend_groups_to_hide: Optional[List] = None, show_scatter_legend: Optional[bool] = None,
         ):
         """ Performs the main plotting and adds optional stats
@@ -4149,7 +4150,7 @@ class FigureS8:
         if figures_config_dict is None:
             figures_config_dict = {
                 'Figure 4': {
-                    'figures_parent_folder': figures_root.joinpath(f'Figure 4 - P_Short Scatter over Time/{figures_date}').resolve(),
+                    'figures_parent_folder': figures_root.joinpath(f'Figure 4 - P_Short Scatter over Time/Inputs/{figures_date}').resolve(),
                     'enable_heuristic_filtered_outputs': False,
                     'enable_add_stats_to_figures': False,
                 },

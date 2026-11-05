@@ -748,8 +748,10 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
     debug_print = kwargs.get('debug_print', False)
     epoch_text_labels_kwargs = kwargs.pop('epoch_text_labels_kwargs', None)
     background_data_results_df = kwargs.pop('background_data_results_df', None)
-    background_scatter_opacity: float = float(kwargs.pop('background_scatter_opacity', 0.5))
-    background_hist_opacity: float = float(kwargs.pop('background_hist_opacity', 0.6))
+    # Match prior heuristic-overlay False series (rgba 170,170,170 @ ~0.45). Ultra-low marker.opacity + tiny pub sizes get dropped by Kaleido SVG export.
+    background_scatter_opacity: float = float(kwargs.pop('background_scatter_opacity', 0.45))
+    background_hist_opacity: float = float(kwargs.pop('background_hist_opacity', 0.45))
+    _PRE_PREDICATE_BG_COLOR: str = 'rgb(170,170,170)'
     _PRE_PREDICATE_BG_LEGENDGROUP: str = '__pre_predicate_bg__'
     
     if use_latex_labels:
@@ -1032,9 +1034,9 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
                 a_trace.hoverinfo = 'skip'
                 if hist_opacity is not None:
                     a_trace.opacity = hist_opacity
-                if trace_type == 'histogram':
-                    a_trace.marker.color = 'rgb(160,160,160)'
-                    a_trace.marker.line = dict(width=0)
+                # Force solid grey on marker (px color_discrete_sequence alone is unreliable under Kaleido for tiny pub markers)
+                a_trace.marker.color = _PRE_PREDICATE_BG_COLOR
+                a_trace.marker.line = dict(width=0)
             ## END if is_background...
 
 
@@ -1069,6 +1071,9 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
             _subfn_finalize_layer_trace(a_trace)
             if is_background:
                 a_trace.name = trace_name_prefix
+                # Prefer fill-opacity over ultra-low marker.opacity so Kaleido keeps grey points in SVG
+                a_trace.marker.opacity = 1.0
+                a_trace.opacity = scatter_opacity
                 fig.add_trace(a_trace, row=1, col=2)
             else:
                 PlotlyFigureContainer.add_trace_with_legend_handling(fig=fig, trace=a_trace, row=1, col=2, already_added_legend_entries=already_added_legend_entries, trace_name_prefix=trace_name_prefix)
@@ -1117,13 +1122,13 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
                 bg_df[size_col] = data_results_df[size_col].iloc[0] if len(data_results_df) > 0 else 1.0
             else:
                 bg_df[size_col] = 1.0
-        bg_common_plot_kwargs = dict(color='_pre_predicate_layer', color_discrete_sequence=['rgb(160,160,160)'], category_orders={'_pre_predicate_layer': ['background']})
-        bg_hist_kwargs = dict(hist_kwargs) | dict(opacity=background_hist_opacity, color='_pre_predicate_layer', color_discrete_sequence=['rgb(160,160,160)'])
+        bg_common_plot_kwargs = dict(color='_pre_predicate_layer', color_discrete_sequence=[_PRE_PREDICATE_BG_COLOR], category_orders={'_pre_predicate_layer': ['background']})
+        bg_hist_kwargs = dict(hist_kwargs) | dict(opacity=background_hist_opacity, color='_pre_predicate_layer', color_discrete_sequence=[_PRE_PREDICATE_BG_COLOR])
         bg_px_scatter_kwargs = dict(px_scatter_kwargs or {})
         # Drop foreground color/hover mappings so background stays single grey non-interactive series
         for _drop_key in ('color', 'color_discrete_sequence', 'color_discrete_map', 'category_orders', 'custom_data', 'hover_data', 'hover_name'):
             bg_px_scatter_kwargs.pop(_drop_key, None)
-        bg_px_scatter_kwargs = bg_px_scatter_kwargs | dict(color='_pre_predicate_layer', color_discrete_sequence=['rgb(160,160,160)'], category_orders={'_pre_predicate_layer': ['background']})
+        bg_px_scatter_kwargs = bg_px_scatter_kwargs | dict(color='_pre_predicate_layer', color_discrete_sequence=[_PRE_PREDICATE_BG_COLOR], category_orders={'_pre_predicate_layer': ['background']})
         # Ensure required x/y present
         if 'x' not in bg_px_scatter_kwargs:
             bg_px_scatter_kwargs['x'] = 'delta_aligned_start_t'
