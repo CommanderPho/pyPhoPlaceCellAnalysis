@@ -1053,6 +1053,18 @@ def try_copy_to_clipboard(code_str: str, label: str) -> None:
         print(_banner)
 
 
+def try_execute_shell_command(code_str: str, label: str) -> None:
+    """Best-effort `shell=True` run of `code_str`; print WARN and continue on failure (never raises)."""
+    import subprocess
+    print(f"Attempting to run ({label}): {code_str}")
+    try:
+        result = subprocess.run(code_str, shell=True, check=False)
+        if result.returncode != 0:
+            print(f'WARN: run failed ({label}) exit {result.returncode}; continuing.')
+    except Exception as e:
+        print(f'WARN: could not run ({label}) ({type(e).__name__}: {e}); continuing.')
+
+
 @function_attributes(short_name=None, tags=['slurm','jobs','files','batch'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-08-09 19:14', related_items=[])
 def generate_batch_single_session_scripts(global_data_root_parent_path, session_batch_basedirs: Dict[IdentifyingContext, Path], included_session_contexts: Optional[List[IdentifyingContext]], output_directory='output/gen_scripts/', use_separate_run_directories:bool=True,
          create_slurm_scripts:bool=False, create_non_slurm_bash_scripts:bool=False, should_create_vscode_workspace:bool=True, should_use_wandb_logging:bool=True, should_use_viztracer_logging:bool=True, should_generate_run_scripts = True, should_generate_figure_scripts = False, should_generate_run_notebooks: bool = False,
