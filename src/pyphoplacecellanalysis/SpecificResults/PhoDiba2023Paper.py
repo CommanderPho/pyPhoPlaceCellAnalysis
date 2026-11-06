@@ -139,6 +139,7 @@ class HierarchicalSessionInventory:
         'PBEs': ('all_sessions_ripple_df', 'all_sessions_ripple_time_bin_df'),
     }
     _EPOCH_KIND_ORDER: Tuple[str, ...] = ('Laps', 'PBEs')
+    _PRE_POST_ORDER: Tuple[str, ...] = ('pre-delta', 'post-delta')
     _EDGE_COLOR: str = '#c5c5c5'
     _NODE_COLORS: Tuple[str, ...] = ('#1f77b4', '#ff7f0e', '#2ca02c', '#d62728')
     _DEPTH_X_STEP: float = 1.45
@@ -682,9 +683,11 @@ class HierarchicalSessionInventory:
         """Pivot leaf counts into one row per animal/session/condition with Laps|PBEs side-by-side columns."""
         work = counts_df.copy()
         work['session'] = work['_session_tree_label'].astype(str)
-        work['pre_post'] = work[condition_col].astype(str)
         work[animal_col] = work[animal_col].astype(str)
         work[epoch_kind_col] = work[epoch_kind_col].astype(str)
+        pre_post_vals = work[condition_col].astype(str)
+        pre_post_cats = list(cls._PRE_POST_ORDER) + [c for c in sorted(pre_post_vals.unique()) if c not in cls._PRE_POST_ORDER]
+        work['pre_post'] = pd.Categorical(pre_post_vals, categories=pre_post_cats, ordered=True)
 
         wide = (
             work.pivot_table(
@@ -710,6 +713,7 @@ class HierarchicalSessionInventory:
         wide = wide.reindex(columns=ordered)
 
         table_df = wide.reset_index().rename(columns={animal_col: 'animal'})
+        table_df['pre_post'] = table_df['pre_post'].astype(str)
         for c in ordered:
             table_df[c] = table_df[c].astype(int)
         ## END for c in ordered...
