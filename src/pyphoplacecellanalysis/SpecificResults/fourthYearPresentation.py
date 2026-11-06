@@ -2,6 +2,7 @@
 Contains code related to Pho Hale's 4th Year PhD Presentation on 2023-09-25
 
 """
+from copy import deepcopy
 from pathlib import Path
 from typing import Dict, List
 import numpy as np
@@ -335,10 +336,10 @@ def fig_surprise_results(curr_active_pipeline):
         return graphics_output_dict
 
     
-    # Change the two track epoch labels to ['maze1', 'maze2'] before preceeding:
-    track_epochs = curr_active_pipeline.sess.epochs
+    # Rename track labels only on a plot-local copy — never mutate sess.epochs/paradigm (breaks find_LongShortGlobal_epoch_names for later completion fns)
+    track_epochs = deepcopy(curr_active_pipeline.sess.epochs)
     assert len(track_epochs._df['label']) == 2, f"labels should be ['maze1', 'maze2']!"
-    track_epochs._df['label'] = ['long', 'short'] # access private methods to set the proper labels
+    track_epochs._df['label'] = ['long', 'short']
     # track_epochs
 
     laps_epochs = curr_active_pipeline.sess.laps.as_epoch_obj()
