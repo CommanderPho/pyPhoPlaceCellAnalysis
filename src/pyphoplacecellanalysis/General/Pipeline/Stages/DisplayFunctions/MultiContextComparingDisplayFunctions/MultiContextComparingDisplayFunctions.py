@@ -426,6 +426,7 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
         # active_pf = deepcopy(owning_pipeline_reference.computation_results[global_epoch_name].computed_data['pf2D_dt']) # PfND_TimeDependent
         # active_pf = deepcopy(owning_pipeline_reference.computation_results[global_epoch_name].computed_data['pf2D'])
         active_pf = deepcopy(owning_pipeline_reference.computation_results[global_epoch_name].computed_data['pf1D'])
+        # active_pf = deepcopy(owning_pipeline_reference.computation_results[global_epoch_name].computed_data['pf1D_dt'])
 
         any_decoder_neuron_IDs: NDArray = deepcopy(directional_trial_by_trial_activity_result.any_decoder_neuron_IDs)
         override_active_neuron_IDs = deepcopy(any_decoder_neuron_IDs)

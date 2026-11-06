@@ -79,13 +79,16 @@ from neuropy.utils.mixins.indexing_helpers import get_dict_subset
 # ==================================================================================================================================================================================================================================================================================== #
 # 2026-11-05 - Hierarchical Session Inventory (displaying counts of time bins/PBEs for each animal/session/etc.                                                                                                                                                                        #
 # ==================================================================================================================================================================================================================================================================================== #
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
+from pathlib import Path
+import os
+import shutil
 
 import pandas as pd
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
-from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionIdentityDataframeAccessor  # for `df.across_session_identity.split_session_key_col_to_fmt_animal_exper_cols(...)`
+
 
 
 @metadata_attributes(short_name=None, tags=['figure', 'session', 'inventory'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-11-05 13:08', related_items=[])
@@ -105,6 +108,29 @@ class HierarchicalSessionInventory:
             ),
         )
         fig.show()
+
+        # Graphviz / ``dot`` (requires Graphviz on PATH, or pass ``dot_path=``):
+        counts_df, g = HierarchicalSessionInventory.build_original_df_dict_hierarchy_inventory_graphviz(
+            original_df_dict=dict(
+                all_sessions_ripple_df=all_sessions_ripple_df,
+                all_sessions_ripple_time_bin_df=all_sessions_ripple_time_bin_df,
+                all_sessions_laps_df=all_sessions_laps_df,
+                all_sessions_laps_time_bin_df=all_sessions_laps_time_bin_df,
+            ),
+        )
+        g  # Jupyter: SVG via graphviz mimebundle
+        # g.render('session_inventory', format='pdf', cleanup=True)
+
+        # Compact styled table (same leaf counts):
+        counts_df, table = HierarchicalSessionInventory.build_original_df_dict_hierarchy_inventory_table(
+            original_df_dict=dict(
+                all_sessions_ripple_df=all_sessions_ripple_df,
+                all_sessions_ripple_time_bin_df=all_sessions_ripple_time_bin_df,
+                all_sessions_laps_df=all_sessions_laps_df,
+                all_sessions_laps_time_bin_df=all_sessions_laps_time_bin_df,
+            ),
+        )
+        table  # Jupyter: rowspan-merged HTML table
     """
 
     _TREE_DEPTH_NAMES: Tuple[str, ...] = ('animal', 'session', 'pre/post', 'Laps | PBEs')
@@ -113,12 +139,20 @@ class HierarchicalSessionInventory:
         'PBEs': ('all_sessions_ripple_df', 'all_sessions_ripple_time_bin_df'),
     }
     _EPOCH_KIND_ORDER: Tuple[str, ...] = ('Laps', 'PBEs')
-    _EDGE_COLOR: str = '#444444'
+    _EDGE_COLOR: str = '#c5c5c5'
     _NODE_COLORS: Tuple[str, ...] = ('#1f77b4', '#ff7f0e', '#2ca02c', '#d62728')
+    _DEPTH_X_STEP: float = 1.45
+    _LEAF_Y_STEP: float = 1.35
+    _LABEL_FONT_COLOR: str = '#111111'
+    _DEFAULT_GRAPHVIZ_DOT_CANDIDATES: Tuple[str, ...] = (
+        r'C:\Program Files\Graphviz\bin\dot.exe',
+        r'C:\Program Files (x86)\Graphviz\bin\dot.exe',
+    )
 
 
     @classmethod
     def _prepare_original_df_dict_for_inventory(cls, original_df_dict: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
+        from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionIdentityDataframeAccessor  # for `df.across_session_identity.split_session_key_col_to_fmt_animal_exper_cols(...)`
         return {
             k: df.rename(columns={'session_name': 'session_key'}, inplace=False).across_session_identity.split_session_key_col_to_fmt_animal_exper_cols(session_key_col='session_key')
             for k, df in original_df_dict.items()
@@ -165,11 +199,6 @@ class HierarchicalSessionInventory:
 
 
     @classmethod
-    def _format_leaf_count_line(cls, epoch_kind: str, n_time_bins: int, n_total_events: int) -> str:
-        return f'{epoch_kind}<br># time_bins: {int(n_time_bins):,}<br># events: {int(n_total_events):,}'
-
-
-    @classmethod
     def _build_animal_hierarchy_tree(cls, counts_df: pd.DataFrame, animal: str, *, animal_col: str, condition_col: str, epoch_kind_col: str) -> Tuple[Dict[str, Dict[str, Any]], Dict[str, List[str]], Optional[str], int]:
         """Build animal → session → pre/post → Laps|PBEs tree; return nodes, children_map, root_id, n_leaves."""
         sub = counts_df[counts_df[animal_col].astype(str) == str(animal)]
@@ -201,9 +230,13 @@ class HierarchicalSessionInventory:
         nodes_by_id: Dict[str, Dict[str, Any]] = {}
         children_map: Dict[str, List[str]] = {}
 
-        def _ensure_node(node_id: str, label: str, depth: int, *, is_leaf: bool) -> None:
+        def _ensure_node(node_id: str, label: str, depth: int, *, is_leaf: bool, epoch_kind: Optional[str] = None, n_time_bins: Optional[int] = None, n_total_events: Optional[int] = None) -> None:
             if node_id not in nodes_by_id:
-                nodes_by_id[node_id] = {'id': node_id, 'label': label, 'depth': depth, 'y': 0.0, 'is_leaf': is_leaf, 'x': float(depth)}
+                nodes_by_id[node_id] = {
+                    'id': node_id, 'label': label, 'depth': depth, 'y': 0.0, 'is_leaf': is_leaf,
+                    'x': float(depth) * float(cls._DEPTH_X_STEP),
+                    'epoch_kind': epoch_kind, 'n_time_bins': n_time_bins, 'n_total_events': n_total_events,
+                }
 
         def _link(parent_id: str, child_id: str) -> None:
             children_map.setdefault(parent_id, [])
@@ -220,14 +253,17 @@ class HierarchicalSessionInventory:
             ordered_leaf_ids.append(leaf_id)
             _ensure_node(sess_id, spec['session'], 1, is_leaf=False)
             _ensure_node(cond_id, spec['condition'], 2, is_leaf=False)
-            _ensure_node(leaf_id, cls._format_leaf_count_line(spec['epoch_kind'], spec['n_time_bins'], spec['n_total_events']), 3, is_leaf=True)
+            _ensure_node(
+                leaf_id, cls._format_leaf_count_line(spec['epoch_kind'], spec['n_time_bins'], spec['n_total_events']), 3, is_leaf=True,
+                epoch_kind=spec['epoch_kind'], n_time_bins=spec['n_time_bins'], n_total_events=spec['n_total_events'],
+            )
             _link(animal_id, sess_id)
             _link(sess_id, cond_id)
             _link(cond_id, leaf_id)
         ## END for leaf_idx, spec in enumerate(leaf_specs)...
 
         for leaf_idx, leaf_id in enumerate(ordered_leaf_ids):
-            nodes_by_id[leaf_id]['y'] = float(leaf_idx)
+            nodes_by_id[leaf_id]['y'] = float(leaf_idx) * float(cls._LEAF_Y_STEP)
         ## END for leaf_idx, leaf_id in enumerate(ordered_leaf_ids)...
 
         def _assign_internal_y(node_id: str) -> float:
@@ -270,12 +306,13 @@ class HierarchicalSessionInventory:
         fig.add_trace(
             go.Scatter(
                 x=edge_x, y=edge_y, mode='lines',
-                line=dict(color=cls._EDGE_COLOR, width=1.6),
+                line=dict(color=cls._EDGE_COLOR, width=1.4),
                 hoverinfo='skip', showlegend=False,
             ),
             row=row, col=col,
         )
 
+        # Markers only (labels drawn as white-backed annotations so they sit above edges)
         for depth in range(4):
             depth_nodes = [n for n in nodes_by_id.values() if int(n['depth']) == depth]
             if len(depth_nodes) == 0:
@@ -283,14 +320,10 @@ class HierarchicalSessionInventory:
             xs = [float(n['x']) for n in depth_nodes]
             ys = [float(n['y']) for n in depth_nodes]
             texts = [str(n['label']) for n in depth_nodes]
-            is_leaf_depth = (depth == 3)
             fig.add_trace(
                 go.Scatter(
-                    x=xs, y=ys, mode='markers+text' if (not is_leaf_depth) else 'markers',
-                    marker=dict(size=10 if depth == 0 else 7, color=cls._NODE_COLORS[depth], line=dict(width=1, color='white')),
-                    text=texts if (not is_leaf_depth) else None,
-                    textposition='top center' if depth == 0 else 'middle left',
-                    textfont=dict(size=11 if depth == 0 else 9),
+                    x=xs, y=ys, mode='markers',
+                    marker=dict(size=11 if depth == 0 else 8, color=cls._NODE_COLORS[depth], line=dict(width=1.2, color='white')),
                     hovertext=texts,
                     hoverinfo='text',
                     showlegend=False,
@@ -298,30 +331,51 @@ class HierarchicalSessionInventory:
                 ),
                 row=row, col=col,
             )
-            if is_leaf_depth:
-                for n in depth_nodes:
-                    fig.add_annotation(
-                        x=float(n['x']) + 0.18, y=float(n['y']),
-                        text=str(n['label']),
-                        showarrow=False, xanchor='left', yanchor='middle', align='left',
-                        font=dict(size=10, family='Consolas, Courier New, monospace'),
-                        bgcolor='rgba(255,255,255,0.95)', bordercolor='#888888', borderwidth=1, borderpad=4,
-                        row=row, col=col,
-                    )
-                ## END for n in depth_nodes...
         ## END for depth in range(4)...
 
+        y_label_offset = 0.28 * float(cls._LEAF_Y_STEP)
+        for n in nodes_by_id.values():
+            depth = int(n['depth'])
+            x = float(n['x'])
+            y = float(n['y'])
+            label = str(n['label'])
+            if depth == 0:
+                # Animal name already in subplot title — skip to avoid overlap on the root
+                continue
+            if depth == 3:
+                fig.add_annotation(
+                    x=x + 0.22, y=y,
+                    text=label,
+                    showarrow=False, xanchor='left', yanchor='middle', align='left',
+                    font=dict(size=10, color=cls._LABEL_FONT_COLOR, family='Consolas, Courier New, monospace'),
+                    bgcolor='rgba(255,255,255,0.96)', bordercolor='#bdbdbd', borderwidth=1, borderpad=4,
+                    row=row, col=col,
+                )
+            else:
+                # Session / pre-post: place ABOVE the node with opaque white pad so lines don't cut through text
+                fig.add_annotation(
+                    x=x, y=y - y_label_offset,
+                    text=label,
+                    showarrow=False, xanchor='center', yanchor='bottom', align='center',
+                    font=dict(size=9 if depth == 2 else 8.5, color=cls._LABEL_FONT_COLOR),
+                    bgcolor='rgba(255,255,255,0.96)', bordercolor='rgba(0,0,0,0)', borderwidth=0, borderpad=2,
+                    row=row, col=col,
+                )
+        ## END for n in nodes_by_id.values()...
+
+        x_max = 3.0 * float(cls._DEPTH_X_STEP) + 2.6
+        y_max = (float(n_leaves) - 1.0) * float(cls._LEAF_Y_STEP) + 0.55
         for depth_idx, depth_name in enumerate(cls._TREE_DEPTH_NAMES):
             fig.add_annotation(
-                x=float(depth_idx), y=-1.15, text=f'<i>{depth_name}</i>',
+                x=float(depth_idx) * float(cls._DEPTH_X_STEP), y=-1.35, text=f'<i>{depth_name}</i>',
                 showarrow=False, xanchor='center', yanchor='top',
-                font=dict(size=9, color='#666666'),
+                font=dict(size=9, color='#777777'),
                 row=row, col=col,
             )
         ## END for depth_idx, depth_name in enumerate(cls._TREE_DEPTH_NAMES)...
 
-        fig.update_xaxes(visible=False, range=[-0.35, 5.4], row=row, col=col)
-        fig.update_yaxes(visible=False, range=[float(n_leaves) - 0.4, -1.55], autorange=False, row=row, col=col)
+        fig.update_xaxes(visible=False, range=[-0.45, x_max], row=row, col=col)
+        fig.update_yaxes(visible=False, range=[y_max, -1.85], autorange=False, row=row, col=col)
 
 
     @classmethod
@@ -349,14 +403,14 @@ class HierarchicalSessionInventory:
 
         n_panels = len(animal_panels)
         if layout_height is None:
-            layout_height = int(max(640, 140 + (max_leaves * 28)))
+            layout_height = int(max(720, 160 + (max_leaves * 36)))
         if layout_width is None:
-            layout_width = int(max(1100, n_panels * 520))
+            layout_width = int(max(1200, n_panels * 560))
 
         fig = make_subplots(
             rows=1, cols=n_panels,
             subplot_titles=[p[0] for p in animal_panels],
-            horizontal_spacing=0.04,
+            horizontal_spacing=0.05,
         )
         for col_idx, (animal_name, nodes_by_id, children_map, n_leaves) in enumerate(animal_panels, start=1):
             cls._add_orthogonal_tree_to_figure(
@@ -374,6 +428,406 @@ class HierarchicalSessionInventory:
             showlegend=False,
         )
         return counts_df, fig
+
+
+    @classmethod
+    def _format_leaf_count_line(cls, epoch_kind: str, n_time_bins: int, n_total_events: int, *, newline: str = '<br>') -> str:
+        return f'{epoch_kind}{newline}# time_bins: {int(n_time_bins):,}{newline}# events: {int(n_total_events):,}'
+
+
+    @classmethod
+    def _format_leaf_count_graphviz_html(cls, epoch_kind: str, n_time_bins: int, n_total_events: int) -> str:
+        """Compact table panel for Graphviz HTML-like labels (figure-style, not a console string)."""
+        return (
+            '<<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="5" COLOR="#555555" BGCOLOR="white">'
+            f'<TR><TD COLSPAN="2" ALIGN="CENTER" BGCOLOR="#F0F0F0"><B>{epoch_kind}</B></TD></TR>'
+            f'<TR><TD ALIGN="LEFT">time bins</TD><TD ALIGN="RIGHT"><B>{int(n_time_bins):,}</B></TD></TR>'
+            f'<TR><TD ALIGN="LEFT">events</TD><TD ALIGN="RIGHT"><B>{int(n_total_events):,}</B></TD></TR>'
+            '</TABLE>>'
+        )
+
+
+    @classmethod
+    def _resolve_graphviz_dot_path(cls, dot_path: Optional[Union[str, Path]] = None) -> Path:
+        """Locate Graphviz ``dot``: explicit path, then PATH, then common Windows install dirs."""
+        if dot_path is not None:
+            resolved = Path(dot_path)
+            if not resolved.is_file():
+                raise FileNotFoundError(f'dot_path not found: {resolved}')
+            return resolved.resolve()
+
+        which = shutil.which('dot')
+        if which:
+            return Path(which).resolve()
+
+        for candidate in cls._DEFAULT_GRAPHVIZ_DOT_CANDIDATES:
+            p = Path(candidate)
+            if p.is_file():
+                return p.resolve()
+        ## END for candidate in cls._DEFAULT_GRAPHVIZ_DOT_CANDIDATES...
+
+        raise FileNotFoundError(
+            'Graphviz `dot` executable not found. Add Graphviz/bin to PATH, or pass '
+            r"dot_path=r'C:\Program Files\Graphviz\bin\dot.exe'."
+        )
+
+
+    @classmethod
+    def _ensure_graphviz_dot_on_path(cls, dot_path: Optional[Union[str, Path]] = None) -> Path:
+        """Resolve ``dot`` and prepend its directory to ``PATH`` so the graphviz Python package can find it."""
+        resolved = cls._resolve_graphviz_dot_path(dot_path=dot_path)
+        bin_dir = str(resolved.parent)
+        path_parts = os.environ.get('PATH', '').split(os.pathsep)
+        if bin_dir not in path_parts:
+            os.environ['PATH'] = bin_dir + os.pathsep + os.environ.get('PATH', '')
+        return resolved
+
+
+    @classmethod
+    def _graphviz_safe_id(cls, node_id: str) -> str:
+        """Graphviz node IDs: alphanumeric + underscore."""
+        out = []
+        for ch in str(node_id):
+            out.append(ch if (ch.isalnum() or ch == '_') else '_')
+        ## END for ch in str(node_id)...
+        return ''.join(out)
+
+
+    @classmethod
+    def _build_single_animal_graphviz_digraph(cls, counts_df: pd.DataFrame, animal: str, *, animal_col: str, condition_col: str, epoch_kind_col: str) -> Any:
+        """One animal's LR monochrome tree (used as a packable component for gvpack)."""
+        import graphviz
+
+        nodes_by_id, children_map, root_id, n_leaves = cls._build_animal_hierarchy_tree(
+            counts_df, animal, animal_col=animal_col, condition_col=condition_col, epoch_kind_col=epoch_kind_col,
+        )
+        if n_leaves == 0 or root_id is None:
+            return None
+
+        g = graphviz.Digraph(
+            name=f'animal_{cls._graphviz_safe_id(str(animal))}',
+            engine='dot',
+            graph_attr={
+                'rankdir': 'LR',
+                'splines': 'ortho',
+                'nodesep': '0.22',
+                'ranksep': '0.65',
+                'fontsize': '12',
+                'fontname': 'Helvetica',
+                'bgcolor': 'white',
+                'pad': '0.15',
+            },
+            node_attr={
+                'fontname': 'Helvetica',
+                'fontsize': '10',
+                'style': 'filled,rounded',
+                'fillcolor': 'white',
+                'color': '#555555',
+                'fontcolor': '#111111',
+                'margin': '0.08,0.06',
+            },
+            edge_attr={
+                'color': '#666666',
+                'arrowsize': '0.45',
+                'penwidth': '1.15',
+                'arrowhead': 'none',
+            },
+        )
+        with g.subgraph(name=f'cluster_{cls._graphviz_safe_id(str(animal))}') as c:
+            c.attr(label=str(animal), color='#555555', style='rounded', fontsize='12', fontname='Helvetica', penwidth='1.2', bgcolor='white')
+            for node_id, node in nodes_by_id.items():
+                depth = int(node['depth'])
+                safe_id = cls._graphviz_safe_id(node_id)
+                if depth == 3:
+                    label = cls._format_leaf_count_graphviz_html(
+                        str(node['epoch_kind']), int(node['n_time_bins']), int(node['n_total_events']),
+                    )
+                    c.node(safe_id, label=label, shape='plaintext', style='', margin='0.02,0.02')
+                elif depth == 0:
+                    c.node(safe_id, label=str(node['label']), shape='box', style='filled,rounded', fillcolor='white', color='#333333', fontsize='11', fontname='Helvetica')
+                else:
+                    c.node(safe_id, label=str(node['label']), shape='box', style='filled,rounded', fillcolor='white', color='#555555', fontsize='9')
+            ## END for node_id, node in nodes_by_id.items()...
+            for parent_id, child_ids in children_map.items():
+                p_safe = cls._graphviz_safe_id(parent_id)
+                for child_id in child_ids:
+                    c.edge(p_safe, cls._graphviz_safe_id(child_id))
+                ## END for child_id in child_ids...
+            ## END for parent_id, child_ids in children_map.items()...
+        ## END with g.subgraph(...) as c...
+        return g
+
+
+    @classmethod
+    def _pack_graphviz_digraphs_horizontally(cls, digraphs: List[Any], *, title: Optional[str], format: str, dot_executable: Path) -> Any:
+        """Layout each digraph with ``dot``, then ``gvpack -array_uN`` into one horizontal row; return a Source that renders via ``neato -n2``."""
+        import graphviz
+        import subprocess
+        import tempfile
+
+        if len(digraphs) == 0:
+            raise ValueError('No animal digraphs to pack.')
+
+        bin_dir = dot_executable.parent
+        gvpack_exe = bin_dir / ('gvpack.exe' if os.name == 'nt' else 'gvpack')
+        neato_exe = bin_dir / ('neato.exe' if os.name == 'nt' else 'neato')
+        if not gvpack_exe.is_file():
+            raise FileNotFoundError(f'gvpack not found next to dot: {gvpack_exe}')
+
+        with tempfile.TemporaryDirectory(prefix='hier_sess_inv_') as tmp:
+            tmp_path = Path(tmp)
+            laid_out_files: List[Path] = []
+            for i, digraph in enumerate(digraphs):
+                laid_bytes = digraph.pipe(format='dot')  # position attributes from dot layout
+                laid_path = tmp_path / f'animal_{i}_laid.gv'
+                laid_path.write_bytes(laid_bytes)
+                laid_out_files.append(laid_path)
+            ## END for i, digraph in enumerate(digraphs)...
+
+            # One row of N columns: array_uN (keep stderr separate so font warnings never pollute DOT)
+            pack_cmd = [str(gvpack_exe), f'-array_u{len(laid_out_files)}', *[str(p) for p in laid_out_files]]
+            pack_proc = subprocess.run(pack_cmd, capture_output=True)
+            if pack_proc.returncode != 0:
+                err = pack_proc.stderr.decode('utf-8', errors='replace') or pack_proc.stdout.decode('utf-8', errors='replace')
+                raise RuntimeError(f'gvpack failed (exit {pack_proc.returncode}): {err}')
+            packed = pack_proc.stdout
+
+        # Attach overall title if requested (as a graph label on the packed root)
+        packed_text = packed.decode('utf-8', errors='replace')
+        # Drop any accidental leading Warning lines that some Graphviz builds emit on stdout
+        packed_lines = packed_text.splitlines()
+        while packed_lines and packed_lines[0].lstrip().startswith('Warning'):
+            packed_lines.pop(0)
+        ## END while packed_lines and packed_lines[0].lstrip().startswith('Warning')...
+        packed_text = '\n'.join(packed_lines).lstrip()
+        if title:
+            # Insert / override label near the first digraph { ... } opening
+            if 'label=' not in packed_text.split('{', 1)[0]:
+                packed_text = packed_text.replace('{', '{\n  label="%s";\n  labelloc=t;\n  labeljust=c;\n' % title.replace('"', '\\"'), 1)
+
+        class _NeatoPositionedSource(graphviz.Source):
+            """Packed DOT with existing coordinates; Jupyter/render uses ``neato -n2``."""
+
+            def pipe(self, format=None, renderer=None, formatter=None, neato_no_op=None, quiet: bool = False, *, engine=None, encoding=None):
+                if neato_no_op is None:
+                    neato_no_op = 2
+                return super().pipe(format=format, renderer=renderer, formatter=formatter, neato_no_op=neato_no_op, quiet=quiet, engine=engine or 'neato', encoding=encoding)
+
+            def _repr_image_svg_xml(self) -> str:
+                return self.pipe(format='svg', encoding='utf-8', neato_no_op=2, engine='neato')
+
+        return _NeatoPositionedSource(packed_text, filename='HierarchicalSessionInventory_packed', format=format, engine='neato')
+
+
+    @classmethod
+    def _build_graphviz_digraph(cls, counts_df: pd.DataFrame, *, animal_col: str, condition_col: str, epoch_kind_col: str, title: Optional[str], format: str = 'svg', dot_executable: Optional[Path] = None) -> Any:
+        """Build per-animal trees and pack them into one horizontal row via Graphviz ``gvpack``."""
+        animals = sorted(counts_df[animal_col].astype(str).unique())
+        animal_graphs: List[Any] = []
+        for animal in animals:
+            ag = cls._build_single_animal_graphviz_digraph(
+                counts_df, animal, animal_col=animal_col, condition_col=condition_col, epoch_kind_col=epoch_kind_col,
+            )
+            if ag is not None:
+                animal_graphs.append(ag)
+        ## END for animal in animals...
+
+        if len(animal_graphs) == 0:
+            raise ValueError('No hierarchical inventory leaves to plot (empty counts after grouping).')
+
+        if dot_executable is None:
+            dot_executable = cls._resolve_graphviz_dot_path()
+
+        if len(animal_graphs) == 1:
+            # Single animal: no pack needed; still monochrome LR digraph with title
+            g = animal_graphs[0]
+            if title:
+                g.graph_attr['label'] = title
+                g.graph_attr['labelloc'] = 't'
+                g.graph_attr['labeljust'] = 'c'
+            g.format = format
+            return g
+
+        return cls._pack_graphviz_digraphs_horizontally(animal_graphs, title=title, format=format, dot_executable=Path(dot_executable))
+
+
+    @classmethod
+    def build_original_df_dict_hierarchy_inventory_graphviz(cls, original_df_dict: Dict[str, pd.DataFrame], *, animal_col: str = 'animal', session_col: str = 'session_name', condition_col: str = 'pre_post_delta_category', epoch_kind_col: str = 'epoch_kind', title: Optional[str] = 'Original data hierarchy — time bins & events', format: str = 'svg', dot_path: Optional[Union[str, Path]] = None) -> Tuple[pd.DataFrame, Any]:
+        """Graphviz/dot rectangular hierarchy: animal → session → pre/post → Laps|PBEs.
+
+        Animals are laid out **side-by-side** (``gvpack -array_uN``). Monochrome nodes; leaf counts as HTML tables.
+
+        Returns ``(counts_df, digraph_or_source)``. Jupyter displays SVG. Render with ``.render('out', format='pdf', cleanup=True)``
+        (multi-animal uses ``neato -n2`` under the hood).
+
+        Requires Graphviz ``dot`` and ``gvpack`` (same ``bin`` folder).
+        """
+        dot_executable = cls._ensure_graphviz_dot_on_path(dot_path=dot_path)
+        prepared = cls._prepare_original_df_dict_for_inventory(original_df_dict)
+        counts_df, _path_cols = cls._build_original_df_dict_hierarchy_counts_df(
+            prepared, animal_col=animal_col, session_col=session_col, condition_col=condition_col, epoch_kind_col=epoch_kind_col,
+        )
+        if len(counts_df) == 0:
+            raise ValueError('No hierarchical inventory leaves to plot (empty counts after grouping).')
+
+        digraph = cls._build_graphviz_digraph(
+            counts_df, animal_col=animal_col, condition_col=condition_col, epoch_kind_col=epoch_kind_col,
+            title=title, format=format, dot_executable=dot_executable,
+        )
+        return counts_df, digraph
+
+
+    @classmethod
+    def _format_hierarchy_inventory_table_df(cls, counts_df: pd.DataFrame, *, animal_col: str, session_col: str, condition_col: str, epoch_kind_col: str) -> pd.DataFrame:
+        """Pivot leaf counts into one row per animal/session/condition with Laps|PBEs side-by-side columns."""
+        work = counts_df.copy()
+        work['session'] = work['_session_tree_label'].astype(str)
+        work['pre_post'] = work[condition_col].astype(str)
+        work[animal_col] = work[animal_col].astype(str)
+        work[epoch_kind_col] = work[epoch_kind_col].astype(str)
+
+        wide = (
+            work.pivot_table(
+                index=[animal_col, 'session', 'pre_post'],
+                columns=epoch_kind_col,
+                values=['n_time_bins', 'n_total_events'],
+                aggfunc='sum',
+                fill_value=0,
+            )
+            .sort_index()
+        )
+        # Flatten MultiIndex columns into readable names: Laps time bins, Laps events, …
+        flat_cols: List[str] = []
+        for metric, epoch_kind in wide.columns.to_list():
+            metric_label = 'time bins' if metric == 'n_time_bins' else 'events'
+            flat_cols.append(f'{epoch_kind} {metric_label}')
+        ## END for metric, epoch_kind in wide.columns.to_list()...
+        wide.columns = flat_cols
+
+        # Stable column order: Laps then PBEs, each with time bins then events
+        preferred = [f'{ek} {m}' for ek in cls._EPOCH_KIND_ORDER for m in ('time bins', 'events')]
+        ordered = [c for c in preferred if c in wide.columns] + [c for c in wide.columns if c not in preferred]
+        wide = wide.reindex(columns=ordered)
+
+        table_df = wide.reset_index().rename(columns={animal_col: 'animal'})
+        for c in ordered:
+            table_df[c] = table_df[c].astype(int)
+        ## END for c in ordered...
+        return table_df
+
+
+    @classmethod
+    def _rowspan_runs(cls, values: List[Any]) -> List[Tuple[bool, int]]:
+        """For each row: ``(emit_cell, rowspan)``. Only the first row of a consecutive run emits a cell."""
+        n = len(values)
+        out: List[Tuple[bool, int]] = [(False, 0)] * n
+        i = 0
+        while i < n:
+            j = i + 1
+            while j < n and values[j] == values[i]:
+                j += 1
+            ## END while j < n and values[j] == values[i]...
+            out[i] = (True, j - i)
+            for k in range(i + 1, j):
+                out[k] = (False, 0)
+            ## END for k in range(i + 1, j)...
+            i = j
+        ## END while i < n...
+        return out
+
+
+    @classmethod
+    def _style_hierarchy_inventory_table(cls, table_df: pd.DataFrame, *, title: Optional[str] = None) -> Any:
+        """HTML table with rowspan-merged animal/session labels (vertically centered) and every-other-row zebra striping."""
+        from html import escape
+
+        count_cols = [c for c in table_df.columns if c not in ('animal', 'session', 'pre_post')]
+        animals = table_df['animal'].astype(str).tolist()
+        sessions = list(zip(animals, table_df['session'].astype(str).tolist()))  # span session within animal
+        animal_spans = cls._rowspan_runs(animals)
+        session_spans = cls._rowspan_runs(sessions)
+        row_shade_even = '#FFFFFF'
+        row_shade_odd = '#EFEFEF'
+        merge_shade = '#FAFAFA'  # neutral bg for rowspan animal/session cells spanning multiple zebra rows
+
+        css = (
+            'border-collapse:collapse;font-family:Helvetica,Arial,sans-serif;font-size:12px;color:#111111;'
+        )
+        th_css = 'background-color:#F0F0F0;color:#111111;font-weight:600;border-bottom:1px solid #555555;text-align:center;padding:6px 10px;white-space:nowrap;'
+        td_base = 'padding:5px 10px;border-bottom:1px solid #DDDDDD;vertical-align:middle;'
+        td_label = td_base + 'text-align:left;font-weight:500;'
+        td_num = td_base + 'text-align:right;font-variant-numeric:tabular-nums;'
+        caption_css = 'caption-side:top;text-align:left;font-size:13px;font-weight:600;padding:0 0 8px 0;color:#111111;'
+
+        parts: List[str] = [f'<table style="{css}">']
+        if title:
+            parts.append(f'<caption style="{caption_css}">{escape(str(title))}</caption>')
+        parts.append('<thead><tr>')
+        for col in table_df.columns:
+            parts.append(f'<th style="{th_css}">{escape(str(col))}</th>')
+        ## END for col in table_df.columns...
+        parts.append('</tr></thead><tbody>')
+
+        for pos in range(len(table_df)):
+            row = table_df.iloc[pos]
+            bg = row_shade_odd if (pos % 2) else row_shade_even
+            parts.append('<tr>')
+            emit_animal, animal_rs = animal_spans[pos]
+            if emit_animal:
+                rs_attr = f' rowspan="{animal_rs}"' if animal_rs > 1 else ''
+                animal_bg = merge_shade if animal_rs > 1 else bg
+                parts.append(f'<td{rs_attr} style="{td_label}background-color:{animal_bg};">{escape(str(row["animal"]))}</td>')
+            emit_session, session_rs = session_spans[pos]
+            if emit_session:
+                rs_attr = f' rowspan="{session_rs}"' if session_rs > 1 else ''
+                session_bg = merge_shade if session_rs > 1 else bg
+                parts.append(f'<td{rs_attr} style="{td_label}background-color:{session_bg};">{escape(str(row["session"]))}</td>')
+            parts.append(f'<td style="{td_label}background-color:{bg};">{escape(str(row["pre_post"]))}</td>')
+            for c in count_cols:
+                parts.append(f'<td style="{td_num}background-color:{bg};">{int(row[c]):,}</td>')
+            ## END for c in count_cols...
+            parts.append('</tr>')
+        ## END for pos in range(len(table_df))...
+        parts.append('</tbody></table>')
+        html = ''.join(parts)
+
+        class _HierarchyInventoryTableDisplay:
+            """Jupyter HTML table; ``.data`` is the unmerged plain DataFrame."""
+
+            def __init__(self, data: pd.DataFrame, html_str: str):
+                self.data = data
+                self._html = html_str
+
+            def _repr_html_(self) -> str:
+                return self._html
+
+            def to_html(self) -> str:
+                return self._html
+
+        return _HierarchyInventoryTableDisplay(table_df.copy(), html)
+
+    @function_attributes(short_name=None, tags=['ACTIVE', 'table', 'good'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-11-05 17:04', related_items=[])
+    @classmethod
+    def build_original_df_dict_hierarchy_inventory_table(cls, original_df_dict: Dict[str, pd.DataFrame], *, animal_col: str = 'animal', session_col: str = 'session_name', condition_col: str = 'pre_post_delta_category', epoch_kind_col: str = 'epoch_kind', title: Optional[str] = 'Original data hierarchy — time bins & events') -> Tuple[pd.DataFrame, Any]:
+        """Same inventory leaf counts as the Graphviz/Plotly builders, shown as a compact styled table.
+
+        One row per animal / session / pre-post, with Laps and PBEs side-by-side (time bins + events).
+        Repeated ``animal`` / ``session`` labels are merged with ``rowspan`` and vertically centered.
+
+        Returns ``(counts_df, table)``. In Jupyter, display ``table``. Use ``table.data`` for the plain DataFrame.
+        """
+        prepared = cls._prepare_original_df_dict_for_inventory(original_df_dict)
+        counts_df, _path_cols = cls._build_original_df_dict_hierarchy_counts_df(
+            prepared, animal_col=animal_col, session_col=session_col, condition_col=condition_col, epoch_kind_col=epoch_kind_col,
+        )
+        if len(counts_df) == 0:
+            raise ValueError('No hierarchical inventory leaves to tabulate (empty counts after grouping).')
+
+        table_df = cls._format_hierarchy_inventory_table_df(
+            counts_df, animal_col=animal_col, session_col=session_col, condition_col=condition_col, epoch_kind_col=epoch_kind_col,
+        )
+        table = cls._style_hierarchy_inventory_table(table_df, title=title)
+        return counts_df, table
 
 
     @classmethod
@@ -5481,6 +5935,7 @@ class Figure5:
             time_bin_size: float = 0.025, use_all_decoders_simultaneously_occupancy: bool = True, use_most_likely_pos_only_pseudo_occupancy: bool = False, split_by_session: bool = False, **kwargs):
         ## INPUTS: time_bin_size, 
         # a_posterior_container: LoadedPosteriorContainer = all_sessions_exported_posteriors_dict['/kdiba/gor01/two/2006-6-12_16-53-46']
+        from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionIdentityDataframeAccessor  # for `df.across_session_identity.split_session_key_col_to_fmt_animal_exper_cols(...)`
 
         _temp_out_occupancy_result_dict = {'laps': {}, 'PBEs': {}}  # session_name -> occupancy dict; `.values()` still works with `_sum_period_occupancy`
 
