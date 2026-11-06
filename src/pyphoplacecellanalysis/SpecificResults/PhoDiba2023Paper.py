@@ -378,10 +378,28 @@ class HierarchicalSessionInventory:
         fig.update_xaxes(visible=False, range=[-0.45, x_max], row=row, col=col)
         fig.update_yaxes(visible=False, range=[y_max, -1.85], autorange=False, row=row, col=col)
 
-
+    @function_attributes(short_name=None, tags=['UNUSED', 'UGLY'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-11-05 17:50', related_items=[])
     @classmethod
     def build_original_df_dict_hierarchy_inventory_figure(cls, original_df_dict: Dict[str, pd.DataFrame], *, animal_col: str = 'animal', session_col: str = 'session_name', condition_col: str = 'pre_post_delta_category', epoch_kind_col: str = 'epoch_kind', layout_width: Optional[int] = None, layout_height: Optional[int] = None, title: Optional[str] = 'Original data hierarchy — time bins & events') -> Tuple[pd.DataFrame, go.Figure]:
-        """Plotly rectangular cladogram: animal → session → pre/post → Laps|PBEs (orthogonal edges, equal leaf spacing)."""
+        """Plotly rectangular cladogram: animal → session → pre/post → Laps|PBEs (orthogonal edges, equal leaf spacing).
+
+        Usage:
+            from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import HierarchicalSessionInventory
+            from neuropy.utils.indexing_helpers import dict_with_renamed_keys
+
+            # from neuropy.utils.matplotlib_helpers import matplotlib_configuration_update
+            _restore_previous_matplotlib_settings_callback = matplotlib_configuration_update(is_interactive=True, backend='Qt5Agg')
+
+            counts_df, fig = HierarchicalSessionInventory.build_original_df_dict_hierarchy_inventory_figure(
+                original_df_dict=dict_with_renamed_keys(df_filter.pre_predicate_df_dict, rename_key_mapping={'filtered_all_sessions_ripple_df': 'all_sessions_ripple_df',
+                        'filtered_all_sessions_ripple_time_bin_df': 'all_sessions_ripple_time_bin_df',
+                        'filtered_all_sessions_laps_df': 'all_sessions_laps_df',
+                        'filtered_all_sessions_laps_time_bin_df': 'all_sessions_laps_time_bin_df'},
+                    ),
+            )
+            fig.show()
+
+        """
         prepared = cls._prepare_original_df_dict_for_inventory(original_df_dict)
         counts_df, _path_cols = cls._build_original_df_dict_hierarchy_counts_df(
             prepared, animal_col=animal_col, session_col=session_col, condition_col=condition_col, epoch_kind_col=epoch_kind_col,
@@ -662,6 +680,23 @@ class HierarchicalSessionInventory:
         (multi-animal uses ``neato -n2`` under the hood).
 
         Requires Graphviz ``dot`` and ``gvpack`` (same ``bin`` folder).
+
+        Usage:
+
+            from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import HierarchicalSessionInventory
+            from neuropy.utils.indexing_helpers import dict_with_renamed_keys
+
+            counts_df, g = HierarchicalSessionInventory.build_original_df_dict_hierarchy_inventory_graphviz(
+                original_df_dict=dict_with_renamed_keys(df_filter.pre_predicate_df_dict, rename_key_mapping={'filtered_all_sessions_ripple_df': 'all_sessions_ripple_df',
+                        'filtered_all_sessions_ripple_time_bin_df': 'all_sessions_ripple_time_bin_df',
+                        'filtered_all_sessions_laps_df': 'all_sessions_laps_df',
+                        'filtered_all_sessions_laps_time_bin_df': 'all_sessions_laps_time_bin_df'},
+                    ),
+            )
+            g  # Jupyter shows SVG
+            # g.render('session_inventory', format='pdf', cleanup=True)
+
+
         """
         dot_executable = cls._ensure_graphviz_dot_on_path(dot_path=dot_path)
         prepared = cls._prepare_original_df_dict_for_inventory(original_df_dict)
@@ -683,21 +718,18 @@ class HierarchicalSessionInventory:
         """Pivot leaf counts into one row per animal/session/condition with Laps|PBEs side-by-side columns."""
         work = counts_df.copy()
         work['session'] = work['_session_tree_label'].astype(str)
+        work['pre_post'] = work[condition_col].astype(str)
         work[animal_col] = work[animal_col].astype(str)
         work[epoch_kind_col] = work[epoch_kind_col].astype(str)
-        pre_post_vals = work[condition_col].astype(str)
-        pre_post_cats = list(cls._PRE_POST_ORDER) + [c for c in sorted(pre_post_vals.unique()) if c not in cls._PRE_POST_ORDER]
-        work['pre_post'] = pd.Categorical(pre_post_vals, categories=pre_post_cats, ordered=True)
 
-        wide = (
-            work.pivot_table(
-                index=[animal_col, 'session', 'pre_post'],
-                columns=epoch_kind_col,
-                values=['n_time_bins', 'n_total_events'],
-                aggfunc='sum',
-                fill_value=0,
-            )
-            .sort_index()
+        # Keep pre_post as plain str here — Categorical in pivot_table (observed=False) expands a
+        # cartesian product of animals × all sessions × pre/post and fills missing with 0.
+        wide = work.pivot_table(
+            index=[animal_col, 'session', 'pre_post'],
+            columns=epoch_kind_col,
+            values=['n_time_bins', 'n_total_events'],
+            aggfunc='sum',
+            fill_value=0,
         )
         # Flatten MultiIndex columns into readable names: Laps time bins, Laps events, …
         flat_cols: List[str] = []
@@ -713,10 +745,19 @@ class HierarchicalSessionInventory:
         wide = wide.reindex(columns=ordered)
 
         table_df = wide.reset_index().rename(columns={animal_col: 'animal'})
-        table_df['pre_post'] = table_df['pre_post'].astype(str)
         for c in ordered:
             table_df[c] = table_df[c].astype(int)
         ## END for c in ordered...
+
+        # Sort after pivot: pre-delta above post-delta (without inventing missing combos)
+        pre_post_cats = list(cls._PRE_POST_ORDER) + [c for c in sorted(table_df['pre_post'].unique()) if c not in cls._PRE_POST_ORDER]
+        table_df['pre_post'] = pd.Categorical(table_df['pre_post'], categories=pre_post_cats, ordered=True)
+        table_df = table_df.sort_values(['animal', 'session', 'pre_post'], kind='mergesort').reset_index(drop=True)
+        table_df['pre_post'] = table_df['pre_post'].astype(str)
+
+        # Drop residual all-zero rows (e.g. outer-merge placeholders with no events and no time bins)
+        if len(ordered) > 0:
+            table_df = table_df.loc[table_df[ordered].sum(axis=1) > 0].reset_index(drop=True)
         return table_df
 
 
