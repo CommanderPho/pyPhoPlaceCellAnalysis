@@ -147,21 +147,23 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
                 curr_active_pipeline.display('_display_jonathan_interactive_replay_firing_rate_comparison', active_identifying_session_ctx)
 
             """
-            if include_includelist is None:
-                include_includelist = owning_pipeline_reference.active_completed_computation_result_names # ['maze', 'sprinkle']
-
             if included_neuron_types is None:
                 included_neuron_types = NeuronType.from_any_string_series(['pyr'])
 
+            if include_includelist is None:
+                include_includelist = owning_pipeline_reference.active_completed_computation_result_names # ['maze', 'sprinkle']
 
-            long_epoch_name = include_includelist[0] # 'maze1_PYR'
-            short_epoch_name = include_includelist[1] # 'maze2_PYR'
-            if len(include_includelist) > 2:
-                global_epoch_name = include_includelist[-1] # 'maze_PYR'
+            # kdiba directional epochs: active_completed[0/1/-1] is maze1_odd/maze2_odd/maze_any — use find_LongShortGlobal instead. non-kdiba: fall back to first 2 + last.
+            if owning_pipeline_reference.is_kdiba_session():
+                long_epoch_name, short_epoch_name, global_epoch_name = owning_pipeline_reference.find_LongShortGlobal_epoch_names()
             else:
-                print(f'WARNING: no global_epoch detected.')
-                global_epoch_name = '' # None
-                
+                long_epoch_name = include_includelist[0] # 'maze1_PYR'
+                short_epoch_name = include_includelist[1] # 'maze2_PYR'
+                if len(include_includelist) > 2:
+                    global_epoch_name = include_includelist[-1] # 'maze_PYR'
+                else:
+                    print(f'WARNING: no global_epoch detected.')
+                    global_epoch_name = '' # None
 
             print(f'include_includelist: {include_includelist}\nlong_epoch_name: {long_epoch_name}, short_epoch_name: {short_epoch_name}, global_epoch_name: {global_epoch_name}')
             pf1d_long = computation_results[long_epoch_name]['computed_data']['pf1D']
@@ -220,10 +222,14 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
             if include_includelist is None:
                 include_includelist = owning_pipeline_reference.active_completed_computation_result_names # ['maze', 'sprinkle']
 
-            long_epoch_name = include_includelist[0] # 'maze1_PYR'
-            short_epoch_name = include_includelist[1] # 'maze2_PYR'
-            assert len(include_includelist) > 2
-            global_epoch_name = include_includelist[-1] # 'maze_PYR'
+            # kdiba directional epochs: active_completed[0/1/-1] is maze1_odd/maze2_odd/maze_any — use find_LongShortGlobal instead. non-kdiba: fall back to first 2 + last.
+            if owning_pipeline_reference.is_kdiba_session():
+                long_epoch_name, short_epoch_name, global_epoch_name = owning_pipeline_reference.find_LongShortGlobal_epoch_names()
+            else:
+                long_epoch_name = include_includelist[0] # 'maze1_PYR'
+                short_epoch_name = include_includelist[1] # 'maze2_PYR'
+                assert len(include_includelist) > 2
+                global_epoch_name = include_includelist[-1] # 'maze_PYR'
             print(f'include_includelist: {include_includelist}\nlong_epoch_name: {long_epoch_name}, short_epoch_name: {short_epoch_name}, global_epoch_name: {global_epoch_name}')
 
             # ## TODO: move this computation elsewhere, this is BAD:
