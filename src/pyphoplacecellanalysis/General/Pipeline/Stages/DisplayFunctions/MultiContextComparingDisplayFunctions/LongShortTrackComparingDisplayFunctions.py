@@ -1498,6 +1498,7 @@ class PhoJonathanPlotHelpers:
             spike_markersize = 3
             disable_left_and_right_pf_plots = True
             position_plot_kwargs = {'color': '#757575c8', 'linewidth': 0.2, 'zorder':5} | kwargs.get('position_plot_kwargs', {})
+            kwargs.setdefault('border_linewidth', 0.25) # thin L/R PF outline on narrow publication axes
             suptitle_params = dict(fontsize='11')
             title_params = dict(fontsize='9')
 
@@ -1506,6 +1507,7 @@ class PhoJonathanPlotHelpers:
             inactive_scatter_markersize = 3
             markersize = 5
             spike_markersize = 4
+            kwargs.setdefault('border_linewidth', 0.5)
             position_plot_kwargs = {'color': '#757575c8', 'linewidth': 1.0, 'zorder':5} | kwargs.get('position_plot_kwargs', {})
             suptitle_params = dict(fontsize='14')
             title_params = dict(fontsize='10')
