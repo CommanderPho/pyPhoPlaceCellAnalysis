@@ -1130,6 +1130,15 @@ class BatchPhoJonathanFiguresHelper:
         if write_vector_format:
             active_pdf_metadata, _UNUSED_pdf_save_filename = build_pdf_metadata_from_display_context(curr_active_identifying_ctx, subset_includelist=subset_includelist, subset_excludelist=subset_excludelist)
             curr_pdf_save_path = final_figure_file_path.with_suffix('.pdf')
+            # Drop needless matplotlib clip masks (axes patches, etc.) so Illustrator/vector PDFs aren't full of empty clipping paths
+            for an_artist in a_fig.findobj():
+                try:
+                    an_artist.set_clip_on(False)
+                    an_artist.set_clip_path(None)
+                except Exception:
+                    pass
+            ## END for an_artist in a_fig.findobj()...
+
             with backend_pdf.PdfPages(curr_pdf_save_path, keep_empty=False, metadata=active_pdf_metadata) as pdf:
                 # Save out PDF page:
                 pdf.savefig(a_fig)
