@@ -49,11 +49,12 @@ from vtkmodules.vtkCommonCore import vtkLookupTable # required for build_custom_
 # 1D Placefields and Tuning Curves                                                                                     #
 # ==================================================================================================================== #
 
-def plot_placefield_tuning_curve(xbin_centers, tuning_curve, ax, is_horizontal:bool=False, color='g', fill_alpha=0.3, border_line_override_color=None, border_line_alpha=0.8):
+def plot_placefield_tuning_curve(xbin_centers, tuning_curve, ax, is_horizontal:bool=False, color='g', fill_alpha=0.3, border_line_override_color=None, border_line_alpha=0.8, border_linewidth: float = 0.5):
     """ Plots the 1D Normalized Tuning Curve in a 2D Plot
 
     fill_alpha: the alpha for the fill color
     border_line_alpha: the alpha for the line
+    border_linewidth: stroke width for the tuning-curve outline (points). Default 0.5 keeps the outline thin on narrow PF axes.
 
     Usage:
         axs1 = plot_placefield_tuning_curve(active_epoch_placefields1D.ratemap.xbin_centers, active_epoch_placefields1D.ratemap.normalized_tuning_curves[curr_cell_id, :].squeeze(), axs1)
@@ -67,10 +68,10 @@ def plot_placefield_tuning_curve(xbin_centers, tuning_curve, ax, is_horizontal:b
 
     if is_horizontal:
         ax.fill_betweenx(xbin_centers, tuning_curve, color=color, alpha=fill_alpha, interpolate=True)
-        ax.plot(tuning_curve, xbin_centers, border_line_override_color, alpha=border_line_alpha)
+        ax.plot(tuning_curve, xbin_centers, border_line_override_color, alpha=border_line_alpha, linewidth=border_linewidth)
     else:
         ax.fill_between(xbin_centers, tuning_curve, color=color, alpha=fill_alpha)
-        ax.plot(xbin_centers, tuning_curve, border_line_override_color, alpha=border_line_alpha)
+        ax.plot(xbin_centers, tuning_curve, border_line_override_color, alpha=border_line_alpha, linewidth=border_linewidth)
     return ax
 
 def _plot_helper_build_jittered_spike_points(curr_cell_spike_times, curr_cell_interpolated_spike_curve_values, jitter_multiplier=2.0, feature_range=(-1, 1), time_independent_jitter=False):
@@ -195,6 +196,7 @@ def _subfn_plot_pf1D_placefield(active_epoch_placefields1D, placefield_cell_inde
     t_end = kwargs.get('t_end', active_epoch_placefields1D.t[-1])
     
     tuning_curve_color: str = kwargs.get('tuning_curve_color', 'g')
+    border_linewidth: float = kwargs.get('border_linewidth', 0.5)
 
     # Part 2: The Placefield Plot to the Right and the connecting features: ______________________________________________ #
     ## The individual spike lines:
@@ -223,7 +225,7 @@ def _subfn_plot_pf1D_placefield(active_epoch_placefields1D, placefield_cell_inde
     #     # right
     #     pass # non-flipped
     
-    ax_pf_tuning_curve = plot_placefield_tuning_curve(active_epoch_placefields1D.ratemap.xbin_centers, tuning_curve=curr_cell_normalized_tuning_curve, ax=ax_pf_tuning_curve, is_horizontal=True, color=tuning_curve_color)
+    ax_pf_tuning_curve = plot_placefield_tuning_curve(active_epoch_placefields1D.ratemap.xbin_centers, tuning_curve=curr_cell_normalized_tuning_curve, ax=ax_pf_tuning_curve, is_horizontal=True, color=tuning_curve_color, border_linewidth=border_linewidth)
     if should_plot_spike_indicator_points_on_placefield:
         curr_cell_interpolated_spike_curve_values = np.interp(curr_cell_spike_positions, active_epoch_placefields1D.ratemap.xbin_centers, curr_cell_normalized_tuning_curve) # (271,)
         curr_cell_jittered_spike_curve_values = _plot_helper_build_jittered_spike_points(curr_cell_spike_times, curr_cell_interpolated_spike_curve_values,

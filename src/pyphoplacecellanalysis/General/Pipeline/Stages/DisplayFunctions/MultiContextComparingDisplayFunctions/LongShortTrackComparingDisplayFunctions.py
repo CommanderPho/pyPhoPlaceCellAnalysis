@@ -1507,8 +1507,8 @@ class PhoJonathanPlotHelpers:
             inactive_scatter_markersize = 3
             markersize = 5
             spike_markersize = 4
-            kwargs.setdefault('border_linewidth', 0.5)
             position_plot_kwargs = {'color': '#757575c8', 'linewidth': 1.0, 'zorder':5} | kwargs.get('position_plot_kwargs', {})
+            kwargs.setdefault('border_linewidth', 0.5)
             suptitle_params = dict(fontsize='14')
             title_params = dict(fontsize='10')
 
