@@ -901,6 +901,8 @@ class LoadedScoreShufflesDataframeAccessor:
         shuffle_p_alpha: float = 0.05
         shuffle_z_threshold: float = 1.96  # ~two-tailed p=0.05; |z| for both 'greater' and 'less' metrics
         high_shuffle_quantile_threshold: float = 0.9  # legacy rank-order quantile, not EpochScoreShuffle p/z
+        time_bin_size: float = 0.025  # keep exactly one decoding tbin
+        custom_replay_name: str = LoadedScoreShufflesDataframeAccessor.DEFAULT_PREFERRED_CUSTOM_REPLAY_NAME
 
         if ('ripple_EpochScoreShuffle_df' not in locals()) or (ripple_EpochScoreShuffle_df is None):
             raise ValueError('ripple_EpochScoreShuffle_df is not loaded. Run the across-session CSV load / shuffle-merge cell first.')
@@ -908,11 +910,13 @@ class LoadedScoreShufflesDataframeAccessor:
         if 'additional_filter_predicates' not in locals() or additional_filter_predicates is None:
             additional_filter_predicates = {}
         _out = LoadedScoreShufflesDataframeAccessor.process_loaded_shuffles(ripple_EpochScoreShuffle_df=ripple_EpochScoreShuffle_df, df_filter=df_filter, additional_filter_predicates=additional_filter_predicates,
-                    shuffle_p_alpha=shuffle_p_alpha, shuffle_z_threshold=shuffle_z_threshold, high_shuffle_quantile_threshold=high_shuffle_quantile_threshold)
+                    shuffle_p_alpha=shuffle_p_alpha, shuffle_z_threshold=shuffle_z_threshold, high_shuffle_quantile_threshold=high_shuffle_quantile_threshold,
+                    time_bin_size=time_bin_size, custom_replay_name=custom_replay_name)
         shuffle_significance_predicates, discovered_shuffle_metrics_df, ripple_EpochScoreShuffle_df = _out
 
         discovered_shuffle_metrics_df
         ripple_EpochScoreShuffle_df
+        LoadedScoreShufflesDataframeAccessor.count_available_shuffles_per_session(ripple_EpochScoreShuffle_df)
 
         additional_filter_predicates.update(shuffle_significance_predicates)
 
@@ -926,6 +930,8 @@ class LoadedScoreShufflesDataframeAccessor:
 
 
     """
+    DEFAULT_TIME_BIN_SIZE: float = 0.025
+    DEFAULT_PREFERRED_CUSTOM_REPLAY_NAME: str = 'withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 8, 9]-frateThresh_2.0'
     # decoder_names: Tuple[str, str, str, str] = DECODER_NAMES
     # default_score_col_names: Tuple[str, ...] = DEFAULT_MLD_SCORE_COL_NAMES
     # p_decoder_col_names: Tuple[str, str, str, str] = ('P_Long_LR', 'P_Long_RL', 'P_Short_LR', 'P_Short_RL')
@@ -944,11 +950,118 @@ class LoadedScoreShufflesDataframeAccessor:
             raise ValueError(f"object must be a pandas Dataframe but is of type: {type(obj)}!\nobj: {obj}")
 
 
+    @classmethod
+    def _comparable_custom_replay_name(cls, name) -> str:
+        """Normalize underscore/hyphen variants for replay-name matching."""
+        if name is None:
+            return ''
+        return str(name).replace('_', '-')
+
+
+    @classmethod
+    def filter_to_single_session_config(cls, ripple_EpochScoreShuffle_df: pd.DataFrame,
+        time_bin_size: float = DEFAULT_TIME_BIN_SIZE, custom_replay_name: Optional[str] = DEFAULT_PREFERRED_CUSTOM_REPLAY_NAME,
+        session_col: str = 'session_name', time_bin_col: str = 'time_bin_size', replay_col: str = 'custom_replay_name',
+        drop_sessions_missing_preferred: bool = True, debug_print: bool = True) -> pd.DataFrame:
+        """Keep exactly one `time_bin_size` (default 25ms) and one `custom_replay_name` per session.
+
+        If `custom_replay_name` is provided, only that comparable name is kept. Sessions with no match are dropped when `drop_sessions_missing_preferred=True`, else the most-common remaining name for that session is used.
+        If `custom_replay_name` is None, each session keeps its most-common remaining name after the tbin filter.
+        """
+        if (ripple_EpochScoreShuffle_df is None) or (len(ripple_EpochScoreShuffle_df) == 0):
+            return ripple_EpochScoreShuffle_df
+
+        df: pd.DataFrame = deepcopy(ripple_EpochScoreShuffle_df)
+        n_before: int = len(df)
+        sessions_before = sorted(df[session_col].astype(str).unique().tolist()) if (session_col in df.columns) else []
+
+        if time_bin_col in df.columns:
+            tbin_vals = pd.to_numeric(df[time_bin_col], errors='coerce')
+            df = df.loc[np.isclose(tbin_vals.to_numpy(dtype=float), float(time_bin_size), rtol=0.0, atol=1e-9)].copy()
+        elif debug_print:
+            print(f'WARN: filter_to_single_session_config: missing `{time_bin_col}`; skipping tbin filter.')
+
+        if (replay_col in df.columns) and (custom_replay_name is not None):
+            preferred_comparable: str = cls._comparable_custom_replay_name(custom_replay_name)
+            replay_comparable = df[replay_col].map(cls._comparable_custom_replay_name)
+            preferred_mask = (replay_comparable == preferred_comparable)
+            if bool(np.any(preferred_mask.to_numpy())):
+                if drop_sessions_missing_preferred:
+                    df = df.loc[preferred_mask].copy()
+                else:
+                    # Prefer the requested name where present; fill remaining sessions with their mode name.
+                    preferred_sessions = set(df.loc[preferred_mask, session_col].astype(str).unique().tolist())
+                    keep_parts: list[pd.DataFrame] = [df.loc[preferred_mask]]
+                    for a_session, a_session_df in df.groupby(session_col, sort=False):
+                        if str(a_session) in preferred_sessions:
+                            continue
+                        name_counts = a_session_df[replay_col].astype(str).value_counts(dropna=False)
+                        chosen_name: str = str(name_counts.index[0])
+                        keep_parts.append(a_session_df.loc[a_session_df[replay_col].astype(str) == chosen_name])
+                    ## END for a_session, a_session_df in df.groupby(session_col, sort=False)...
+                    df = pd.concat(keep_parts, axis='index', ignore_index=True) if (len(keep_parts) > 0) else df.iloc[0:0].copy()
+            elif debug_print:
+                print(f'WARN: preferred custom_replay_name={custom_replay_name!r} not found after tbin={time_bin_size}; falling back to per-session mode.')
+
+        if (replay_col in df.columns) and (session_col in df.columns) and (len(df) > 0):
+            # Enforce exactly one replay name per session (mode if multiples remain).
+            keep_idx: list = []
+            for a_session, a_session_df in df.groupby(session_col, sort=False):
+                name_counts = a_session_df[replay_col].astype(str).value_counts(dropna=False)
+                if len(name_counts) > 1:
+                    chosen_name: str = str(name_counts.index[0])
+                    if debug_print:
+                        print(f'WARN: session={a_session!r} still has {len(name_counts)} custom_replay_name values after preferred filter; keeping mode={chosen_name!r}')
+                    keep_idx.extend(a_session_df.loc[a_session_df[replay_col].astype(str) == chosen_name].index.tolist())
+                else:
+                    keep_idx.extend(a_session_df.index.tolist())
+                ## END if len(name_counts) > 1...
+            ## END for a_session, a_session_df in df.groupby(session_col, sort=False)...
+            df = df.loc[keep_idx].copy()
+
+        if debug_print:
+            sessions_after = sorted(df[session_col].astype(str).unique().tolist()) if (session_col in df.columns) else []
+            dropped_sessions = sorted(set(sessions_before) - set(sessions_after))
+            tbin_uniques = sorted(pd.to_numeric(df[time_bin_col], errors='coerce').dropna().unique().tolist()) if ((time_bin_col in df.columns) and (len(df) > 0)) else []
+            replay_uniques = sorted(df[replay_col].astype(str).unique().tolist()) if ((replay_col in df.columns) and (len(df) > 0)) else []
+            print(f'filter_to_single_session_config: n_rows {n_before} -> {len(df)}; n_sessions {len(sessions_before)} -> {len(sessions_after)}; time_bin_size uniques={tbin_uniques}; custom_replay_name uniques={replay_uniques}')
+            if len(dropped_sessions) > 0:
+                print(f'\tdropped sessions missing preferred config ({len(dropped_sessions)}): {dropped_sessions}')
+
+        return df.reset_index(drop=True)
+
+
+    @classmethod
+    def count_available_shuffles_per_session(cls, ripple_EpochScoreShuffle_df: pd.DataFrame,
+        p_col: str = 'travel_p_long_LR', n_extreme_col: str = 'travel_n_extreme_long_LR',
+        session_col: str = 'session_name', time_bin_col: str = 'time_bin_size', replay_col: str = 'custom_replay_name') -> pd.DataFrame:
+        """Recover n_valid_shuffles ≈ n_extreme / p (where p>0) and summarize per session/config."""
+        if (ripple_EpochScoreShuffle_df is None) or (len(ripple_EpochScoreShuffle_df) == 0):
+            return pd.DataFrame(columns=[session_col, replay_col, time_bin_col, 'n_epochs', 'n_shuffles_median', 'n_shuffles_min', 'n_shuffles_max', 'n_shuffles_nunique'])
+
+        df: pd.DataFrame = deepcopy(ripple_EpochScoreShuffle_df)
+        if (p_col not in df.columns) or (n_extreme_col not in df.columns):
+            raise ValueError(f'need `{p_col}` and `{n_extreme_col}` to recover n_shuffles; present={list(df.columns)}')
+
+        p_vals = pd.to_numeric(df[p_col], errors='coerce')
+        n_vals = pd.to_numeric(df[n_extreme_col], errors='coerce')
+        valid_mask = (p_vals > 0) & p_vals.notna() & n_vals.notna()
+        df = df.loc[valid_mask].copy()
+        df['n_shuffles'] = np.rint((n_vals.loc[valid_mask] / p_vals.loc[valid_mask]).to_numpy(dtype=float)).astype(int)
+
+        group_cols = [c for c in (session_col, replay_col, time_bin_col) if c in df.columns]
+        out_df: pd.DataFrame = (df.groupby(group_cols, dropna=False)
+            .agg(n_epochs=('n_shuffles', 'size'), n_shuffles_median=('n_shuffles', 'median'), n_shuffles_min=('n_shuffles', 'min'), n_shuffles_max=('n_shuffles', 'max'), n_shuffles_nunique=('n_shuffles', 'nunique'))
+            .reset_index())
+        out_df['n_shuffles_median'] = out_df['n_shuffles_median'].astype(int)
+        return out_df.sort_values(group_cols).reset_index(drop=True)
+
 
     @classmethod
     def process_loaded_shuffles(cls, ripple_EpochScoreShuffle_df: pd.DataFrame, additional_filter_predicates=None,
         shuffle_p_alpha: float = 0.05, shuffle_z_threshold: float = 1.96, high_shuffle_quantile_threshold: float = 0.9,
-        **kwargs):
+        time_bin_size: float = DEFAULT_TIME_BIN_SIZE, custom_replay_name: Optional[str] = DEFAULT_PREFERRED_CUSTOM_REPLAY_NAME,
+        drop_sessions_missing_preferred: bool = True, **kwargs):
         """ Load the Shuffles
 
         Usage:
@@ -957,6 +1070,8 @@ class LoadedScoreShufflesDataframeAccessor:
             shuffle_p_alpha: float = 0.05
             shuffle_z_threshold: float = 1.96  # ~two-tailed p=0.05; |z| for both 'greater' and 'less' metrics
             high_shuffle_quantile_threshold: float = 0.9  # legacy rank-order quantile, not EpochScoreShuffle p/z
+            time_bin_size: float = 0.025
+            custom_replay_name: str = LoadedScoreShufflesDataframeAccessor.DEFAULT_PREFERRED_CUSTOM_REPLAY_NAME
 
             if ('ripple_EpochScoreShuffle_df' not in locals()) or (ripple_EpochScoreShuffle_df is None):
                 raise ValueError('ripple_EpochScoreShuffle_df is not loaded. Run the across-session CSV load / shuffle-merge cell first.')
@@ -964,11 +1079,13 @@ class LoadedScoreShufflesDataframeAccessor:
             if 'additional_filter_predicates' not in locals() or additional_filter_predicates is None:
                 additional_filter_predicates = {}
             _out = LoadedScoreShufflesDataframeAccessor.process_loaded_shuffles(ripple_EpochScoreShuffle_df=ripple_EpochScoreShuffle_df, df_filter=df_filter, additional_filter_predicates=additional_filter_predicates,
-                        shuffle_p_alpha=shuffle_p_alpha, shuffle_z_threshold=shuffle_z_threshold, high_shuffle_quantile_threshold=high_shuffle_quantile_threshold)
+                        shuffle_p_alpha=shuffle_p_alpha, shuffle_z_threshold=shuffle_z_threshold, high_shuffle_quantile_threshold=high_shuffle_quantile_threshold,
+                        time_bin_size=time_bin_size, custom_replay_name=custom_replay_name)
             shuffle_significance_predicates, discovered_shuffle_metrics_df, ripple_EpochScoreShuffle_df = _out
 
             discovered_shuffle_metrics_df
             ripple_EpochScoreShuffle_df
+            LoadedScoreShufflesDataframeAccessor.count_available_shuffles_per_session(ripple_EpochScoreShuffle_df)
 
             additional_filter_predicates.update(shuffle_significance_predicates)
 
@@ -984,6 +1101,7 @@ class LoadedScoreShufflesDataframeAccessor:
         from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionHelpers
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.SequenceBasedComputations import DEFAULT_SHUFFLE_DECODER_NAMES, SCORE_EXTREME_MODE
 
+        ripple_EpochScoreShuffle_df = cls.filter_to_single_session_config(ripple_EpochScoreShuffle_df, time_bin_size=time_bin_size, custom_replay_name=custom_replay_name, drop_sessions_missing_preferred=drop_sessions_missing_preferred, debug_print=True)
         ripple_EpochScoreShuffle_df, epoch_score_shuffle_transfer_col_names = AcrossSessionHelpers.prepare_epoch_score_shuffle_transfer_columns(ripple_EpochScoreShuffle_df)
         decoder_names: list[str] = list(DEFAULT_SHUFFLE_DECODER_NAMES)
 

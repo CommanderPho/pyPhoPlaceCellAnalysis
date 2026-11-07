@@ -1868,6 +1868,9 @@ class LoadedPosteriorContainer:
         #     all_cells_first_spike_time_df_loaded, global_spikes_df_loaded, global_spikes_dict_loaded, first_spikes_dict_loaded, extra_dfs_dict_loaded = a_first_spike_time_tuple ## unpack
 
 
+from neuropy.utils.indexing_helpers import find_nearest_time
+
+
 @metadata_attributes(short_name=None, tags=['export', 'posterior', 'datasource', 'plotting'], input_requires=[], output_provides=[], uses=[], used_by=['DataFrameFilter'], creation_date='2024-12-16 22:28', related_items=[])
 @define(slots=False, eq=False, repr=False)
 class PosteriorPlottingDatasource:
@@ -2177,71 +2180,72 @@ class PosteriorPlottingDatasource:
         return entries[0]
 
 
-    def _match_epoch_index(self, epoch_starts: NDArray, start_t: float, time_bin_size: Optional[float], epoch_stops: Optional[NDArray] = None, time_bin_edges=None, t_bin_centers=None) -> Optional[int]:
-        starts = np.asarray(epoch_starts, dtype=float)
-        if starts.size == 0:
-            return None
-        tbin = float(time_bin_size) if time_bin_size is not None else 0.05
-        tolerance = max(0.5, 10.0 * tbin)
-        target = float(start_t)
-        # Prefer containment in [first_edge, last_edge] so per-time-bin rows still hit the parent epoch.
-        ref_edges = None
-        ref_centers = None
-        if isinstance(time_bin_edges, dict):
-            ref_edges = next((time_bin_edges[d] for d in self.DECODER_NAMES if d in time_bin_edges and len(time_bin_edges[d]) > 0), None)
-        elif time_bin_edges is not None:
-            ref_edges = time_bin_edges
-        if isinstance(t_bin_centers, dict):
-            ref_centers = next((t_bin_centers[d] for d in self.DECODER_NAMES if d in t_bin_centers and len(t_bin_centers[d]) > 0), None)
-        elif t_bin_centers is not None:
-            ref_centers = t_bin_centers
-        if ref_edges is not None:
-            for i in range(len(ref_edges)):
-                try:
-                    e_f = np.asarray(ref_edges[i], dtype=float).ravel()
-                except Exception:
-                    continue
-                finite = e_f[np.isfinite(e_f)]
-                if finite.size == 0:
-                    continue
-                lo = float(finite[0])
-                hi = float(finite[-1]) if finite.size > 1 else (lo + tbin)
-                if (lo - tolerance) <= target <= (hi + tolerance):
-                    return i
-            ## END for i in range(len(ref_edges))....
-        if epoch_stops is not None:
-            stops = np.asarray(epoch_stops, dtype=float)
-            n = min(starts.size, stops.size)
-            for i in range(n):
-                if (not np.isfinite(starts[i])) or (not np.isfinite(stops[i])):
-                    continue
-                lo = float(min(starts[i], stops[i]))
-                hi = float(max(starts[i], stops[i]))
-                if (lo - tolerance) <= target <= (hi + tolerance):
-                    return i
-            ## END for i in range(n)....
-        if ref_centers is not None:
-            for i in range(len(ref_centers)):
-                c = np.asarray(ref_centers[i]).ravel()
-                if c.size == 0:
-                    continue
-                try:
-                    c_f = c.astype(float)
-                except Exception:
-                    continue
-                if np.any(np.abs(c_f - target) <= tolerance):
-                    return i
-            ## END for i in range(len(ref_centers))....
+    # def _match_epoch_index(self, epoch_starts: NDArray, start_t: float, time_bin_size: Optional[float], epoch_stops: Optional[NDArray] = None, time_bin_edges=None, t_bin_centers=None) -> Optional[int]: #TODO 2026-11-06 21:46: - [ ] CONFIRMED BROKEN, RETURNS WRONG INDEX
+    #     starts = np.asarray(epoch_starts, dtype=float)
+    #     if starts.size == 0:
+    #         return None
+    #     assert (time_bin_size is not None), f"2026-11-06 - WTF?!"
+    #     tbin = float(time_bin_size) if time_bin_size is not None else 0.05
+    #     tolerance = max(0.5, 10.0 * tbin)
+    #     target = float(start_t)
+    #     # Prefer containment in [first_edge, last_edge] so per-time-bin rows still hit the parent epoch.
+    #     ref_edges = None
+    #     ref_centers = None
+    #     if isinstance(time_bin_edges, dict):
+    #         ref_edges = next((time_bin_edges[d] for d in self.DECODER_NAMES if d in time_bin_edges and len(time_bin_edges[d]) > 0), None)
+    #     elif time_bin_edges is not None:
+    #         ref_edges = time_bin_edges
+    #     if isinstance(t_bin_centers, dict):
+    #         ref_centers = next((t_bin_centers[d] for d in self.DECODER_NAMES if d in t_bin_centers and len(t_bin_centers[d]) > 0), None)
+    #     elif t_bin_centers is not None:
+    #         ref_centers = t_bin_centers
+    #     if ref_edges is not None:
+    #         for i in range(len(ref_edges)):
+    #             try:
+    #                 e_f = np.asarray(ref_edges[i], dtype=float).ravel()
+    #             except Exception:
+    #                 continue
+    #             finite = e_f[np.isfinite(e_f)]
+    #             if finite.size == 0:
+    #                 continue
+    #             lo = float(finite[0])
+    #             hi = float(finite[-1]) if finite.size > 1 else (lo + tbin)
+    #             if (lo - tolerance) <= target <= (hi + tolerance):
+    #                 return i
+    #         ## END for i in range(len(ref_edges))....
+    #     if epoch_stops is not None:
+    #         stops = np.asarray(epoch_stops, dtype=float)
+    #         n = min(starts.size, stops.size)
+    #         for i in range(n):
+    #             if (not np.isfinite(starts[i])) or (not np.isfinite(stops[i])):
+    #                 continue
+    #             lo = float(min(starts[i], stops[i]))
+    #             hi = float(max(starts[i], stops[i]))
+    #             if (lo - tolerance) <= target <= (hi + tolerance):
+    #                 return i
+    #         ## END for i in range(n)....
+    #     if ref_centers is not None:
+    #         for i in range(len(ref_centers)):
+    #             c = np.asarray(ref_centers[i]).ravel()
+    #             if c.size == 0:
+    #                 continue
+    #             try:
+    #                 c_f = c.astype(float)
+    #             except Exception:
+    #                 continue
+    #             if np.any(np.abs(c_f - target) <= tolerance):
+    #                 return i
+    #         ## END for i in range(len(ref_centers))....
 
-        valid = np.isfinite(starts)
-        if not np.any(valid):
-            return None
-        diffs = np.abs(starts - target)
-        diffs[~valid] = np.inf
-        idx = int(np.argmin(diffs))
-        if not np.isfinite(diffs[idx]) or (diffs[idx] > tolerance):
-            return None
-        return idx
+    #     valid = np.isfinite(starts)
+    #     if not np.any(valid):
+    #         return None
+    #     diffs = np.abs(starts - target)
+    #     diffs[~valid] = np.inf
+    #     idx = int(np.argmin(diffs))
+    #     if not np.isfinite(diffs[idx]) or (diffs[idx] > tolerance):
+    #         return None
+    #     return idx
 
 
     def get_posterior_data(self, session_name: str, custom_replay_name: str, a_variable_name: str = 'p_x_given_n_grey', a_decoder_name: str = 'long_LR', last_selected_idx: Optional[int] = 0,
@@ -2251,6 +2255,8 @@ class PosteriorPlottingDatasource:
 
         Prefer `start_t` (+ session/replay/tbin) over scatter `last_selected_idx`. Missing epoch returns None.
         """
+        
+
         if session_name is None:
             return None
         session_path: str = self.build_session_path(session_name, format_name=format_name, animal=animal, exper_name=exper_name)
@@ -2273,8 +2279,11 @@ class PosteriorPlottingDatasource:
         epoch_idx: Optional[int] = None
         match_tbin = entry.get('time_bin_size') if time_bin_size is None else time_bin_size
         if start_t is not None:
-            epoch_idx = self._match_epoch_index(entry.get('epoch_starts', np.array([])), float(start_t), match_tbin,
-                                                epoch_stops=entry.get('epoch_stops'), time_bin_edges=entry.get('time_bin_edges'), t_bin_centers=entry.get('t_bin_centers'))
+            # epoch_idx = self._match_epoch_index(entry.get('epoch_starts', np.array([])), float(start_t), match_tbin,
+            #                                     epoch_stops=entry.get('epoch_stops'), time_bin_edges=entry.get('time_bin_edges'), t_bin_centers=entry.get('t_bin_centers')) #TODO 2026-11-06 21:44: - [ ] BUSTED CONFIRMED, WRONG INDEX RETURNED
+
+            _, epoch_idx, closest_time, matched_time_difference = find_nearest_time(entry.get('epoch_starts', np.array([])), target_time=float(start_t))
+            assert matched_time_difference < 0.01, f"matched_time_difference: {matched_time_difference}"
         elif last_selected_idx is not None:
             epoch_idx = int(last_selected_idx)
         if epoch_idx is None:
