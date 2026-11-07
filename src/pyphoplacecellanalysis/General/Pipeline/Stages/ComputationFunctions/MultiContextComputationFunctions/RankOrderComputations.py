@@ -3405,10 +3405,9 @@ class RankOrderGlobalDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Dis
         if include_includelist is None:
             include_includelist = owning_pipeline_reference.active_completed_computation_result_names # ['maze', 'sprinkle']
 
-        long_epoch_name = include_includelist[0] # 'maze1_PYR'
-        short_epoch_name = include_includelist[1] # 'maze2_PYR'
-        assert len(include_includelist) > 2
-        global_epoch_name = include_includelist[-1] # 'maze_PYR'
+        # For kdiba: Primary/Secondary == Long/Short (maze1_any / maze2_any), not maze1_odd / maze2_odd.
+        long_epoch_name, short_epoch_name, global_epoch_name = owning_pipeline_reference.safe_resolve_PrimarySecondaryGlobal_epoch_names(include_includelist)
+        assert (global_epoch_name != '') and (global_epoch_name is not None)
 
         directional_laps_results = global_computation_results.computed_data['DirectionalLaps']
         assert 'RankOrder' in global_computation_results.computed_data, f"as of 2023-11-30 - RankOrder is required to determine the appropriate 'minimum_inclusion_fr_Hz' to use. Previously None was used."

@@ -758,6 +758,30 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
 
         return long_epoch_name, short_epoch_name, global_epoch_name
 
+    # @function_attributes(short_name=None, tags=['safe', 'long-short', 'epochs', 'epoch-names', 'kdiba'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-11-06 17:20', related_items=[])
+    def safe_resolve_PrimarySecondaryGlobal_epoch_names(self, include_includelist=None):
+        """Resolve (primary, secondary, global) epoch filter names.
+
+        For kdiba sessions: delegates to find_LongShortGlobal_epoch_names()
+        so primary/secondary are the canonical Long/Short tracks (e.g. maze1_any / maze2_any),
+        not directional odd/even prefixes from active_completed_computation_result_names.
+
+        For non-kdiba sessions: falls back to include_includelist[0]/[1]/[-1]
+        (or active_completed_computation_result_names when include_includelist is None).
+
+        Usage:
+            # For kdiba: Primary/Secondary == Long/Short (maze1_any / maze2_any), not maze1_odd / maze2_odd.
+            long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.safe_resolve_PrimarySecondaryGlobal_epoch_names(include_includelist)
+        """
+        if include_includelist is None:
+            include_includelist = self.active_completed_computation_result_names
+        if self.is_kdiba_session():
+            return self.find_LongShortGlobal_epoch_names()  # Long, Short, Global
+        primary_epoch_name = include_includelist[0]
+        secondary_epoch_name = include_includelist[1]
+        global_epoch_name = include_includelist[-1] if len(include_includelist) > 2 else ''
+        return primary_epoch_name, secondary_epoch_name, global_epoch_name
+
 
     def find_LongShortDelta_times(self) -> Tuple[float, float, float]:
         """ Helper function to returns the [t_start, t_delta, t_end] session times. They must exist.
@@ -1870,7 +1894,7 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
         else:
             if progress_print:
                 print(f'Running batch_extended_computations(...) with included_computation_filter_names: "{included_computation_filter_names}"')
-            global_epoch_name = included_computation_filter_names[-1]
+            global_epoch_name = self.find_Global_epoch_name()
             
         
         ## Specify the computations and the requirements to validate them.
@@ -2996,6 +3020,19 @@ class PipelineWithComputedPipelineStageMixin:
 
         """
         return self.stage.find_LongShortGlobal_epoch_names()
+
+    # @function_attributes(short_name=None, tags=['safe', 'long-short', 'epochs', 'epoch-names', 'kdiba'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-11-06 17:20', related_items=[])
+    def safe_resolve_PrimarySecondaryGlobal_epoch_names(self, include_includelist=None):
+        """Resolve (primary, secondary, global) epoch filter names.
+
+        For kdiba sessions: Primary/Secondary == Long/Short (e.g. maze1_any / maze2_any), not maze1_odd / maze2_odd.
+        For non-kdiba: falls back to include_includelist[0]/[1]/[-1].
+
+        Usage:
+            # For kdiba: Primary/Secondary == Long/Short (maze1_any / maze2_any), not maze1_odd / maze2_odd.
+            long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.safe_resolve_PrimarySecondaryGlobal_epoch_names(include_includelist)
+        """
+        return self.stage.safe_resolve_PrimarySecondaryGlobal_epoch_names(include_includelist=include_includelist)
 
 
     def find_LongShortDelta_times(self) -> Tuple[float, float, float]:
