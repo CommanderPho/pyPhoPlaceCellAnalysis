@@ -982,13 +982,14 @@ class PhoJonathanPlotHelpers:
     
     @classmethod
     def get_default_spike_scatter_kwargs_dict(cls, prepare_for_publication: bool=True, spikes_alpha:float=0.9) -> Dict[str, Dict]:
+        # gid → SVG <g id="..."> groups for Illustrator/Inkscape layer selection
         common_simple_kwargs_overrides = {'spikes_color_RGB': None, 'spikes_alpha': None, 'should_use_hairy_plot_for_spikes': False} # False → circular ax.plot markers; True → HairyLinePlot ticks (ignores marker/markersize)
         if not prepare_for_publication:
             spike_plot_kwargs_dict = {
-                'all': {**common_simple_kwargs_overrides, 'markersize':4.0, 'marker': '.', 'markerfacecolor':(0.1, 0.1, 0.1, (spikes_alpha*0.6*0.5)), 'markeredgecolor':(0.1, 0.1, 0.1, (spikes_alpha*0.5)), 'zorder':10},
-                'is_included_long_pf1D': {**common_simple_kwargs_overrides, 'markersize':5.0, 'marker': '.', 'markerfacecolor':(0, 0, 1, (spikes_alpha*0.6)), 'markeredgecolor':(0, 0, 1, spikes_alpha), 'zorder':15},
-                'is_included_short_pf1D': {**common_simple_kwargs_overrides, 'markersize':5.0, 'marker': '.', 'markerfacecolor':(1, 0, 0, (spikes_alpha*0.6)), 'markeredgecolor':(1, 0, 0, spikes_alpha), 'zorder':15},
-                'is_included_PBE': {**common_simple_kwargs_overrides, 'markersize':5.0, 'marker': '.', 'markerfacecolor':(0.102, 0.831, 0, (spikes_alpha*0.6)), 'markeredgecolor':(0.102, 0.831, 0, spikes_alpha), 'zorder':15},
+                'all': {**common_simple_kwargs_overrides, 'gid': 'spikes_all', 'markersize':4.0, 'marker': '.', 'markerfacecolor':(0.1, 0.1, 0.1, (spikes_alpha*0.6*0.5)), 'markeredgecolor':(0.1, 0.1, 0.1, (spikes_alpha*0.5)), 'zorder':10},
+                'is_included_long_pf1D': {**common_simple_kwargs_overrides, 'gid': 'spikes_long_pf1D', 'markersize':5.0, 'marker': '.', 'markerfacecolor':(0, 0, 1, (spikes_alpha*0.6)), 'markeredgecolor':(0, 0, 1, spikes_alpha), 'zorder':15},
+                'is_included_short_pf1D': {**common_simple_kwargs_overrides, 'gid': 'spikes_short_pf1D', 'markersize':5.0, 'marker': '.', 'markerfacecolor':(1, 0, 0, (spikes_alpha*0.6)), 'markeredgecolor':(1, 0, 0, spikes_alpha), 'zorder':15},
+                'is_included_PBE': {**common_simple_kwargs_overrides, 'gid': 'spikes_PBE', 'markersize':5.0, 'marker': '.', 'markerfacecolor':(0.102, 0.831, 0, (spikes_alpha*0.6)), 'markeredgecolor':(0.102, 0.831, 0, spikes_alpha), 'zorder':15},
             }
         else:
             ## publication figure — keep subtle '.' markers, but larger than 1/2 so they remain readable on thin rows
@@ -997,10 +998,10 @@ class PhoJonathanPlotHelpers:
                 # 'is_included_long_pf1D': {**common_simple_kwargs_overrides, 'markersize': 10.0, 'marker': '.', 'markerfacecolor':(0, 0, 1, (spikes_alpha*0.6)), 'markeredgecolor': 'none', 'zorder':15},
                 # 'is_included_short_pf1D': {**common_simple_kwargs_overrides, 'markersize': 10.0, 'marker': '.', 'markerfacecolor':(1, 0, 0, (spikes_alpha*0.6)), 'markeredgecolor': 'none', 'zorder':15},
                 # 'is_included_PBE': {**common_simple_kwargs_overrides, 'markersize': 10.0, 'marker': '.', 'markerfacecolor':(0.102, 0.831, 0, (spikes_alpha*0.6)), 'markeredgecolor': 'none', 'zorder':15},
-                'all': {**common_simple_kwargs_overrides, 'markersize': 1.0, 'marker': '.', 'markerfacecolor':(0.1, 0.1, 0.1, (spikes_alpha*0.6*0.5)), 'markeredgecolor': 'none', 'zorder':10},
-                'is_included_long_pf1D': {**common_simple_kwargs_overrides, 'markersize': 2.0, 'marker': '.', 'markerfacecolor':(0, 0, 1, (spikes_alpha*0.6)), 'markeredgecolor': 'none', 'zorder':15},
-                'is_included_short_pf1D': {**common_simple_kwargs_overrides, 'markersize': 2.0, 'marker': '.', 'markerfacecolor':(1, 0, 0, (spikes_alpha*0.6)), 'markeredgecolor': 'none', 'zorder':15},
-                'is_included_PBE': {**common_simple_kwargs_overrides, 'markersize': 2.0, 'marker': '.', 'markerfacecolor':(0.102, 0.831, 0, (spikes_alpha*0.6)), 'markeredgecolor': 'none', 'zorder':15}, ## NOTE this is the text 'none' not the value None, which I think has special meaning to matplotlib
+                'all': {**common_simple_kwargs_overrides, 'gid': 'spikes_all', 'markersize': 1.0, 'marker': '.', 'markerfacecolor':(0.1, 0.1, 0.1, (spikes_alpha*0.6*0.5)), 'markeredgecolor': 'none', 'zorder':10},
+                'is_included_long_pf1D': {**common_simple_kwargs_overrides, 'gid': 'spikes_long_pf1D', 'markersize': 2.0, 'marker': '.', 'markerfacecolor':(0, 0, 1, (spikes_alpha*0.6)), 'markeredgecolor': 'none', 'zorder':15},
+                'is_included_short_pf1D': {**common_simple_kwargs_overrides, 'gid': 'spikes_short_pf1D', 'markersize': 2.0, 'marker': '.', 'markerfacecolor':(1, 0, 0, (spikes_alpha*0.6)), 'markeredgecolor': 'none', 'zorder':15},
+                'is_included_PBE': {**common_simple_kwargs_overrides, 'gid': 'spikes_PBE', 'markersize': 2.0, 'marker': '.', 'markerfacecolor':(0.102, 0.831, 0, (spikes_alpha*0.6)), 'markeredgecolor': 'none', 'zorder':15}, ## NOTE this is the text 'none' not the value None, which I think has special meaning to matplotlib
             }
                     
         # spike_plot_kwargs_dict.update(
@@ -1619,9 +1620,9 @@ class PhoJonathanPlotHelpers:
                 curr_ax_lap_spikes = curr_fig.add_subplot(gs[:, 1:], label=f'ax_lap_spikes[{aclu:02d}]')
                 curr_ax_right_placefield = None
             else:
-                curr_ax_left_placefield = curr_fig.add_subplot(gs[:, 1]) # only the last element of the row
+                curr_ax_left_placefield = curr_fig.add_subplot(gs[:, 1], label=f'ax_left_pf1D[{aclu:02d}]') # only the last element of the row
                 curr_ax_lap_spikes = curr_fig.add_subplot(gs[:, 2:-1], label=f'ax_lap_spikes[{aclu:02d}]', sharey=curr_ax_left_placefield) # all up to excluding the last element of the row
-                curr_ax_right_placefield = curr_fig.add_subplot(gs[:, -1], sharey=curr_ax_lap_spikes, label=f'ax_pf1D[{aclu:02d}]') # only the last element of the row
+                curr_ax_right_placefield = curr_fig.add_subplot(gs[:, -1], sharey=curr_ax_lap_spikes, label=f'ax_right_pf1D[{aclu:02d}]') # only the last element of the row
 
         else:
             curr_ax_firing_rate = curr_fig.add_subplot(gs[0, 2:-1], label=f'ax_firing_rate[{aclu:02d}]') if not disable_left_and_right_pf_plots else curr_fig.add_subplot(gs[0, 1:], label=f'ax_firing_rate[{aclu:02d}]') # the whole top row except: the first element (which will contain the label column) the last element (to match the firing rates below)
@@ -1632,9 +1633,9 @@ class PhoJonathanPlotHelpers:
                 curr_ax_lap_spikes = curr_fig.add_subplot(gs[1, 1:], label=f'ax_lap_spikes[{aclu:02d}]')
                 curr_ax_right_placefield = None
             else:
-                curr_ax_left_placefield = curr_fig.add_subplot(gs[1, 1]) # only the last element of the row
+                curr_ax_left_placefield = curr_fig.add_subplot(gs[1, 1], label=f'ax_left_pf1D[{aclu:02d}]') # only the last element of the row
                 curr_ax_lap_spikes = curr_fig.add_subplot(gs[1, 2:-1], label=f'ax_lap_spikes[{aclu:02d}]', sharey=curr_ax_left_placefield) # all up to excluding the last element of the row
-                curr_ax_right_placefield = curr_fig.add_subplot(gs[1, -1], sharey=curr_ax_lap_spikes, label=f'ax_pf1D[{aclu:02d}]') # only the last element of the row
+                curr_ax_right_placefield = curr_fig.add_subplot(gs[1, -1], sharey=curr_ax_lap_spikes, label=f'ax_right_pf1D[{aclu:02d}]') # only the last element of the row
 
 
 
@@ -1873,6 +1874,11 @@ class PhoJonathanPlotHelpers:
             
             kwargs['optional_aclu_info_row_tuple'] = curr_aclu_row_tuple
             # curr_aclu_row_tuple = kwargs.get('optional_aclu_info_row_tuple', None)
+
+            try:
+                curr_fig.set_gid(f'cell_aclu_{aclu:02d}')
+            except Exception:
+                pass
 
             curr_single_cell_out_dict = cls._plot_pho_jonathan_batch_plot_single_cell(t_split, time_bins, unit_specific_time_binned_firing_rates, pf1D_all, aclu_to_idx, rdf, irdf, show_inter_replay_frs, _temp_aclu_to_fragile_linear_neuron_IDX, aclu, curr_fig, colors,\
                                                                                        debug_print=debug_print, disable_top_row=disable_top_row, prepare_for_publication=prepare_for_publication, **kwargs)

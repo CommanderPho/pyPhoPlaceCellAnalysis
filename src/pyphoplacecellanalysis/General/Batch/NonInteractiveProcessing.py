@@ -34,6 +34,7 @@ from pyphoplacecellanalysis.General.Model.SpecificComputationValidation import S
 from pyphoplacecellanalysis.General.Mixins.CrossComputationComparisonHelpers import SplitPartitionMembership # needed for batch_extended_computations, batch_programmatic_figures
 from pyphoplacecellanalysis.General.Mixins.ExportHelpers import programmatic_display_to_PDF, programmatic_render_to_file
 from pyphoplacecellanalysis.General.Mixins.ExportHelpers import build_pdf_metadata_from_display_context # newer version of build_pdf_export_metadata
+from pyphoplacecellanalysis.General.Mixins.ExportHelpers import postprocess_matplotlib_svg_for_publication
 from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import NeuropyPipeline, PipelineSavingScheme # for batch_load_session
 
 from pyphoplacecellanalysis.SpecificResults.fourthYearPresentation import export_active_relative_entropy_results_videos
@@ -939,10 +940,11 @@ class BatchPhoJonathanFiguresHelper:
     is_publication_ready_figure: bool = True
 
     @classmethod
-    def perform_run(cls, curr_active_pipeline, shared_aclus=None, long_only_aclus=None, short_only_aclus=None, n_max_page_rows=10, write_vector_format=False, write_png=True, progress_print=True, debug_print=False, disable_top_row=False, **kwargs) -> Dict[IdentifyingContext, MatplotlibRenderPlots]:
+    def perform_run(cls, curr_active_pipeline, shared_aclus=None, long_only_aclus=None, short_only_aclus=None, n_max_page_rows=10, write_vector_format=False, write_png=True, vector_format: str = 'svg', progress_print=True, debug_print=False, disable_top_row=False, **kwargs) -> Dict[IdentifyingContext, MatplotlibRenderPlots]:
         """ The only public function. Performs the batch plotting.
         
         # split_by_short_long_shared, bool: whether to create separate figures for the short/long exclusive cells and the shared. If False all will be treated as "shared"
+        # vector_format: 'svg' (default) or 'pdf' when write_vector_format=True
         
         """
         if long_only_aclus is None:
@@ -960,18 +962,19 @@ class BatchPhoJonathanFiguresHelper:
         active_identifying_session_ctx = curr_active_pipeline.sess.get_context() # 'bapun_RatN_Day4_2019-10-15_11-30-06'
         
         _batch_plot_kwargs_list = cls._build_batch_plot_kwargs(long_only_aclus, short_only_aclus, shared_aclus, active_identifying_session_ctx, n_max_page_rows=n_max_page_rows, _extra_kwargs=dict(disable_top_row=disable_top_row))
-        active_out_figure_container_dict: Dict[IdentifyingContext, MatplotlibRenderPlots] = cls._perform_batch_plot(curr_active_pipeline, _batch_plot_kwargs_list, write_vector_format=write_vector_format, write_png=write_png, progress_print=progress_print, debug_print=debug_print, **kwargs)
+        active_out_figure_container_dict: Dict[IdentifyingContext, MatplotlibRenderPlots] = cls._perform_batch_plot(curr_active_pipeline, _batch_plot_kwargs_list, write_vector_format=write_vector_format, write_png=write_png, vector_format=vector_format, progress_print=progress_print, debug_print=debug_print, **kwargs)
         
         return active_out_figure_container_dict
 
 
     @function_attributes(short_name=None, tags=['MAIN'], input_requires=[], output_provides=[], uses=['cls.perform_run(...)'], used_by=[], creation_date='2025-06-30 22:27', related_items=[])
     @classmethod
-    def run(cls, curr_active_pipeline, neuron_replay_stats_df, included_unit_neuron_IDs=None, n_max_page_rows=10, write_vector_format=False, write_png=True, progress_print=True, debug_print=False,
+    def run(cls, curr_active_pipeline, neuron_replay_stats_df, included_unit_neuron_IDs=None, n_max_page_rows=10, write_vector_format=False, write_png=True, vector_format: str = 'svg', progress_print=True, debug_print=False,
              show_only_refined_cells:bool=False, disable_top_row=False, split_by_short_long_shared: bool = True, override_fig_man=None) -> Dict[IdentifyingContext, MatplotlibRenderPlots]:
         """ The only public function. Performs the batch plotting.
         
         # split_by_short_long_shared, bool: whether to create separate figures for the short/long exclusive cells and the shared. If False all will be treated as "shared"
+        # vector_format: 'svg' (default) or 'pdf' when write_vector_format=True
         
         """
         if included_unit_neuron_IDs is not None:
@@ -1008,7 +1011,7 @@ class BatchPhoJonathanFiguresHelper:
             shared_df = neuron_replay_stats_df.copy()
             shared_aclus = np.unique(shared_df.index.values).tolist()
         
-        return cls.perform_run(curr_active_pipeline=curr_active_pipeline, shared_aclus=shared_aclus, long_only_aclus=long_only_aclus, short_only_aclus=short_only_aclus, n_max_page_rows=n_max_page_rows, write_vector_format=write_vector_format, write_png=write_png, progress_print=progress_print, debug_print=debug_print,
+        return cls.perform_run(curr_active_pipeline=curr_active_pipeline, shared_aclus=shared_aclus, long_only_aclus=long_only_aclus, short_only_aclus=short_only_aclus, n_max_page_rows=n_max_page_rows, write_vector_format=write_vector_format, write_png=write_png, vector_format=vector_format, progress_print=progress_print, debug_print=debug_print,
             disable_top_row=disable_top_row, override_fig_man=override_fig_man,
         )
         # return active_out_figure_container_dict
@@ -1103,16 +1106,82 @@ class BatchPhoJonathanFiguresHelper:
         return _batch_plot_kwargs_list
 
 
-    @function_attributes(short_name=None, tags=['save', 'export', 'single-figure'], input_requires=[], output_provides=[], uses=[], used_by=['cls._perform_save_batch_plotted_figures'], creation_date='2025-06-30 22:45', related_items=[])
+    @function_attributes(short_name=None, tags=['save', 'export', 'single-figure'], input_requires=[], output_provides=[], uses=['_subfn_prepare_figure_for_svg_export'], used_by=['cls._perform_save_batch_plotted_figures'], creation_date='2025-06-30 22:45', related_items=[])
     @classmethod
-    def _perform_save_single_plotted_fig(cls, curr_active_pipeline, curr_active_identifying_ctx: IdentifyingContext, a_fig_container: MatplotlibRenderPlots, subset_includelist=None, subset_excludelist=None, write_vector_format=False, write_png=True, override_fig_man: Optional[FileOutputManager]=None, progress_print=True, debug_print=False):
+    def _perform_save_single_plotted_fig(cls, curr_active_pipeline, curr_active_identifying_ctx: IdentifyingContext, a_fig_container: MatplotlibRenderPlots, subset_includelist=None, subset_excludelist=None, write_vector_format=False, write_png=True, vector_format: str = 'svg', override_fig_man: Optional[FileOutputManager]=None, progress_print=True, debug_print=False):
         """ Saves a single figure produced by the first half of `_perform_batch_plot` 
             
         ## perform saving if needed:
         if (write_png or write_vector_format):
-            cls._perform_save_batch_plotted_figures(curr_active_pipeline, active_out_figure_container_dict=active_out_figure_container_dict, subset_includelist=subset_includelist, subset_excludelist=subset_excludelist, write_vector_format=write_vector_format, write_png=write_png, progress_print=progress_print, debug_print=debug_print)
-    
+            cls._perform_save_batch_plotted_figures(...)
+        
+        vector_format: 'svg' (default) or 'pdf' when write_vector_format=True
         """
+        # Transparent background, no clip groups, and SVG gids from axes labels / existing artist gids.
+        def _subfn_prepare_figure_for_svg_export(a_fig, a_fig_container: Optional[MatplotlibRenderPlots] = None):
+            # XML/SVG id-safe token (axes labels like ax_lap_spikes[05] → ax_lap_spikes_05_).
+            def _subfn_svg_safe_gid(gid: str) -> str:
+                import re
+                return re.sub(r'[^A-Za-z0-9_\-.]', '_', gid)
+
+            a_fig.patch.set_visible(False)
+            a_fig.patch.set_facecolor('none')
+            a_fig.patch.set_edgecolor('none')
+            try:
+                a_fig.set_facecolor('none')
+            except Exception:
+                pass
+
+            for ax in a_fig.axes:
+                ax_label = ax.get_label() or ''
+                ax_gid = _subfn_svg_safe_gid(ax_label) if ax_label else ''
+                if ax_gid:
+                    ax.set_gid(ax_gid)
+                ax.patch.set_visible(False)
+                ax.patch.set_facecolor('none')
+                ax.patch.set_edgecolor('none')
+                ax.set_facecolor('none')
+                # Name ungrouped children under this axis for Illustrator layer picking
+                for i, line in enumerate(ax.lines):
+                    existing = line.get_gid()
+                    if existing:
+                        line.set_gid(_subfn_svg_safe_gid(existing))
+                    else:
+                        line.set_gid(f'{ax_gid}_line_{i}' if ax_gid else f'line_{i}')
+                ## END for i, line in enumerate(ax.lines)...
+                for i, coll in enumerate(ax.collections):
+                    existing = coll.get_gid()
+                    if existing:
+                        coll.set_gid(_subfn_svg_safe_gid(existing))
+                    else:
+                        coll.set_gid(f'{ax_gid}_collection_{i}' if ax_gid else f'collection_{i}')
+                ## END for i, coll in enumerate(ax.collections)...
+                for i, patch in enumerate(ax.patches):
+                    existing = patch.get_gid()
+                    if existing:
+                        patch.set_gid(_subfn_svg_safe_gid(existing))
+                    else:
+                        patch.set_gid(f'{ax_gid}_patch_{i}' if ax_gid else f'patch_{i}')
+                ## END for i, patch in enumerate(ax.patches)...
+            ## END for ax in a_fig.axes...
+
+            if a_fig_container is not None:
+                for i, a_subfig in enumerate(getattr(a_fig_container, 'subfigs', None) or []):
+                    try:
+                        if not a_subfig.get_gid():
+                            a_subfig.set_gid(f'cell_row_{i}')
+                    except Exception:
+                        pass
+                ## END for i, a_subfig in enumerate(...)...
+
+            for an_artist in a_fig.findobj():
+                try:
+                    an_artist.set_clip_on(False)
+                    an_artist.set_clip_path(None)
+                except Exception:
+                    pass
+            ## END for an_artist in a_fig.findobj()...
+
         output_file_paths = []
         if override_fig_man is None:
             fig_man = curr_active_pipeline.get_output_manager()
@@ -1126,27 +1195,39 @@ class BatchPhoJonathanFiguresHelper:
         final_figure_file_path = fig_man.get_figure_save_file_path(curr_active_identifying_ctx, make_folder_if_needed=True) # complete file path without extension: e.g. '/ProgrammaticDisplayFunctionTesting/2023-06-15/kdiba_pin01_one_11-03_12-3-25_BatchPhoJonathanReplayFRC_short_only_[13, 22, 28]'
         a_fig, subfigs, axs, plot_data = a_fig_container.figures[0], a_fig_container.subfigs, a_fig_container.axes, a_fig_container.plot_data
         
-        # One plot at a time to PDF:
+        # Vector export (default SVG; PDF still supported via vector_format='pdf'):
         if write_vector_format:
-            active_pdf_metadata, _UNUSED_pdf_save_filename = build_pdf_metadata_from_display_context(curr_active_identifying_ctx, subset_includelist=subset_includelist, subset_excludelist=subset_excludelist)
-            curr_pdf_save_path = final_figure_file_path.with_suffix('.pdf')
-            # Drop needless matplotlib clip masks (axes patches, etc.) so Illustrator/vector PDFs aren't full of empty clipping paths
-            for an_artist in a_fig.findobj():
-                try:
-                    an_artist.set_clip_on(False)
-                    an_artist.set_clip_path(None)
-                except Exception:
-                    pass
-            ## END for an_artist in a_fig.findobj()...
+            vector_format_norm = str(vector_format or 'svg').lower().lstrip('.')
+            if vector_format_norm not in ('svg', 'pdf'):
+                raise ValueError(f"vector_format must be 'svg' or 'pdf', got {vector_format!r}")
 
-            with backend_pdf.PdfPages(curr_pdf_save_path, keep_empty=False, metadata=active_pdf_metadata) as pdf:
-                # Save out PDF page:
-                pdf.savefig(a_fig)
-                curr_active_pipeline.register_output_file(output_path=curr_pdf_save_path, output_metadata={'context': curr_active_identifying_ctx, 'fig': (a_fig), 'pdf_metadata': active_pdf_metadata})
-                output_file_paths.append(curr_pdf_save_path)
-                a_fig_container.saved_figures.append(curr_pdf_save_path)
-                if progress_print:
-                    print(f'\t saved {curr_pdf_save_path}')
+            if vector_format_norm == 'svg':
+                curr_vector_save_path = final_figure_file_path.with_suffix('.svg')
+                _subfn_prepare_figure_for_svg_export(a_fig, a_fig_container=a_fig_container)
+                with mpl.rc_context({'svg.fonttype': 'none', 'savefig.transparent': True}):
+                    a_fig.savefig(curr_vector_save_path, format='svg', transparent=True, facecolor='none', edgecolor='none')
+                postprocess_matplotlib_svg_for_publication(curr_vector_save_path)
+                output_metadata = {'context': curr_active_identifying_ctx, 'fig': (a_fig), 'fig_format': 'matplotlib_svg'}
+            else:
+                active_pdf_metadata, _UNUSED_pdf_save_filename = build_pdf_metadata_from_display_context(curr_active_identifying_ctx, subset_includelist=subset_includelist, subset_excludelist=subset_excludelist)
+                curr_vector_save_path = final_figure_file_path.with_suffix('.pdf')
+                # Drop needless matplotlib clip masks so Illustrator/vector PDFs aren't full of empty clipping paths
+                for an_artist in a_fig.findobj():
+                    try:
+                        an_artist.set_clip_on(False)
+                        an_artist.set_clip_path(None)
+                    except Exception:
+                        pass
+                ## END for an_artist in a_fig.findobj()...
+                with backend_pdf.PdfPages(curr_vector_save_path, keep_empty=False, metadata=active_pdf_metadata) as pdf:
+                    pdf.savefig(a_fig)
+                output_metadata = {'context': curr_active_identifying_ctx, 'fig': (a_fig), 'pdf_metadata': active_pdf_metadata, 'fig_format': 'matplotlib_pdf'}
+
+            curr_active_pipeline.register_output_file(output_path=curr_vector_save_path, output_metadata=output_metadata)
+            output_file_paths.append(curr_vector_save_path)
+            a_fig_container.saved_figures.append(curr_vector_save_path)
+            if progress_print:
+                print(f'\t saved {curr_vector_save_path}')
 
         # Also save .png versions:
         if write_png:
@@ -1167,13 +1248,12 @@ class BatchPhoJonathanFiguresHelper:
 
     @function_attributes(short_name=None, tags=['save', 'export', 'multi-figure'], input_requires=[], output_provides=[], uses=['cls._perform_save_single_plotted_fig'], used_by=[], creation_date='2025-06-30 22:45', related_items=[])
     @classmethod
-    def _perform_save_batch_plotted_figures(cls, curr_active_pipeline, active_out_figure_container_dict: Dict[IdentifyingContext, MatplotlibRenderPlots], subset_includelist=None, subset_excludelist=None, write_vector_format=False, write_png=True, override_fig_man: Optional[FileOutputManager]=None, progress_print=True, debug_print=False):
+    def _perform_save_batch_plotted_figures(cls, curr_active_pipeline, active_out_figure_container_dict: Dict[IdentifyingContext, MatplotlibRenderPlots], subset_includelist=None, subset_excludelist=None, write_vector_format=False, write_png=True, vector_format: str = 'svg', override_fig_man: Optional[FileOutputManager]=None, progress_print=True, debug_print=False):
         """ Saves all plots produced by the first half of `_perform_batch_plot` 
             
         ## perform saving if needed:
         if (write_png or write_vector_format):
-            cls._perform_save_batch_plotted_figures(curr_active_pipeline, active_out_figure_container_dict=active_out_figure_container_dict, subset_includelist=subset_includelist, subset_excludelist=subset_excludelist, write_vector_format=write_vector_format, write_png=write_png, progress_print=progress_print, debug_print=debug_print)
-    
+            cls._perform_save_batch_plotted_figures(...)
         """
         output_file_paths = []
         if override_fig_man is None:
@@ -1187,7 +1267,7 @@ class BatchPhoJonathanFiguresHelper:
             ## 2023-06-14 - New way using `fig_man.get_figure_save_file_path(...)` - this is correct
             curr_output_file_paths = cls._perform_save_single_plotted_fig(curr_active_pipeline=curr_active_pipeline, curr_active_identifying_ctx=curr_active_identifying_ctx, a_fig_container=a_fig_container,
                                                                   subset_includelist=subset_includelist, subset_excludelist=subset_excludelist,
-                                                                  write_vector_format=write_vector_format, write_png=write_png, override_fig_man=fig_man,
+                                                                  write_vector_format=write_vector_format, write_png=write_png, vector_format=vector_format, override_fig_man=fig_man,
                                                                   progress_print=progress_print, debug_print=debug_print)
             output_file_paths.extend(curr_output_file_paths)
         ## END for curr_active_identifying_ctx, a_fig_container in active_out_figure_container_dict.items()...
@@ -1197,7 +1277,7 @@ class BatchPhoJonathanFiguresHelper:
 
 
     @classmethod
-    def _perform_batch_plot(cls, curr_active_pipeline, active_kwarg_list, subset_includelist=None, subset_excludelist=None, write_vector_format=False, write_png=True, progress_print=True, debug_print=False, close_figures_to_save_memory: bool = True, override_fig_man: Optional[FileOutputManager]=None, **kwargs) -> Dict[IdentifyingContext, MatplotlibRenderPlots]:
+    def _perform_batch_plot(cls, curr_active_pipeline, active_kwarg_list, subset_includelist=None, subset_excludelist=None, write_vector_format=False, write_png=True, vector_format: str = 'svg', progress_print=True, debug_print=False, close_figures_to_save_memory: bool = True, override_fig_man: Optional[FileOutputManager]=None, **kwargs) -> Dict[IdentifyingContext, MatplotlibRenderPlots]:
         """ Plots everything by calling `cls._subfn_batch_plot_automated` using the kwargs provided in `active_kwarg_list`
 
         Args:
@@ -1205,6 +1285,7 @@ class BatchPhoJonathanFiguresHelper:
             figures_parent_out_path (_type_, optional): _description_. Defaults to None.
             write_vector_format (bool, optional): _description_. Defaults to False.
             write_png (bool, optional): _description_. Defaults to True.
+            vector_format (str, optional): 'svg' (default) or 'pdf' when write_vector_format=True.
             progress_print (bool, optional): _description_. Defaults to True.
             debug_print (bool, optional): _description_. Defaults to False.
 
@@ -1237,7 +1318,7 @@ class BatchPhoJonathanFiguresHelper:
                     print(f'writing images...')
                 output_file_paths = cls._perform_save_single_plotted_fig(curr_active_pipeline, curr_active_identifying_ctx=curr_active_identifying_ctx, a_fig_container=a_fig_container,
                                                               subset_includelist=subset_includelist, subset_excludelist=subset_excludelist,
-                                                              write_vector_format=write_vector_format, write_png=write_png, override_fig_man=fig_man,
+                                                              write_vector_format=write_vector_format, write_png=write_png, vector_format=vector_format, override_fig_man=fig_man,
                                                              progress_print=progress_print, debug_print=debug_print)
                 if progress_print:
                     print(f'\tdone.')
