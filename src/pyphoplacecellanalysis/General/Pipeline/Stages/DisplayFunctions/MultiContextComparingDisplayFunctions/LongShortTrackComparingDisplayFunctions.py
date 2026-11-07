@@ -982,7 +982,7 @@ class PhoJonathanPlotHelpers:
     
     @classmethod
     def get_default_spike_scatter_kwargs_dict(cls, prepare_for_publication: bool=True, spikes_alpha:float=0.9) -> Dict[str, Dict]:
-        common_simple_kwargs_overrides = {'spikes_color_RGB': None, 'spikes_alpha': None}
+        common_simple_kwargs_overrides = {'spikes_color_RGB': None, 'spikes_alpha': None, 'should_use_hairy_plot_for_spikes': False} # False → circular ax.plot markers; True → HairyLinePlot ticks (ignores marker/markersize)
         if not prepare_for_publication:
             spike_plot_kwargs_dict = {
                 'all': {**common_simple_kwargs_overrides, 'markersize':4.0, 'marker': '.', 'markerfacecolor':(0.1, 0.1, 0.1, (spikes_alpha*0.6*0.5)), 'markeredgecolor':(0.1, 0.1, 0.1, (spikes_alpha*0.5)), 'zorder':10},
@@ -991,7 +991,7 @@ class PhoJonathanPlotHelpers:
                 'is_included_PBE': {**common_simple_kwargs_overrides, 'markersize':5.0, 'marker': '.', 'markerfacecolor':(0.102, 0.831, 0, (spikes_alpha*0.6)), 'markeredgecolor':(0.102, 0.831, 0, spikes_alpha), 'zorder':15},
             }
         else:
-            ## publication figure
+            ## publication figure — keep subtle '.' markers, but larger than 1/2 so they remain readable on thin rows
             spike_plot_kwargs_dict = {
                 # 'all': {**common_simple_kwargs_overrides, 'markersize': 8.0, 'marker': '.', 'markerfacecolor':(0.1, 0.1, 0.1, (spikes_alpha*0.6*0.5)), 'markeredgecolor': 'none', 'zorder':10},
                 # 'is_included_long_pf1D': {**common_simple_kwargs_overrides, 'markersize': 10.0, 'marker': '.', 'markerfacecolor':(0, 0, 1, (spikes_alpha*0.6)), 'markeredgecolor': 'none', 'zorder':15},
@@ -1398,9 +1398,12 @@ class PhoJonathanPlotHelpers:
         else:
             spikes_color_RGBA = [*spikes_color_RGB, spikes_alpha]
 
+        # normal_x/normal_y are HairyLinePlot-only; strip before ax.plot so Line2D does not see them
+        normal_x = kwargs.pop('normal_x', None)
+        normal_y = kwargs.pop('normal_y', None)
         spike_plot_kwargs = ({'linestyle':'none', 'markersize':5.0, 'marker': '.', 'markerfacecolor':spikes_color_RGBA, 'markeredgecolor':spikes_color_RGBA, 'zorder':10} | kwargs)
         if should_use_hairy_plot_for_spikes:
-            hairs_line_collection, _ = HairyLinePlot._perform_plot_hairy_overlayed_position(x=a_spk_t, y=a_spk_pos, ax=ax, color=spikes_color_RGBA, should_draw_reference_line=False, **(spike_plot_kwargs or {}))
+            hairs_line_collection, _ = HairyLinePlot._perform_plot_hairy_overlayed_position(x=a_spk_t, y=a_spk_pos, ax=ax, color=spikes_color_RGBA, should_draw_reference_line=False, normal_x=normal_x, normal_y=normal_y, **(spike_plot_kwargs or {}))
 
         else:
             ax.plot(a_spk_t, a_spk_pos, color=spikes_color_RGBA, **(spike_plot_kwargs or {})) # , color=[*spikes_color, spikes_alpha]
@@ -1502,7 +1505,7 @@ class PhoJonathanPlotHelpers:
             markersize = 4
             disable_top_row = True ## override to True
             spike_markersize = 3
-            disable_left_and_right_pf_plots = True
+            disable_left_and_right_pf_plots = False
             position_plot_kwargs = {'color': '#757575c8', 'linewidth': 0.2, 'zorder':5} | kwargs.get('position_plot_kwargs', {})
             kwargs.setdefault('border_linewidth', 0.25) # thin L/R PF outline on narrow publication axes
             suptitle_params = dict(fontsize='11')
