@@ -2160,106 +2160,57 @@ class PosteriorPlottingDatasource:
 
 
     def _select_tbin_entry(self, entries: List[Dict], time_bin_size: Optional[float]) -> Optional[Dict]:
+        """Pick the entry for `time_bin_size`. Never silently substitute a *different known* tbin.
+
+        Ripple epoch starts are shared across tbins, so falling back to another tbin would still
+        nearest-match `start_t` and return the wrong-resolution posterior.
+        """
         if not entries:
             return None
-        if time_bin_size is None:
-            return entries[0] if len(entries) == 1 else entries[0]
-        target = float(time_bin_size)
-        for entry in entries:
-            entry_tbin = entry.get('time_bin_size')
-            if entry_tbin is None:
-                continue
-            if np.isclose(float(entry_tbin), target, atol=1e-6, rtol=1e-4):
-                return entry
-        ## END for entry in entries....
-
-        # Raw HDF5 session dicts often have no tbin on the key; use the only/first unknown entry.
+        known = [e for e in entries if e.get('time_bin_size') is not None]
         unknown = [e for e in entries if e.get('time_bin_size') is None]
-        if unknown:
+        if time_bin_size is None:
+            if len(entries) == 1:
+                return entries[0]
+            # Prefer a single known tbin if unambiguous; otherwise require an explicit request.
+            if len(known) == 1 and len(unknown) == 0:
+                return known[0]
+            if len(unknown) == 1 and len(known) == 0:
+                return unknown[0]
+            return None
+        target = float(time_bin_size)
+        for entry in known:
+            if np.isclose(float(entry['time_bin_size']), target, atol=1e-6, rtol=1e-4):
+                return entry
+        ## END for entry in known....
+
+        # Raw notebook loads often omit tbin on the entry; allow unknown only when no conflicting known tbins exist.
+        if (len(unknown) > 0) and (len(known) == 0):
             return unknown[0]
-        return entries[0]
-
-
-    # def _match_epoch_index(self, epoch_starts: NDArray, start_t: float, time_bin_size: Optional[float], epoch_stops: Optional[NDArray] = None, time_bin_edges=None, t_bin_centers=None) -> Optional[int]: #TODO 2026-11-06 21:46: - [ ] CONFIRMED BROKEN, RETURNS WRONG INDEX
-    #     starts = np.asarray(epoch_starts, dtype=float)
-    #     if starts.size == 0:
-    #         return None
-    #     assert (time_bin_size is not None), f"2026-11-06 - WTF?!"
-    #     tbin = float(time_bin_size) if time_bin_size is not None else 0.05
-    #     tolerance = max(0.5, 10.0 * tbin)
-    #     target = float(start_t)
-    #     # Prefer containment in [first_edge, last_edge] so per-time-bin rows still hit the parent epoch.
-    #     ref_edges = None
-    #     ref_centers = None
-    #     if isinstance(time_bin_edges, dict):
-    #         ref_edges = next((time_bin_edges[d] for d in self.DECODER_NAMES if d in time_bin_edges and len(time_bin_edges[d]) > 0), None)
-    #     elif time_bin_edges is not None:
-    #         ref_edges = time_bin_edges
-    #     if isinstance(t_bin_centers, dict):
-    #         ref_centers = next((t_bin_centers[d] for d in self.DECODER_NAMES if d in t_bin_centers and len(t_bin_centers[d]) > 0), None)
-    #     elif t_bin_centers is not None:
-    #         ref_centers = t_bin_centers
-    #     if ref_edges is not None:
-    #         for i in range(len(ref_edges)):
-    #             try:
-    #                 e_f = np.asarray(ref_edges[i], dtype=float).ravel()
-    #             except Exception:
-    #                 continue
-    #             finite = e_f[np.isfinite(e_f)]
-    #             if finite.size == 0:
-    #                 continue
-    #             lo = float(finite[0])
-    #             hi = float(finite[-1]) if finite.size > 1 else (lo + tbin)
-    #             if (lo - tolerance) <= target <= (hi + tolerance):
-    #                 return i
-    #         ## END for i in range(len(ref_edges))....
-    #     if epoch_stops is not None:
-    #         stops = np.asarray(epoch_stops, dtype=float)
-    #         n = min(starts.size, stops.size)
-    #         for i in range(n):
-    #             if (not np.isfinite(starts[i])) or (not np.isfinite(stops[i])):
-    #                 continue
-    #             lo = float(min(starts[i], stops[i]))
-    #             hi = float(max(starts[i], stops[i]))
-    #             if (lo - tolerance) <= target <= (hi + tolerance):
-    #                 return i
-    #         ## END for i in range(n)....
-    #     if ref_centers is not None:
-    #         for i in range(len(ref_centers)):
-    #             c = np.asarray(ref_centers[i]).ravel()
-    #             if c.size == 0:
-    #                 continue
-    #             try:
-    #                 c_f = c.astype(float)
-    #             except Exception:
-    #                 continue
-    #             if np.any(np.abs(c_f - target) <= tolerance):
-    #                 return i
-    #         ## END for i in range(len(ref_centers))....
-
-    #     valid = np.isfinite(starts)
-    #     if not np.any(valid):
-    #         return None
-    #     diffs = np.abs(starts - target)
-    #     diffs[~valid] = np.inf
-    #     idx = int(np.argmin(diffs))
-    #     if not np.isfinite(diffs[idx]) or (diffs[idx] > tolerance):
-    #         return None
-    #     return idx
+        return None
 
 
     def get_posterior_data(self, session_name: str, custom_replay_name: str, a_variable_name: str = 'p_x_given_n_grey', a_decoder_name: str = 'long_LR', last_selected_idx: Optional[int] = 0,
                            start_t: Optional[float] = None, time_bin_size: Optional[float] = None, format_name: Optional[str] = None, animal: Optional[str] = None, exper_name: Optional[str] = None,
-                           return_all_decoders: bool = False, epochs_name: Optional[str] = None):
+                           return_all_decoders: bool = False, epochs_name: Optional[str] = None, return_match_info: bool = False, max_allowed_time_deviation: float = 0.01, debug_print: bool = False):
         """Look up greyscale posterior image(s) for an epoch.
 
-        Prefer `start_t` (+ session/replay/tbin) over scatter `last_selected_idx`. Missing epoch returns None.
-        """
-        
+        Prefer `start_t` (+ session/replay/tbin) over scatter `last_selected_idx`.
+        Missing session/tbin/images returns None. A nearest start with
+        ``abs(matched_time_difference) > max_allowed_time_deviation`` asserts.
 
+        If `return_match_info=True`, returns `(images_or_none, match_info_dict)` where match_info includes
+        `epoch_idx`, `matched_start`, `matched_time_difference`, `entry_time_bin_size`, and `n_entries_considered`.
+        """
+        def _ret(images, match_info):
+            return (images, match_info) if return_match_info else images
+
+
+        match_info: Dict[str, Any] = {'epoch_idx': None, 'matched_start': None, 'matched_time_difference': None, 'entry_time_bin_size': None, 'n_entries_considered': 0, 'session_path': None}
         if session_name is None:
-            return None
+            return _ret(None, match_info)
         session_path: str = self.build_session_path(session_name, format_name=format_name, animal=animal, exper_name=exper_name)
+        match_info['session_path'] = session_path
         replay_part: str = str(custom_replay_name).strip('/') if custom_replay_name else ''
         full_key: str = self._normalize_context_key(f'{session_path}/{replay_part}' if replay_part else session_path)
         entries = self.data_field_dict.get(full_key)
@@ -2268,26 +2219,50 @@ class PosteriorPlottingDatasource:
         if not entries:
             entries = self._fuzzy_find_entries(session_path, custom_replay_name)
         if not entries:
-            return None
+            if debug_print:
+                print(f'get_posterior_data: no entries for session_path={session_path!r} replay={replay_part!r}')
+            return _ret(None, match_info)
         if epochs_name:
             named = [e for e in entries if str(e.get('epochs_name') or 'ripple') == str(epochs_name)]
-            if named:
-                entries = named
+            if not named:
+                if debug_print:
+                    print(f'get_posterior_data: no entries with epochs_name={epochs_name!r}; available={[e.get("epochs_name") for e in entries]}')
+                return _ret(None, match_info)
+            entries = named
+        match_info['n_entries_considered'] = len(entries)
         entry = self._select_tbin_entry(entries, time_bin_size)
         if entry is None:
-            return None
+            if debug_print:
+                print(f'get_posterior_data: no tbin match for time_bin_size={time_bin_size!r}; available={[e.get("time_bin_size") for e in entries]}')
+            return _ret(None, match_info)
+        match_info['entry_time_bin_size'] = entry.get('time_bin_size')
         epoch_idx: Optional[int] = None
-        match_tbin = entry.get('time_bin_size') if time_bin_size is None else time_bin_size
         if start_t is not None:
-            # epoch_idx = self._match_epoch_index(entry.get('epoch_starts', np.array([])), float(start_t), match_tbin,
-            #                                     epoch_stops=entry.get('epoch_stops'), time_bin_edges=entry.get('time_bin_edges'), t_bin_centers=entry.get('t_bin_centers')) #TODO 2026-11-06 21:44: - [ ] BUSTED CONFIRMED, WRONG INDEX RETURNED
-
-            _, epoch_idx, closest_time, matched_time_difference = find_nearest_time(entry.get('epoch_starts', np.array([])), target_time=float(start_t))
-            assert matched_time_difference < 0.01, f"matched_time_difference: {matched_time_difference}"
+            # Prefer nearest epoch *start* (same as RankOrderRastersDebugger). The old
+            # `_match_epoch_index` containment walk with ~0.5s tolerance returned the first
+            # overlapping padded interval and was confirmed wrong.
+            epoch_starts = np.asarray(entry.get('epoch_starts', np.array([])), dtype=float)
+            if (epoch_starts.size == 0) or (not np.any(np.isfinite(epoch_starts))):
+                return _ret(None, match_info)
+            # Always take the nearest start (no silent None from find_nearest_time); assert if too far.
+            # NDArray path uses searchsorted and assumes ascending order (unlike the DataFrame path, which sorts).
+            _arr, epoch_idx, closest_time, matched_time_difference = find_nearest_time(epoch_starts, target_time=float(start_t), max_allowed_deviation=None)
+            match_info['matched_start'] = closest_time
+            match_info['matched_time_difference'] = matched_time_difference
+            match_info['epoch_idx'] = epoch_idx
+            if epoch_idx is None:
+                if debug_print:
+                    print(f'get_posterior_data: find_nearest_time returned no index for start_t={start_t}')
+                return _ret(None, match_info)
+            assert abs(float(matched_time_difference)) <= float(max_allowed_time_deviation), (
+                f'get_posterior_data: matched_time_difference={matched_time_difference} exceeds max_allowed_time_deviation={max_allowed_time_deviation} '
+                f'(start_t={start_t}, matched_start={closest_time}, epoch_idx={epoch_idx}, session_path={session_path!r}, time_bin_size={entry.get("time_bin_size")!r})'
+            )
         elif last_selected_idx is not None:
             epoch_idx = int(last_selected_idx)
+            match_info['epoch_idx'] = epoch_idx
         if epoch_idx is None:
-            return None
+            return _ret(None, match_info)
         variable_dict = entry.get(a_variable_name) or entry.get('p_x_given_n_grey') or entry.get('p_x_given_n') or {}
         if return_all_decoders:
             out = {}
@@ -2297,9 +2272,9 @@ class PosteriorPlottingDatasource:
                     out[decoder_name] = imgs[epoch_idx]
             ## END for decoder_name in self.DECODER_NAMES....
 
-            return out if out else None
+            return _ret((out if out else None), match_info)
         imgs = variable_dict.get(a_decoder_name, [])
         if epoch_idx >= len(imgs):
-            return None
-        return imgs[epoch_idx]
+            return _ret(None, match_info)
+        return _ret(imgs[epoch_idx], match_info)
 
