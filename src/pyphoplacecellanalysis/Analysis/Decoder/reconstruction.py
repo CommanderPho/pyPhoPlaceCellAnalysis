@@ -591,8 +591,10 @@ class SingleEpochDecodedResult(HDF_SerializationMixin, AttrsBasedClassHelperMixi
         img_data, multi_decoder_color_overlay = self._perform_build_multi_decoder_color_overlay_image_data(spikes_df=spikes_df, xbin=xbin, lower_bound_alpha=lower_bound_alpha, drop_below_threshold=drop_below_threshold, t_bin_size=t_bin_size)
         
         kwargs = {}
-        desired_height = 400
-        desired_width = None
+        if (desired_height is None):
+            desired_height = 400
+        if (desired_width is None):
+            desired_width = None
         skip_img_normalization = True
         _out_img = get_array_as_image(img_data, desired_height=desired_height, desired_width=desired_width, skip_img_normalization=skip_img_normalization, export_kind=HeatmapExportKind.RAW_RGBA, **kwargs) # Image.Image - NDArray[ND.Shape["IM_HEIGHT, IM_WIDTH, 4"], np.floating]
         
@@ -752,35 +754,24 @@ class SingleEpochDecodedResult(HDF_SerializationMixin, AttrsBasedClassHelperMixi
     #                 f.create_dataset(attribute, data=value)
     #             # ... handle other attribute types as needed ...    
 
-    def to_hdf(self, file_path, key: str, debug_print=False, enable_hdf_testing_mode:bool=False, required_zero_padding=None, leafs_include_epoch_idx:bool=False, **kwargs):
-        """ Saves the object to key in the hdf5 file specified by file_path
+    def to_hdf(self, file_path, key: str, debug_print=False, enable_hdf_testing_mode:bool=False, required_zero_padding=None, leafs_include_epoch_idx:bool=False, save_full_object: bool = True, **kwargs):
+        """ Saves the object to key in the hdf5 file specified by file_path.
+
         enable_hdf_testing_mode: bool - default False - if True, errors are not thrown for the first field that cannot be serialized, and instead all are attempted to see which ones work.
+        save_full_object: bool - default False - legacy export mode (PosteriorExporting-compatible): writes marginal_x `p_x_given_n` + grey image + common arrays.
+            When True, also writes round-trip fields (`p_x_given_n_full`, optional `spkcount`, `epoch_data_index`) so `read_hdf` can rebuild a valid `SingleEpochDecodedResult`.
 
-
-        Usage:
+        Usage (legacy / PosteriorExporting):
             import h5py
-            
-            _pfnd_obj: PfND = long_one_step_decoder_1D.pf
-            hdf5_output_path: Path = curr_active_pipeline.get_output_path().joinpath('test_data.h5')
-            with h5py.File(a_save_path, 'w') as f: ## open the path as a HDF5 file handle:
-                _pfnd_obj.to_hdf(f, key='test_pfnd')
-            
-                
-        More Error-tolerant usage:                
-            import h5py
-
-            a_decoder_name: str = 'long'
-            a_full_decoded_2D_posterior_result: SingleEpochDecodedResult = results2D.continuous_results[a_decoder_name].get_result_for_epoch(0)
-            a_save_path = Path('data/a_full_decoded_2D_posterior_result.pkl').resolve()
-            if not a_save_path.parent.exists():
-                print(f'creating "{a_save_path.parent}"...')
-                a_save_path.parent.mkdir(exist_ok=True)
-            
-            with h5py.File(a_save_path, 'w') as f: ## open the path as a HDF5 file handle:
+            with h5py.File(a_save_path, 'w') as f:
                 a_full_decoded_2D_posterior_result.to_hdf(f, 'a_full_decoded_2D_posterior_result')
-                print(f'\tsaved "{a_save_path}".')
-                
-    
+
+        Round-trip usage:
+            import h5py
+            with h5py.File(a_save_path, 'w') as f:
+                a_result.to_hdf(f, 'epoch_0', save_full_object=True)
+            restored = SingleEpochDecodedResult.read_hdf(a_save_path, key='epoch_0')
+
         """
         import h5py
         from pyphocorehelpers.plotting.media_output_helpers import img_data_to_greyscale, get_array_as_image
@@ -826,11 +817,16 @@ class SingleEpochDecodedResult(HDF_SerializationMixin, AttrsBasedClassHelperMixi
         # Get current date and time
         current_time = datetime.now().isoformat()
 
+        # Ensure the group exists before writing datasets/attrs (create_dataset with nested paths also creates it, but attrs need an explicit group).
+        if key not in f:
+            f.create_group(key)
+
         # 'p_x_given_n':
         # epoch_id_identifier_str: str = f'{key}/p_x_given_n'
         # epoch_id_str = _subfn_get_key_str('p_x_given_n')
         
         # img_data = self.p_x_given_n.astype(float)  # .shape: (4, n_curr_epoch_time_bins) - (63, 4, 120)
+        # Legacy export: store x-marginal posterior under `p_x_given_n` for PosteriorExporting / image consumers.
         p_x_given_n = deepcopy(self.marginal_x.p_x_given_n)
 
         f.create_dataset(_subfn_get_key_str('p_x_given_n'), data=p_x_given_n.astype(float))
@@ -849,19 +845,29 @@ class SingleEpochDecodedResult(HDF_SerializationMixin, AttrsBasedClassHelperMixi
                 # img_data = self.p_x_given_n.astype(float)  # .shape: (4, n_curr_epoch_time_bins) - (63, 4, 120)
                 f.create_dataset(_subfn_get_key_str(a_field_name), data=a_val) # TypeError: No conversion path for dtype: dtype('<U24')
                 # f.attrs['creation_date'] = current_time
+        ## END for a_field_name in dataset_type_fields...
 
         ## Custom derived:
         # 't_bin_centers':
         t_bin_centers = deepcopy(self.time_bin_container.centers)
         f.create_dataset(_subfn_get_key_str('t_bin_centers'), data=t_bin_centers)
         # f.attrs['creation_date'] = current_time
+
+        if save_full_object:
+            ## Round-trip / full-object fields (used by `read_hdf`):
+            f.create_dataset(_subfn_get_key_str('p_x_given_n_full'), data=np.asarray(self.p_x_given_n).astype(float))
+            if self.spkcount is not None:
+                f.create_dataset(_subfn_get_key_str('spkcount'), data=np.asarray(self.spkcount))
         
         ## Attributes:
         group = f[key]
         group.attrs['creation_date'] = current_time
         group.attrs['nbins'] = self.nbins
         group.attrs['n_xbins'] = self.n_xbins
+        group.attrs['save_full_object'] = bool(save_full_object)
         # group.attrs['ndim'] = self.ndim
+        if save_full_object and (self.epoch_data_index is not None):
+            group.attrs['epoch_data_index'] = int(self.epoch_data_index)
 
         epoch_info_tuple = deepcopy(self.epoch_info_tuple) # EpochTuple(Index=28, start=971.8437469999772, stop=983.9541530000279, label='28', duration=12.110406000050716, lap_id=29, lap_dir=1, score=0.36769430044232587, velocity=1.6140523749028528, intercept=1805.019565924132, speed=1.6140523749028528, wcorr=-0.9152062701244238, P_decoder=0.6562437078530542, pearsonr=-0.7228173157676305, travel=0.0324318935144031, coverage=0.19298245614035087, jump=0.0005841121495327102, sequential_correlation=16228.563177472019, monotonicity_score=16228.563177472019, laplacian_smoothness=16228.563177472019, longest_sequence_length=22, longest_sequence_length_ratio=0.4583333333333333, direction_change_bin_ratio=0.19148936170212766, congruent_dir_bins_ratio=0.574468085106383, total_congruent_direction_change=257.92556950947574, total_variation=326.1999849678664, integral_second_derivative=7423.7044320722935, stddev_of_diff=8.368982188902695)
         epoch_info_tuple_included_fields = [k for k in dir(epoch_info_tuple) if ((not k.startswith('_')) and (k not in ['index', 'count']))] # ['Index', 'P_decoder', 'congruent_dir_bins_ratio', 'count', 'coverage', 'direction_change_bin_ratio', 'duration', 'index', 'integral_second_derivative', 'intercept', 'jump', 'label', 'lap_dir', 'lap_id', 'laplacian_smoothness', 'longest_sequence_length', 'longest_sequence_length_ratio', 'monotonicity_score', 'pearsonr', 'score', 'sequential_correlation', 'speed', 'start', 'stddev_of_diff', 'stop', 'total_congruent_direction_change', 'total_variation', 'travel', 'velocity', 'wcorr']
@@ -871,13 +877,161 @@ class SingleEpochDecodedResult(HDF_SerializationMixin, AttrsBasedClassHelperMixi
             a_val = getattr(epoch_info_tuple, a_field_name)
             if (a_val is not None):
                 ## valid value
-                group.attrs[a_field_name] = a_val
+                try:
+                    group.attrs[a_field_name] = a_val
+                except TypeError:
+                    ## e.g. unicode/bool quirks — store string form
+                    group.attrs[a_field_name] = str(a_val)
+        ## END for a_field_name in epoch_info_tuple_included_fields...
 
 
     @classmethod
-    def read_hdf(cls, file_path, key: str, **kwargs) -> "PfND":
-        """ Reads the data from the key in the hdf5 file at file_path """
-        raise NotImplementedError("read_hdf not implemented")
+    def read_hdf(cls, file_path, key: str, **kwargs) -> "SingleEpochDecodedResult":
+        """ Reads a `SingleEpochDecodedResult` from the HDF5 group at `key`.
+
+        Prefer groups written with `to_hdf(..., save_full_object=True)` (has `p_x_given_n_full`).
+        Legacy groups (PosteriorExporting / `save_full_object=False`) still load, but for 2D the restored
+        `p_x_given_n` may be the x-marginal only (stored under dataset `p_x_given_n`).
+
+        Usage:
+            restored = SingleEpochDecodedResult.read_hdf(path_or_h5py_file, key='epoch_0')
+        """
+        import h5py
+        from collections import namedtuple
+
+        owns_file: bool = False
+        if isinstance(file_path, (str, Path)):
+            f = h5py.File(Path(file_path).resolve(), 'r')
+            owns_file = True
+        else:
+            ## already-open h5py.File (or File-like handle), matching `to_hdf`'s expectation
+            f = file_path
+
+        try:
+            assert key in f, f"HDF5 key '{key}' not found in file."
+            group = f[key]
+
+            def _subfn_load_dataset(name: str) -> Optional[NDArray]:
+                if name in group:
+                    return np.asarray(group[name])
+                return None
+            ## END def _subfn_load_dataset...
+
+            p_x_given_n_full = _subfn_load_dataset('p_x_given_n_full')
+            p_x_given_n_legacy = _subfn_load_dataset('p_x_given_n')
+            if p_x_given_n_full is not None:
+                p_x_given_n = p_x_given_n_full
+            else:
+                assert p_x_given_n_legacy is not None, f"Neither 'p_x_given_n_full' nor 'p_x_given_n' found under key '{key}'."
+                p_x_given_n = p_x_given_n_legacy
+
+            most_likely_positions = _subfn_load_dataset('most_likely_positions')
+            most_likely_position_indicies = _subfn_load_dataset('most_likely_position_indicies')
+            time_bin_edges = _subfn_load_dataset('time_bin_edges')
+            t_bin_centers = _subfn_load_dataset('t_bin_centers')
+            spkcount = _subfn_load_dataset('spkcount')
+
+            ## Attributes:
+            reserved_attr_names = {'creation_date', 'nbins', 'n_xbins', 'epoch_data_index', 'save_full_object'}
+            nbins_attr = group.attrs.get('nbins', None)
+            epoch_data_index = group.attrs.get('epoch_data_index', None)
+            if epoch_data_index is not None:
+                try:
+                    epoch_data_index = int(epoch_data_index)
+                except (TypeError, ValueError):
+                    epoch_data_index = None
+
+            if nbins_attr is not None:
+                nbins = int(nbins_attr)
+            elif most_likely_positions is not None:
+                nbins = int(np.shape(most_likely_positions)[0]) if np.ndim(most_likely_positions) >= 1 else 1
+            else:
+                nbins = int(np.shape(p_x_given_n)[-1])
+
+            ## Rebuild epoch_info_tuple from remaining attrs:
+            epoch_info_field_names = []
+            epoch_info_values = []
+            for attr_name in group.attrs.keys():
+                if attr_name in reserved_attr_names:
+                    continue
+                a_val = group.attrs[attr_name]
+                if isinstance(a_val, bytes):
+                    a_val = a_val.decode('utf-8')
+                if isinstance(a_val, str) and (a_val == 'None'):
+                    a_val = None
+                ## h5py may return numpy scalars — leave as-is / cast lightly
+                if isinstance(a_val, np.generic):
+                    a_val = a_val.item()
+                epoch_info_field_names.append(str(attr_name))
+                epoch_info_values.append(a_val)
+            ## END for attr_name in group.attrs.keys()...
+
+            if len(epoch_info_field_names) > 0:
+                EpochTuple = namedtuple('EpochTuple', epoch_info_field_names)
+                epoch_info_tuple = EpochTuple(*epoch_info_values)
+            else:
+                EpochTuple = namedtuple('EpochTuple', [])
+                epoch_info_tuple = EpochTuple()
+
+            ## Rebuild time_bin_container from edges / centers:
+            time_bin_container = None
+            if time_bin_edges is not None:
+                edges_arr = np.asarray(time_bin_edges)
+                centers_arr = np.asarray(t_bin_centers) if t_bin_centers is not None else None
+                if (edges_arr.ndim == 2) and (edges_arr.shape[-1] == 2):
+                    ## overlapping sliding windows stored as (n_bins, 2) [start, stop]
+                    window_start_edges = edges_arr[:, 0]
+                    window_stop_edges = edges_arr[:, 1]
+                    if centers_arr is None:
+                        centers_arr = (window_start_edges + window_stop_edges) / 2.0
+                    window_widths = window_stop_edges - window_start_edges
+                    window_width = float(np.nanmedian(window_widths)) if len(window_widths) > 0 else 0.0
+                    if (centers_arr is not None) and (len(centers_arr) > 1):
+                        hop = float(np.nanmedian(np.diff(centers_arr)))
+                    else:
+                        hop = window_width
+                    epoch_variable_extents = (float(window_start_edges[0]), float(window_stop_edges[-1]))
+                    time_bin_container = BinningContainer.from_sliding_windows(window_start_edges=window_start_edges, window_stop_edges=window_stop_edges, epoch_variable_extents=epoch_variable_extents, window_width=window_width, hop=hop)
+                else:
+                    ## contiguous histogram edges (n_bins+1,)
+                    if centers_arr is not None:
+                        time_bin_container = BinningContainer(edges=edges_arr, centers=centers_arr)
+                    else:
+                        time_bin_container = BinningContainer.init_from_edges(edges=edges_arr, edge_info=None)
+            elif t_bin_centers is not None:
+                time_bin_container = BinningContainer(centers=np.asarray(t_bin_centers))
+            else:
+                raise ValueError(f"Cannot rebuild time_bin_container: neither 'time_bin_edges' nor 't_bin_centers' found under key '{key}'.")
+
+            ## Recompute marginals when possible:
+            marginal_x = None
+            marginal_y = None
+            marginal_z = None
+            if most_likely_positions is not None:
+                marginal_x, marginal_y, marginal_z = BasePositionDecoder.perform_build_marginals(p_x_given_n=p_x_given_n, most_likely_positions=most_likely_positions, debug_print=False)
+            else:
+                ## best-effort: treat as 1D marginal container from whatever posterior we have
+                marginal_x = DynamicContainer(p_x_given_n=np.asarray(p_x_given_n), most_likely_positions_1D=None)
+                marginal_y = None
+                marginal_z = None
+
+            return cls(
+                p_x_given_n=np.asarray(p_x_given_n),
+                epoch_info_tuple=epoch_info_tuple,
+                most_likely_positions=most_likely_positions,
+                most_likely_position_indicies=most_likely_position_indicies,
+                nbins=nbins,
+                time_bin_container=time_bin_container,
+                time_bin_edges=time_bin_edges,
+                marginal_x=marginal_x,
+                marginal_y=marginal_y,
+                marginal_z=marginal_z,
+                epoch_data_index=epoch_data_index,
+                spkcount=spkcount,
+            )
+        finally:
+            if owns_file:
+                f.close()
 
 
 from neuropy.utils.mixins.binning_helpers import get_bin_centers # used for `pos_bin_centers`
@@ -1346,7 +1500,6 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
         # TODO 2023-04-13 -can these squished similar way?: most_likely_positions_list, most_likely_position_indicies_list 
         return n_timebins, flat_time_bin_containers, timebins_p_x_given_n # flat_time_bin_containers: seems to be an NDArray of centers or something instead of containers
 
-
     def flatten_to_masked_values(self):
         """ appends np.nan values to the beginning and end of each posterior (adding a start and end timebin as well) to allow flat plotting via matplotlib.
         Looks  like it was depricated by `plot_slices_1D_most_likely_position_comparsions` to plot epoch slices (corresponding to certain periods in time) along the continuous session duration.
@@ -1413,6 +1566,34 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
         assert np.shape(updated_is_masked_bin)[0] == desired_total_n_timebins
 
         return desired_total_n_timebins, updated_is_masked_bin, updated_time_bin_containers, updated_timebins_p_x_given_n
+
+
+    # ==================================================================================================================================================================================================================================================================================== #
+    # Implement `HDF_SerializationMixin`:                                                                                                                                                                                                                                                  #
+    # ==================================================================================================================================================================================================================================================================================== #
+    def to_hdf(self, file_path):
+        with h5py.File(file_path, 'w') as f:
+            for attribute, value in self.__dict__.items():
+                if isinstance(value, pd.DataFrame):
+                    value.to_hdf(file_path, key=attribute)
+                elif isinstance(value, np.ndarray):
+                    f.create_dataset(attribute, data=value)
+                # ... handle other attribute types as needed ...
+
+    @classmethod
+    def read_hdf(cls, file_path):
+        with h5py.File(file_path, 'r') as f:
+            attrs_dict = {}
+            for attribute in cls.__annotations__:
+                if attribute in f:
+                    if pd.api.types.is_categorical_dtype(f[attribute]):
+                        attrs_dict[attribute] = pd.read_hdf(file_path, key=attribute)
+                    else:
+                        attrs_dict[attribute] = np.array(f[attribute])
+                # ... handle other attribute types as needed ...
+        return cls(**attrs_dict)
+
+
 
 
     def find_data_indicies_from_epoch_times(self, epoch_times: NDArray) -> NDArray:
