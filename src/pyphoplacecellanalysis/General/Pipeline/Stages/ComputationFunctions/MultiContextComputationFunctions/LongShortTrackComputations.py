@@ -708,8 +708,15 @@ class LongShortPipelineTests:
             short_epoch_name = override_short_epoch_name
         long_results, short_results, global_results = [self.curr_active_pipeline.computation_results[an_epoch_name]['computed_data'] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
         assert np.all(long_results.pf1D_Decoder.xbin == short_results.pf1D_Decoder.xbin), f"long_results.pf1D_Decoder.xbin: {len(long_results.pf1D_Decoder.xbin)}, short_results.pf1D_Decoder.xbin: {len(short_results.pf1D_Decoder.xbin)}"
-        assert np.all(long_results.pf2D_Decoder.xbin == short_results.pf2D_Decoder.xbin), f"long_results.pf2D_Decoder.xbin: {len(long_results.pf2D_Decoder.xbin)}, short_results.pf2D_Decoder.xbin: {len(short_results.pf2D_Decoder.xbin)}"
-        assert np.all(long_results.pf2D_Decoder.ybin == short_results.pf2D_Decoder.ybin), f"long_results.pf2D_Decoder.ybin: {len(long_results.pf2D_Decoder.ybin)}, short_results.pf2D_Decoder.ybin: {len(short_results.pf2D_Decoder.ybin)}"
+        if (long_results.pf2D_Decoder is not None) and (short_results.pf2D_Decoder is not None):
+            assert np.all(long_results.pf2D_Decoder.xbin == short_results.pf2D_Decoder.xbin), f"long_results.pf2D_Decoder.xbin: {len(long_results.pf2D_Decoder.xbin)}, short_results.pf2D_Decoder.xbin: {len(short_results.pf2D_Decoder.xbin)}"
+            assert np.all(long_results.pf2D_Decoder.ybin == short_results.pf2D_Decoder.ybin), f"long_results.pf2D_Decoder.ybin: {len(long_results.pf2D_Decoder.ybin)}, short_results.pf2D_Decoder.ybin: {len(short_results.pf2D_Decoder.ybin)}"
+        else:
+            if (long_results.pf2D_Decoder is None):
+                print(f'WARN: LongShortPipelineTests.validate_decoders(long_epoch_name: "{long_epoch_name}", short_epoch_name: "{short_epoch_name}"): long_results.pf2D_Decoder is None! (no 2D Decoder!). Continuing.')
+            if (short_results.pf2D_Decoder is None):
+                print(f'WARN: LongShortPipelineTests.validate_decoders(long_epoch_name: "{long_epoch_name}", short_epoch_name: "{short_epoch_name}"): short_results.pf2D_Decoder is None! (no 2D Decoder!). Continuing.')
+
 
     def validate(self, override_long_epoch_name:Optional[str]=None, override_short_epoch_name:Optional[str]=None) -> bool:
         long_epoch_name, short_epoch_name, global_epoch_name = self.curr_active_pipeline.find_LongShortGlobal_epoch_names()
