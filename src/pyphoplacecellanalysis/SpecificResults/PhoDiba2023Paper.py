@@ -453,7 +453,8 @@ class HierarchicalSessionInventory:
 
     @classmethod
     @function_attributes(short_name=None, tags=['matplotlib', 'table', 'figure', 'svg', 'output'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-11-10 03:30', related_items=[])
-    def export_hierarchical_table(cls, df: pd.DataFrame, output_stem="output/recording_table", width=8.0, row_height=0.25, fontsize=9, **kwargs):
+    def export_hierarchical_table(cls, df: pd.DataFrame,
+            output_stem="output/recording_table", save_image_extensions = [".svg"], width=8.0, row_height=0.25, fontsize=9, save_csv: bool = False, **kwargs):
         """Render contiguous animal/session groups as visually merged cells.
         Input: one row per animal × session × period.
 
@@ -479,7 +480,7 @@ class HierarchicalSessionInventory:
                     ),
             )
             # table  # styled HTML in Jupyter; plain DF via table.data
-            fig, ax, wide = HierarchicalSessionInventory.export_hierarchical_table(df=deepcopy(table.data).rename(columns=dict(zip(['Laps time bins', 'Laps events', 'PBEs time bins', 'PBEs events'], ['lap_bins', 'lap_events', 'pbe_bins', 'pbe_events'])), inplace=False))
+            fig, ax, wide, _out_files = HierarchicalSessionInventory.export_hierarchical_table(df=deepcopy(table.data).rename(columns=dict(zip(['Laps time bins', 'Laps events', 'PBEs time bins', 'PBEs events'], ['lap_bins', 'lap_events', 'pbe_bins', 'pbe_events'])), inplace=False))
             plt.show()
 
 
@@ -706,22 +707,34 @@ class HierarchicalSessionInventory:
         rule(header_height, color="#46515c", lw=0.8)
         rule(total_height, color="#46515c", lw=0.9)
 
-        stem = Path(output_stem)
-        stem.parent.mkdir(parents=True, exist_ok=True)
+        _out_files = []
 
-        for extension in [".pdf", ".svg", ".png"]:
-            fig.savefig(
-                stem.with_suffix(extension),
-                dpi=600,
-                bbox_inches="tight",
-                pad_inches=0.04,
-                facecolor="white",
-            )
+        if output_stem is not None:
+            stem = Path(output_stem)
+            stem.parent.mkdir(parents=False, exist_ok=True)
+            # save_image_extensions = [".pdf", ".svg", ".png"]
+            if isinstance(save_image_extensions, str):
+                save_image_extensions = [save_image_extensions] ## make single element list
 
-        # Preserve the hierarchical column headers in the CSV.
-        wide.to_csv(stem.with_suffix(".csv"))
+            
+            for extension in save_image_extensions:
+                save_path = stem.with_suffix(extension)
+                fig.savefig(save_path, dpi=600, bbox_inches="tight", pad_inches=0.04, facecolor="white")
+                print(f'saved to "{save_path.as_posix()}"')
+                _out_files.append(save_path)
 
-        return fig, ax, wide
+            if save_csv:
+                # Preserve the hierarchical column headers in the CSV.
+                save_path = stem.with_suffix(".csv")
+                wide.to_csv(save_path)
+                print(f'saved to "{save_path.as_posix()}"')
+                _out_files.append(save_path)
+
+        else:
+            print(f'skipping all saves because output_stem is None!')
+
+
+        return fig, ax, wide, _out_files
 
 
 
