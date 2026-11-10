@@ -624,6 +624,16 @@ class PipelinePickleFileSelectorWidget:
 
 
     @property
+    def current_override_parameters_flat_keypaths_dict(self) -> Dict:
+        """Map widget short names to ComputationKWargParameters keypaths for update_parameters."""
+        short_values = self.current_parameter_values
+        return {
+            'rank_order_shuffle_analysis.minimum_inclusion_fr_Hz': short_values['minimum_inclusion_fr_Hz'],
+            'rank_order_shuffle_analysis.included_qclu_values': short_values['included_qclu_values'],
+        }
+
+
+    @property
     def are_current_parameter_values_modified(self) -> bool:
         """Get the current parameter values from the widgets"""
         if self.on_get_global_variable_callback:
@@ -1109,7 +1119,7 @@ class PipelinePickleFileSelectorWidget:
                 print('_subfn_compute(): running batch_load_session(...) for local filtering/computations before extended batch computations...')
                 custom_suffix: str = self.build_custom_suffix_from_modified_widget_parameters()
                 active_pickle_filename: str = f'loadedSessPickle{custom_suffix}.pkl'
-                override_parameters_flat_keypaths_dict = deepcopy(self.current_parameter_values)
+                override_parameters_flat_keypaths_dict = deepcopy(self.current_override_parameters_flat_keypaths_dict)
                 skip_save_on_initial_load: bool = (PipelineSavingScheme.init(saving_mode).value == PipelineSavingScheme.SKIP_SAVING.value)
                 curr_active_pipeline = _subfn_run_batch_local_pipeline_load(active_pickle_filename, override_parameters_flat_keypaths_dict, skip_save_on_initial_load=skip_save_on_initial_load)
                 update_global_variable_fn('curr_active_pipeline', curr_active_pipeline)
@@ -1138,7 +1148,7 @@ class PipelinePickleFileSelectorWidget:
             update_global_variable_fn = self.on_update_global_variable_callback
             assert update_global_variable_fn is not None
             assert get_global_variable_fn is not None
-            override_parameters_flat_keypaths_dict = deepcopy(self.current_parameter_values)
+            override_parameters_flat_keypaths_dict = deepcopy(self.current_override_parameters_flat_keypaths_dict)
             print(f'_subfn_compute_new():\n\toverride_parameters_flat_keypaths_dict: {override_parameters_flat_keypaths_dict}\n')
             custom_suffix: str = self.build_custom_suffix_from_modified_widget_parameters()
             print(f'\tcustom_suffix: "{custom_suffix}"')
