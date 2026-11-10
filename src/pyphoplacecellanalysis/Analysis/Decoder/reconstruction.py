@@ -1571,27 +1571,250 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
     # ==================================================================================================================================================================================================================================================================================== #
     # Implement `HDF_SerializationMixin`:                                                                                                                                                                                                                                                  #
     # ==================================================================================================================================================================================================================================================================================== #
-    def to_hdf(self, file_path):
-        with h5py.File(file_path, 'w') as f:
-            for attribute, value in self.__dict__.items():
-                if isinstance(value, pd.DataFrame):
-                    value.to_hdf(file_path, key=attribute)
-                elif isinstance(value, np.ndarray):
-                    f.create_dataset(attribute, data=value)
-                # ... handle other attribute types as needed ...
+    def to_hdf(self, file_path, key: str, debug_print: bool = False, save_full_object: bool = True, file_mode: str = 'a', **kwargs):
+        """ Saves this multi-epoch result under `key` by writing top-level metadata plus per-epoch groups.
+
+        Layout under `key`:
+            attrs: decoding_time_bin_size, decoding_slideby (if not None), num_filter_epochs, save_full_object
+            datasets: nbins, optional pos_bin_edges, epoch_description_list
+            `{key}/filter_epochs`: column datasets reconstituting the filter_epochs DataFrame
+            `{key}/epochs/{i:0{pad}d}`: SingleEpochDecodedResult.to_hdf(..., save_full_object=...)
+
+        Usage:
+            with h5py.File(path, 'w') as f:
+                result.to_hdf(f, key='decoded_epochs', save_full_object=True)
+            # or:
+            result.to_hdf(path, key='decoded_epochs', save_full_object=True)
+            restored = DecodedFilterEpochsResult.read_hdf(path, key='decoded_epochs')
+        """
+        import h5py
+
+        owns_file: bool = False
+        if isinstance(file_path, (str, Path)):
+            f = h5py.File(Path(file_path).resolve(), file_mode)
+            owns_file = True
+        else:
+            f = file_path
+
+        try:
+            if key not in f:
+                f.create_group(key)
+            group = f[key]
+
+            num_filter_epochs: int = int(self.num_filter_epochs)
+            pad: int = max(len(str(num_filter_epochs)), 1)
+
+            group.attrs['decoding_time_bin_size'] = float(self.decoding_time_bin_size)
+            group.attrs['num_filter_epochs'] = num_filter_epochs
+            group.attrs['save_full_object'] = bool(save_full_object)
+            if self.decoding_slideby is not None:
+                group.attrs['decoding_slideby'] = float(self.decoding_slideby)
+            elif 'decoding_slideby' in group.attrs:
+                del group.attrs['decoding_slideby']
+
+            ## Datasets:
+            if 'nbins' in group:
+                del group['nbins']
+            group.create_dataset('nbins', data=np.asarray(self.nbins))
+
+            if self.pos_bin_edges is not None:
+                if 'pos_bin_edges' in group:
+                    del group['pos_bin_edges']
+                group.create_dataset('pos_bin_edges', data=np.asarray(self.pos_bin_edges))
+            elif 'pos_bin_edges' in group:
+                del group['pos_bin_edges']
+
+            epoch_description_list = list(self.epoch_description_list) if self.epoch_description_list is not None else []
+            # pad/truncate descriptions to num_filter_epochs for a stable array
+            if len(epoch_description_list) < num_filter_epochs:
+                epoch_description_list = epoch_description_list + ([''] * (num_filter_epochs - len(epoch_description_list)))
+            elif len(epoch_description_list) > num_filter_epochs:
+                epoch_description_list = epoch_description_list[:num_filter_epochs]
+            desc_arr = np.asarray(epoch_description_list, dtype=h5py.string_dtype(encoding='utf-8'))
+            if 'epoch_description_list' in group:
+                del group['epoch_description_list']
+            group.create_dataset('epoch_description_list', data=desc_arr)
+
+            ## filter_epochs DataFrame as column datasets under `{key}/filter_epochs` (h5py-only; avoids pandas+h5py same-file lock issues):
+            filter_epochs_df = ensure_dataframe(self.filter_epochs)
+            filter_epochs_key: str = f'{key}/filter_epochs'
+            if filter_epochs_key in f:
+                del f[filter_epochs_key]
+            fe_group = f.create_group(filter_epochs_key)
+            column_names = [str(c) for c in filter_epochs_df.columns]
+            fe_group.attrs['columns'] = np.asarray(column_names, dtype=h5py.string_dtype(encoding='utf-8'))
+            for col_name in column_names:
+                col_values = filter_epochs_df[col_name].to_numpy()
+                if np.issubdtype(col_values.dtype, np.number) or np.issubdtype(col_values.dtype, np.bool_):
+                    fe_group.create_dataset(col_name, data=col_values)
+                else:
+                    # strings / objects
+                    str_values = np.asarray([('' if v is None else str(v)) for v in col_values], dtype=h5py.string_dtype(encoding='utf-8'))
+                    fe_group.create_dataset(col_name, data=str_values)
+            ## END for col_name in column_names...
+
+            ## Per-epoch groups:
+            epochs_group_key: str = f'{key}/epochs'
+            if epochs_group_key in f:
+                del f[epochs_group_key]
+            f.create_group(epochs_group_key)
+
+            for i in np.arange(num_filter_epochs):
+                active_captured_single_epoch_result: SingleEpochDecodedResult = self.get_result_for_epoch(active_epoch_idx=int(i))
+                epoch_key: str = f'{epochs_group_key}/{i:0{pad}d}'
+                if debug_print:
+                    print(f'writing epoch {i} -> {epoch_key}')
+                active_captured_single_epoch_result.to_hdf(f, key=epoch_key, debug_print=debug_print, save_full_object=save_full_object, required_zero_padding=pad, **kwargs)
+            ## END for i in np.arange(num_filter_epochs)...
+        finally:
+            if owns_file:
+                f.close()
+
 
     @classmethod
-    def read_hdf(cls, file_path):
-        with h5py.File(file_path, 'r') as f:
-            attrs_dict = {}
-            for attribute in cls.__annotations__:
-                if attribute in f:
-                    if pd.api.types.is_categorical_dtype(f[attribute]):
-                        attrs_dict[attribute] = pd.read_hdf(file_path, key=attribute)
+    def read_hdf(cls, file_path, key: str, **kwargs) -> "DecodedFilterEpochsResult":
+        """ Reads a `DecodedFilterEpochsResult` from the HDF5 group at `key`.
+
+        Prefer groups written with `to_hdf(..., save_full_object=True)`.
+        Reconstructs list fields from `{key}/epochs/*` via `SingleEpochDecodedResult.read_hdf`.
+
+        Usage:
+            restored = DecodedFilterEpochsResult.read_hdf(path_or_h5py_file, key='decoded_epochs')
+        """
+        import h5py
+
+        owns_file: bool = False
+        if isinstance(file_path, (str, Path)):
+            f = h5py.File(Path(file_path).resolve(), 'r')
+            owns_file = True
+        else:
+            f = file_path
+
+        try:
+            assert key in f, f"HDF5 key '{key}' not found in file."
+            group = f[key]
+
+            decoding_time_bin_size: float = float(group.attrs['decoding_time_bin_size'])
+            num_filter_epochs_attr = group.attrs.get('num_filter_epochs', None)
+            decoding_slideby = group.attrs.get('decoding_slideby', None)
+            if decoding_slideby is not None:
+                decoding_slideby = float(decoding_slideby)
+
+            nbins = np.asarray(group['nbins']) if ('nbins' in group) else None
+            pos_bin_edges = np.asarray(group['pos_bin_edges']) if ('pos_bin_edges' in group) else None
+
+            epoch_description_list: List[str] = []
+            if 'epoch_description_list' in group:
+                raw_descs = np.asarray(group['epoch_description_list'])
+                for v in raw_descs:
+                    if isinstance(v, bytes):
+                        epoch_description_list.append(v.decode('utf-8'))
                     else:
-                        attrs_dict[attribute] = np.array(f[attribute])
-                # ... handle other attribute types as needed ...
-        return cls(**attrs_dict)
+                        epoch_description_list.append(str(v))
+                ## END for v in raw_descs...
+
+            ## filter_epochs (column datasets under `{key}/filter_epochs`):
+            filter_epochs_key: str = f'{key}/filter_epochs'
+            filter_epochs_df: Optional[pd.DataFrame] = None
+            if filter_epochs_key in f:
+                fe_group = f[filter_epochs_key]
+                if 'columns' in fe_group.attrs:
+                    raw_cols = np.asarray(fe_group.attrs['columns'])
+                    column_names = [(c.decode('utf-8') if isinstance(c, bytes) else str(c)) for c in raw_cols]
+                else:
+                    column_names = [name for name in fe_group.keys()]
+                col_dict = {}
+                for col_name in column_names:
+                    if col_name not in fe_group:
+                        continue
+                    col_data = np.asarray(fe_group[col_name])
+                    if col_data.dtype.kind in ('S', 'O', 'U'):
+                        col_dict[col_name] = [(v.decode('utf-8') if isinstance(v, bytes) else (None if v is None else str(v))) for v in col_data]
+                    else:
+                        col_dict[col_name] = col_data
+                ## END for col_name in column_names...
+                filter_epochs_df = pd.DataFrame(col_dict)
+
+            ## Per-epoch groups:
+            epochs_group_key: str = f'{key}/epochs'
+            assert epochs_group_key in f, f"Missing epochs group '{epochs_group_key}'."
+            epochs_group = f[epochs_group_key]
+            epoch_child_names = sorted([name for name in epochs_group.keys()], key=lambda s: int(s) if str(s).isdigit() else str(s))
+
+            most_likely_positions_list = []
+            p_x_given_n_list = []
+            marginal_x_list = []
+            marginal_y_list = []
+            marginal_z_list = []
+            most_likely_position_indicies_list = []
+            spkcount_list = []
+            time_bin_containers = []
+            time_bin_edges_list = []
+            nbins_from_epochs = []
+            epoch_info_rows = []
+
+            for epoch_name in epoch_child_names:
+                epoch_key: str = f'{epochs_group_key}/{epoch_name}'
+                single_epoch_result: SingleEpochDecodedResult = SingleEpochDecodedResult.read_hdf(f, key=epoch_key, **kwargs)
+                most_likely_positions_list.append(single_epoch_result.most_likely_positions)
+                p_x_given_n_list.append(single_epoch_result.p_x_given_n)
+                marginal_x_list.append(single_epoch_result.marginal_x)
+                marginal_y_list.append(single_epoch_result.marginal_y)
+                marginal_z_list.append(single_epoch_result.marginal_z)
+                most_likely_position_indicies_list.append(single_epoch_result.most_likely_position_indicies)
+                spkcount_list.append(single_epoch_result.spkcount)
+                time_bin_containers.append(single_epoch_result.time_bin_container)
+                time_bin_edges_list.append(single_epoch_result.time_bin_edges)
+                nbins_from_epochs.append(int(single_epoch_result.nbins))
+                if single_epoch_result.epoch_info_tuple is not None:
+                    try:
+                        epoch_info_rows.append(single_epoch_result.epoch_info_tuple._asdict())
+                    except AttributeError:
+                        epoch_info_rows.append({})
+                else:
+                    epoch_info_rows.append({})
+            ## END for epoch_name in epoch_child_names...
+
+            if nbins is None:
+                nbins = np.asarray(nbins_from_epochs, dtype=np.int_)
+            else:
+                nbins = np.asarray(nbins)
+
+            if filter_epochs_df is None:
+                if len(epoch_info_rows) > 0:
+                    filter_epochs_df = pd.DataFrame(epoch_info_rows)
+                else:
+                    filter_epochs_df = pd.DataFrame({'start': np.zeros(len(epoch_child_names)), 'stop': np.ones(len(epoch_child_names)), 'label': np.arange(len(epoch_child_names)).astype(str)})
+
+            if num_filter_epochs_attr is not None:
+                num_filter_epochs: int = int(num_filter_epochs_attr)
+            else:
+                num_filter_epochs = len(epoch_child_names)
+
+            if (epoch_description_list is None) or (len(epoch_description_list) == 0):
+                epoch_description_list = []
+
+            return cls(
+                decoding_time_bin_size=decoding_time_bin_size,
+                decoding_slideby=decoding_slideby,
+                filter_epochs=filter_epochs_df,
+                num_filter_epochs=num_filter_epochs,
+                most_likely_positions_list=most_likely_positions_list,
+                p_x_given_n_list=p_x_given_n_list,
+                marginal_x_list=marginal_x_list,
+                marginal_y_list=marginal_y_list,
+                marginal_z_list=marginal_z_list,
+                most_likely_position_indicies_list=most_likely_position_indicies_list,
+                spkcount=spkcount_list,
+                nbins=nbins,
+                time_bin_containers=time_bin_containers,
+                time_bin_edges=time_bin_edges_list,
+                epoch_description_list=epoch_description_list,
+                pos_bin_edges=pos_bin_edges,
+            )
+        finally:
+            if owns_file:
+                f.close()
 
 
 
