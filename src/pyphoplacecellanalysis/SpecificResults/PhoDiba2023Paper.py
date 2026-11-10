@@ -88,7 +88,9 @@ import pandas as pd
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
-
+import matplotlib as mpl
+import matplotlib.pyplot as plt
+from matplotlib.patches import Rectangle
 
 
 @metadata_attributes(short_name=None, tags=['figure', 'session', 'inventory'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-11-05 13:08', related_items=[])
@@ -447,6 +449,167 @@ class HierarchicalSessionInventory:
             showlegend=False,
         )
         return counts_df, fig
+
+
+    @classmethod
+    @function_attributes(short_name=None, tags=['matplotlib', 'table', 'figure', 'svg', 'output'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-11-10 03:30', related_items=[])
+    def export_hierarchical_table(cls, df: pd.DataFrame, output_stem="output/recording_table", width=8.0, row_height=0.25, fontsize=9, **kwargs):
+        """Render contiguous animal/session groups as visually merged cells.
+
+
+        Usage:
+            from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import HierarchicalSessionInventory
+
+            fig, ax = HierarchicalSessionInventory.export_hierarchical_table(counts_df)
+            plt.show()
+
+        """
+        df = df.reset_index(drop=True).copy()
+        if df.empty:
+            raise ValueError("Cannot render an empty table.")
+
+        required = [
+            "animal", "session", "pre_post",
+            "lap_bins", "lap_events", "pbe_bins", "pbe_events",
+        ]
+        missing = set(required) - set(df.columns)
+        if missing:
+            raise ValueError(f"Missing columns: {sorted(missing)}")
+
+        # Preserve input ordering; each animal/session must be contiguous.
+        def runs(keys):
+            start = 0
+            for stop in range(1, len(df) + 1):
+                if stop == len(df) or any(
+                    df.iloc[stop][key] != df.iloc[start][key]
+                    for key in keys
+                ):
+                    yield start, stop
+                    start = stop
+
+        animal_runs = list(runs(["animal"]))
+        session_runs = list(runs(["animal", "session"]))
+
+        for keys, groups in [
+            (["animal"], animal_runs),
+            (["animal", "session"], session_runs),
+        ]:
+            values = [tuple(df.iloc[a][key] for key in keys) for a, _ in groups]
+            if len(values) != len(set(values)):
+                raise ValueError(f"Groups {keys} must be contiguous.")
+
+        # Relative widths for the seven columns.
+        widths = [0.80, 1.90, 1.15, 1.15, 1.05, 1.15, 1.10]
+        edges = [0]
+        for value in widths:
+            edges.append(edges[-1] + value)
+
+        headers = [
+            "Animal", "Recording session", "Period",
+            "Laps\nTime bins", "Laps\nEvents",
+            "PBEs\nTime bins", "PBEs\nEvents",
+        ]
+
+        n = len(df)
+        header_height = 1.65
+        total_height = n + header_height
+
+        fig, ax = plt.subplots(
+            figsize=(width, total_height * row_height),
+            facecolor="white",
+        )
+        fig.subplots_adjust(left=0.015, right=0.985, top=0.99, bottom=0.01)
+        ax.set_xlim(0, edges[-1])
+        ax.set_ylim(total_height, 0)
+        ax.axis("off")
+
+        # Header.
+        ax.add_patch(Rectangle(
+            (0, 0), edges[-1], header_height,
+            facecolor="#e9edf1", edgecolor="none",
+        ))
+
+        for j, label in enumerate(headers):
+            ax.text(
+                (edges[j] + edges[j + 1]) / 2,
+                header_height / 2,
+                label,
+                ha="center", va="center",
+                fontsize=fontsize, fontweight="bold",
+                linespacing=1.25,
+            )
+
+        # Body shading only over nonmerged columns.
+        for i, row in df.iterrows():
+            y = header_height + i
+            if row["pre_post"] == "post-delta":
+                ax.add_patch(Rectangle(
+                    (edges[2], y), edges[-1] - edges[2], 1,
+                    facecolor="#f1f3f5", edgecolor="none",
+                ))
+
+            ax.text(
+                edges[2] + 0.10, y + 0.5, row["pre_post"],
+                ha="left", va="center", fontsize=fontsize,
+            )
+
+            for j, col in enumerate(required[3:], start=3):
+                ax.text(
+                    edges[j + 1] - 0.12, y + 0.5,
+                    f"{int(row[col]):,}",
+                    ha="right", va="center", fontsize=fontsize,
+                )
+
+        # Merged animal labels.
+        for start, stop in animal_runs:
+            ax.text(
+                edges[0] + 0.10,
+                header_height + (start + stop) / 2,
+                str(df.iloc[start]["animal"]),
+                ha="left", va="center",
+                fontsize=fontsize, fontweight="bold",
+            )
+
+        # Merged session labels and fine session separators.
+        for start, stop in session_runs:
+            ax.text(
+                (edges[1] + edges[2]) / 2,
+                header_height + (start + stop) / 2,
+                str(df.iloc[start]["session"]),
+                ha="center", va="center", fontsize=fontsize,
+            )
+            if stop < n:
+                ax.hlines(
+                    header_height + stop, edges[1], edges[-1],
+                    color="#cdd2d7", linewidth=0.45,
+                )
+
+        # Stronger animal separators across the full table.
+        for _, stop in animal_runs[:-1]:
+            ax.hlines(
+                header_height + stop, 0, edges[-1],
+                color="#89939d", linewidth=0.8,
+            )
+
+        # Top, header, and bottom rules; no vertical grid lines.
+        for y, lw in [(0, 0.9), (header_height, 0.7), (total_height, 0.9)]:
+            ax.hlines(y, 0, edges[-1], color="#46515c", linewidth=lw)
+
+        stem = Path(output_stem)
+        stem.parent.mkdir(parents=True, exist_ok=True)
+
+        for suffix in [".pdf", ".svg", ".png"]:
+            fig.savefig(
+                stem.with_suffix(suffix),
+                dpi=600,
+                bbox_inches="tight",
+                pad_inches=0.04,
+                facecolor="white",
+            )
+
+        df.to_csv(stem.with_suffix(".csv"), index=False)
+        return fig, ax
+
 
 
     @classmethod
