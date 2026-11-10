@@ -2271,8 +2271,9 @@ class PosteriorPlottingDatasource:
                 if epoch_idx < len(imgs):
                     out[decoder_name] = imgs[epoch_idx]
             ## END for decoder_name in self.DECODER_NAMES....
-
             return _ret((out if out else None), match_info)
+
+
         imgs = variable_dict.get(a_decoder_name, [])
         if epoch_idx >= len(imgs):
             return _ret(None, match_info)

@@ -73,13 +73,15 @@ def _make_shuffle_object(n_epochs: int = 3, n_decoders: int = 4, n_shuffles: int
     real_wcorr = rng.uniform(-0.8, 0.8, size=(n_epochs, n_decoders))
     real_coverage = rng.uniform(0.1, 0.9, size=(n_epochs, n_decoders))
     real_travel = rng.uniform(0.05, 0.6, size=(n_epochs, n_decoders))
+    real_spearman = rng.uniform(-0.8, 0.8, size=(n_epochs, n_decoders))
     output_extracted_score_arrays_list = []
     output_extracted_result_wcorrs_list = []
     for shuffle_idx in np.arange(n_shuffles):
         shuffle_wcorr = real_wcorr + rng.normal(0.0, 0.25, size=(n_epochs, n_decoders)) + (0.05 * shuffle_idx)
         shuffle_coverage = np.clip(real_coverage + rng.normal(0.0, 0.15, size=(n_epochs, n_decoders)), 0.0, 1.0)
         shuffle_travel = np.clip(real_travel + rng.normal(0.0, 0.12, size=(n_epochs, n_decoders)), 0.0, None)
-        score_dict = {'wcorr': shuffle_wcorr, 'coverage': shuffle_coverage, 'travel': shuffle_travel}
+        shuffle_spearman = real_spearman + rng.normal(0.0, 0.2, size=(n_epochs, n_decoders)) + (0.03 * shuffle_idx)
+        score_dict = {'wcorr': shuffle_wcorr, 'coverage': shuffle_coverage, 'travel': shuffle_travel, 'spearman': shuffle_spearman}
         output_extracted_score_arrays_list.append(score_dict)
         output_extracted_result_wcorrs_list.append(_wcorr_df_dict(shuffle_wcorr))
     ## END for shuffle_idx in np.arange(n_shuffles)....
@@ -87,7 +89,7 @@ def _make_shuffle_object(n_epochs: int = 3, n_decoders: int = 4, n_shuffles: int
     return DecodedEpochScoreShuffle(
         filtered_epochs_df=_epochs_df(n_epochs),
         real_decoder_ripple_weighted_corr_arr=real_wcorr,
-        real_score_arrays={'wcorr': real_wcorr, 'coverage': real_coverage, 'travel': real_travel},
+        real_score_arrays={'wcorr': real_wcorr, 'coverage': real_coverage, 'travel': real_travel, 'spearman': real_spearman},
         output_extracted_result_wcorrs_list=output_extracted_result_wcorrs_list,
         output_extracted_score_arrays_list=output_extracted_score_arrays_list,
         enable_heuristic_shuffle_scoring=True,
@@ -194,7 +196,7 @@ class TestPostComputeAllMetricsWideDf(unittest.TestCase):
         obj = _make_shuffle_object(n_epochs=n_epochs, n_decoders=n_decoders, n_shuffles=n_shuffles)
         all_stats = obj.post_compute_all_metrics(decoder_names=deepcopy(DEFAULT_SHUFFLE_DECODER_NAMES))
 
-        self.assertCountEqual(list(all_stats.keys()), ['wcorr', 'coverage', 'travel'])
+        self.assertCountEqual(list(all_stats.keys()), ['wcorr', 'coverage', 'travel', 'spearman'])
         for metric_name, (p_arr, z_arr, n_more_extreme_arr) in all_stats.items():
             self.assertEqual(p_arr.shape, (n_epochs, n_decoders), msg=metric_name)
             self.assertEqual(z_arr.shape, (n_epochs, n_decoders), msg=metric_name)
@@ -207,7 +209,7 @@ class TestPostComputeAllMetricsWideDf(unittest.TestCase):
         wide_df, _all_shuffles_wcorr_df = obj.build_all_shuffles_dataframes(decoder_names=deepcopy(DEFAULT_SHUFFLE_DECODER_NAMES))
         self.assertIn('wcorr_long_LR', wide_df.columns)
         self.assertIn('wcorr_z_long', wide_df.columns)
-        for metric_name in ('coverage', 'travel'):
+        for metric_name in ('coverage', 'travel', 'spearman'):
             for decoder_name in DEFAULT_SHUFFLE_DECODER_NAMES:
                 self.assertIn(f'{metric_name}_{decoder_name}', wide_df.columns)
                 self.assertIn(f'{metric_name}_z_{decoder_name}', wide_df.columns)
@@ -215,7 +217,7 @@ class TestPostComputeAllMetricsWideDf(unittest.TestCase):
                 self.assertIn(f'{metric_name}_n_extreme_{decoder_name}', wide_df.columns)
             ## END for decoder_name in DEFAULT_SHUFFLE_DECODER_NAMES....
 
-        ## END for metric_name in ('coverage', 'travel')....
+        ## END for metric_name in ('coverage', 'travel', 'spearman')....
 
 
     def test_post_compute_all_metrics_uses_score_extreme_mode(self):
@@ -243,6 +245,55 @@ class TestPostComputeAllMetricsWideDf(unittest.TestCase):
         np.testing.assert_array_equal(n_travel, np.full((1, 4), 3))  # less: 0.1, 0.2, 0.3
         np.testing.assert_array_equal(n_coverage, np.full((1, 4), 1))  # greater: 0.9
         np.testing.assert_array_equal(n_wcorr, np.full((1, 4), 1))  # abs_greater: 0.9
+
+
+class TestSpearmanScoreArrays(unittest.TestCase):
+    """Spearman from prepared spikes and _ensure_real_score_arrays without decode dict."""
+
+    def test_spearman_arrays_from_prepared_spikes_df_shape_and_finite(self):
+        n_epochs: int = 2
+        epochs_df = _epochs_df(n_epochs)
+        epochs_df['label'] = np.arange(n_epochs, dtype=int)
+        # Perfect monotonic increase for epoch 0 / long_LR; anti-correlated for epoch 1 / long_LR
+        prepared_rows = []
+        for spike_idx, (t, peak) in enumerate([(0.0, 10.0), (0.1, 20.0), (0.2, 30.0), (0.3, 40.0)]):
+            prepared_rows.append({'t_rel_seconds': t, 'aclu': spike_idx + 1, 'Probe_Epoch_id': 0, 'long_LR_pf_peak_x': peak, 'long_RL_pf_peak_x': peak, 'short_LR_pf_peak_x': peak, 'short_RL_pf_peak_x': peak})
+        ## END for spike_idx, (t, peak) in enumerate(...)...
+        for spike_idx, (t, peak) in enumerate([(1.0, 40.0), (1.1, 30.0), (1.2, 20.0), (1.3, 10.0)]):
+            prepared_rows.append({'t_rel_seconds': t, 'aclu': spike_idx + 1, 'Probe_Epoch_id': 1, 'long_LR_pf_peak_x': peak, 'long_RL_pf_peak_x': peak, 'short_LR_pf_peak_x': peak, 'short_RL_pf_peak_x': peak})
+        ## END for spike_idx, (t, peak) in enumerate(...)...
+        prepared_spikes_df = pd.DataFrame(prepared_rows)
+
+        out = DecodedEpochScoreShuffle._spearman_arrays_from_prepared_spikes_df(prepared_spikes_df=prepared_spikes_df, active_epochs_df=epochs_df, decoder_names=deepcopy(DEFAULT_SHUFFLE_DECODER_NAMES))
+        self.assertIn('spearman', out)
+        spearman_arr = out['spearman']
+        self.assertEqual(spearman_arr.shape, (n_epochs, 4))
+        np.testing.assert_allclose(spearman_arr[0, :], np.ones(4), atol=1e-8)
+        np.testing.assert_allclose(spearman_arr[1, :], -np.ones(4), atol=1e-8)
+
+
+    def test_ensure_real_score_arrays_populates_spearman_without_decode_dict(self):
+        n_epochs, n_decoders = 2, 4
+        obj = _make_shuffle_object(n_epochs=n_epochs, n_decoders=n_decoders, n_shuffles=2)
+        obj.real_score_arrays = {'wcorr': np.asarray(obj.real_decoder_ripple_weighted_corr_arr)}
+        obj.real_decoder_ripple_filter_epochs_decoder_result_dict = None
+        obj.active_spikes_df = pd.DataFrame({'t_rel_seconds': [0.0, 0.1], 'aclu': [1, 2]})
+        obj.filtered_epochs_df = _epochs_df(n_epochs)
+        obj.filtered_epochs_df['label'] = np.arange(n_epochs, dtype=int)
+        obj.track_templates = _TemplatesMock(xbin=np.linspace(0.0, 200.0, 9), track_length_dict={'long_LR': 200.0, 'long_RL': 200.0, 'short_LR': 140.0, 'short_RL': 140.0})
+        fake_spearman = np.full((n_epochs, n_decoders), 0.42, dtype=float)
+        with patch.object(DecodedEpochScoreShuffle, 'compute_shuffle_spearman_score_arrays', return_value={'spearman': fake_spearman}) as mocked_spearman:
+            # _TemplatesMock lacks get_decoders_dict, so guard skips unless we add it
+            obj.track_templates.get_decoders_dict = lambda: {name: None for name in DEFAULT_SHUFFLE_DECODER_NAMES}
+            obj._ensure_real_score_arrays(decoder_names=deepcopy(DEFAULT_SHUFFLE_DECODER_NAMES))
+            mocked_spearman.assert_called_once()
+        self.assertIn('spearman', obj.real_score_arrays)
+        np.testing.assert_allclose(obj.real_score_arrays['spearman'], fake_spearman)
+
+
+    def test_score_extreme_mode_includes_spearman_abs_greater(self):
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.SequenceBasedComputations import SCORE_EXTREME_MODE
+        self.assertEqual(SCORE_EXTREME_MODE['spearman'], 'abs_greater')
 
 
 class TestPickleCompat(unittest.TestCase):

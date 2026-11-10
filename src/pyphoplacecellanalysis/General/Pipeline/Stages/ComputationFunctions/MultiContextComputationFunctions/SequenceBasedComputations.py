@@ -203,6 +203,7 @@ ExportedWCorrShufflesPickleFilenameParser = ExportedEpochScoreShufflesPickleFile
 DEFAULT_SHUFFLE_DECODER_NAMES: List[str] = ['long_LR', 'long_RL', 'short_LR', 'short_RL']
 SCORE_EXTREME_MODE: Dict[str, str] = {
     'wcorr': 'abs_greater',
+    'spearman': 'abs_greater',
     'radon_score': 'greater',
     'radon_velocity': 'abs_greater',
     'coverage': 'greater',
@@ -222,7 +223,7 @@ SCORE_EXTREME_MODE: Dict[str, str] = {
 
 @define(slots=False, repr=False, eq=False)
 class DecodedEpochScoreShuffle(ComputedResult):
-    """Performs cell-identity shuffles and scores decoded ripple epochs (wcorr, heuristics, optional radon).
+    """Performs cell-identity shuffles and scores decoded ripple epochs (wcorr, spearman, heuristics, optional radon).
 
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.SequenceBasedComputations import DecodedEpochScoreShuffle, WCorrShuffle
 
@@ -233,7 +234,7 @@ class DecodedEpochScoreShuffle(ComputedResult):
     Which epochs does it test? Just replay? where did it get these from?
 
     """
-    _VersionedResultMixin_version: str = "2026.10.26_0" # to be updated in your IMPLEMENTOR to indicate its version
+    _VersionedResultMixin_version: str = "2026.11.09_0" # to be updated in your IMPLEMENTOR to indicate its version
 
     curr_active_pipeline = non_serialized_field(default=None, repr=False) # required to continue computations
     track_templates = non_serialized_field(default=None, repr=False) # required to continue computations
@@ -255,7 +256,7 @@ class DecodedEpochScoreShuffle(ComputedResult):
     enable_heuristic_shuffle_scoring: bool = serialized_attribute_field(default=True, is_computable=False, repr=True)
     enable_radon_shuffle_scoring: bool = serialized_attribute_field(default=False, is_computable=False, repr=True)
 
-    result_version: str = serialized_attribute_field(default='2026.10.26_0', is_computable=False, repr=False) # this field specfies the version of the result. 
+    result_version: str = serialized_attribute_field(default='2026.11.09_0', is_computable=False, repr=False) # this field specfies the version of the result. 
 
     @property
     def n_epochs(self):
@@ -432,12 +433,14 @@ class DecodedEpochScoreShuffle(ComputedResult):
         #                                                                                                                             shuffled_decoders_dict=deepcopy(track_templates.get_decoders_dict()),
         #                                                                                                                             **all_templates_decode_kwargs)
 
-        return cls(curr_active_pipeline=curr_active_pipeline, track_templates=track_templates,
+        _obj = cls(curr_active_pipeline=curr_active_pipeline, track_templates=track_templates,
             filtered_epochs_df=replay_epochs_df, active_spikes_df=active_spikes_df,
             # alt_directional_merged_decoders_result=alt_directional_merged_decoders_result, real_directional_merged_decoders_result=real_directional_merged_decoders_result,
             real_decoder_ripple_weighted_corr_arr=real_decoder_ripple_weighted_corr_arr,
             real_decoder_ripple_filter_epochs_decoder_result_dict=real_decoder_ripple_filter_epochs_decoder_result_dict,
-            all_templates_decode_kwargs=all_templates_decode_kwargs, enable_saving_entire_decoded_shuffle_result=enable_saving_entire_decoded_shuffle_result) # output_extracted_result_wcorrs_list=[], 
+            all_templates_decode_kwargs=all_templates_decode_kwargs, enable_saving_entire_decoded_shuffle_result=enable_saving_entire_decoded_shuffle_result) # output_extracted_result_wcorrs_list=[],
+        _obj._ensure_real_score_arrays(decoder_names=deepcopy(track_templates.get_decoder_names()))
+        return _obj
 
 
     @classmethod
@@ -618,20 +621,113 @@ class DecodedEpochScoreShuffle(ComputedResult):
         return {'radon_score': radon_score_arr, 'radon_velocity': radon_velocity_arr}
 
 
+    @classmethod
+    def _decoder_dict_to_aclu_peak_map_dict(cls, decoders_dict: Dict[str, BasePositionDecoder], peak_mode: str = 'CoM') -> Dict[str, Dict]:
+        """Build `{decoder_name: {aclu: pf_peak_x}}` from a decoder dict (real or shuffled)."""
+        assert peak_mode in ['peaks', 'CoM']
+        out_peak_map_dict: Dict[str, Dict] = {}
+        for a_name, a_decoder in decoders_dict.items():
+            if a_decoder is None:
+                out_peak_map_dict[a_name] = {}
+                continue
+            if peak_mode == 'peaks':
+                peak_values = a_decoder.peak_locations
+            else:
+                peak_values = a_decoder.peak_tuning_curve_center_of_masses
+            out_peak_map_dict[a_name] = deepcopy(dict(zip(a_decoder.neuron_IDs, peak_values)))
+        ## END for a_name, a_decoder in decoders_dict.items()....
+
+        return out_peak_map_dict
+
+
+    @classmethod
+    def _prepare_spikes_for_spearman_scoring(cls, track_templates: TrackTemplates, spikes_df: pd.DataFrame, active_epochs_df: pd.DataFrame, decoder_aclu_peak_map_dict: Dict[str, Dict]) -> pd.DataFrame:
+        """All spikes in each epoch with `{decoder}_pf_peak_x` from the provided peak maps (no within-epoch aclu shuffle)."""
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.RankOrderComputations import RankOrderAnalyses
+
+        if not isinstance(active_epochs_df, pd.DataFrame):
+            active_epochs_df = active_epochs_df.to_dataframe()
+        active_epochs_df = deepcopy(active_epochs_df)
+        epoch_label_column_name: str = 'label'
+        assert epoch_label_column_name in active_epochs_df.columns, f'active_epochs_df must contain "{epoch_label_column_name}" for Probe_Epoch_id assignment'
+        active_epochs_df[epoch_label_column_name] = pd.to_numeric(active_epochs_df[epoch_label_column_name]).astype(int)
+
+        included_neuron_ids = np.array(track_templates.any_decoder_neuron_IDs)
+        spikes_df = deepcopy(spikes_df).spikes.sliced_by_neuron_id(included_neuron_ids)
+        spikes_df = spikes_df.spikes.adding_epochs_identity_column(active_epochs_df, epoch_id_key_name='Probe_Epoch_id', epoch_label_column_name=epoch_label_column_name, should_replace_existing_column=True, drop_non_epoch_spikes=True)
+
+        prepared_spikes_df: pd.DataFrame = RankOrderAnalyses._subfn_build_all_pf_peak_x_columns(track_templates, selected_spikes_df=spikes_df, override_decoder_aclu_peak_map_dict=decoder_aclu_peak_map_dict, _MODERN_INTERNAL_SHUFFLE=False)
+        return prepared_spikes_df
+
+
+    @classmethod
+    def _spearman_arrays_from_prepared_spikes_df(cls, prepared_spikes_df: pd.DataFrame, active_epochs_df: pd.DataFrame, decoder_names: Optional[List[str]] = None) -> Dict[str, NDArray]:
+        """Group prepared spikes by Probe_Epoch_id and build `(n_epochs, n_decoders)` spearman array aligned to `active_epochs_df` rows."""
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.RankOrderComputations import RankOrderAnalyses
+
+        if decoder_names is None:
+            decoder_names = deepcopy(DEFAULT_SHUFFLE_DECODER_NAMES)
+        if not isinstance(active_epochs_df, pd.DataFrame):
+            active_epochs_df = active_epochs_df.to_dataframe()
+
+        n_epochs: int = len(active_epochs_df)
+        n_decoders: int = len(decoder_names)
+        spearman_arr = np.full((n_epochs, n_decoders), np.nan, dtype=float)
+        if (prepared_spikes_df is None) or (len(prepared_spikes_df) == 0):
+            return {'spearman': spearman_arr}
+
+        spearman_df: pd.DataFrame = prepared_spikes_df.groupby('Probe_Epoch_id').apply(lambda group: RankOrderAnalyses._subfn_calculate_correlations(group, method='spearman', decoder_names=decoder_names)).reset_index()
+        if 'Probe_Epoch_id' not in spearman_df.columns:
+            return {'spearman': spearman_arr}
+        spearman_df = spearman_df.set_index('Probe_Epoch_id')
+
+        epoch_labels = pd.to_numeric(active_epochs_df['label']).astype(int).to_numpy()
+        for epoch_row_idx, epoch_label in enumerate(epoch_labels):
+            if epoch_label not in spearman_df.index:
+                continue
+            for decoder_idx, a_decoder_name in enumerate(decoder_names):
+                col_name: str = f'{a_decoder_name}_spearman'
+                if col_name in spearman_df.columns:
+                    spearman_arr[epoch_row_idx, decoder_idx] = float(spearman_df.loc[epoch_label, col_name])
+            ## END for decoder_idx, a_decoder_name in enumerate(decoder_names)...
+        ## END for epoch_row_idx, epoch_label in enumerate(epoch_labels)...
+
+        return {'spearman': spearman_arr}
+
+
+    @classmethod
+    def compute_shuffle_spearman_score_arrays(cls, track_templates: TrackTemplates, spikes_df: pd.DataFrame, active_epochs_df: pd.DataFrame, decoder_aclu_peak_map_dict: Optional[Dict[str, Dict]] = None, decoder_names: Optional[List[str]] = None) -> Dict[str, NDArray]:
+        """Dense-ranked spike-time vs PF-peak-x Spearman for all spikes in each epoch → `{'spearman': (n_epochs, n_decoders)}`."""
+        if decoder_names is None:
+            decoder_names = deepcopy(track_templates.get_decoder_names())
+        if decoder_aclu_peak_map_dict is None:
+            decoder_aclu_peak_map_dict = track_templates.get_decoder_aclu_peak_map_dict(peak_mode='CoM')
+        prepared_spikes_df: pd.DataFrame = cls._prepare_spikes_for_spearman_scoring(track_templates=track_templates, spikes_df=spikes_df, active_epochs_df=active_epochs_df, decoder_aclu_peak_map_dict=decoder_aclu_peak_map_dict)
+        return cls._spearman_arrays_from_prepared_spikes_df(prepared_spikes_df=prepared_spikes_df, active_epochs_df=active_epochs_df, decoder_names=decoder_names)
+
+
     def _ensure_real_score_arrays(self, decoder_names: Optional[List[str]]=None):
-        """Populate `real_score_arrays` from stored real decode + wcorr, scoring heuristics/radon once."""
+        """Populate `real_score_arrays` from stored real decode + wcorr, scoring spearman/heuristics/radon once."""
         if self.real_score_arrays is None:
             self.real_score_arrays = {}
         if (self.real_decoder_ripple_weighted_corr_arr is not None) and ('wcorr' not in self.real_score_arrays):
             self.real_score_arrays['wcorr'] = np.asarray(self.real_decoder_ripple_weighted_corr_arr)
-        self.real_decoder_ripple_filter_epochs_decoder_result_dict = self._coerce_decoded_epochs_result_dict(self.real_decoder_ripple_filter_epochs_decoder_result_dict)
-        if self.real_decoder_ripple_filter_epochs_decoder_result_dict is None:
-            return
         if decoder_names is None:
             if self.track_templates is not None:
                 decoder_names = deepcopy(self.track_templates.get_decoder_names())
             else:
                 decoder_names = deepcopy(DEFAULT_SHUFFLE_DECODER_NAMES)
+        ## Spearman uses spikes + peak maps only (no decoded posteriors).
+        if (self.track_templates is not None) and ('spearman' not in self.real_score_arrays) and (self.active_spikes_df is not None) and (len(self.active_spikes_df) > 0) and (self.filtered_epochs_df is not None) and (len(self.filtered_epochs_df) > 0) and hasattr(self.track_templates, 'get_decoders_dict'):
+            try:
+                real_peak_map_dict = self._decoder_dict_to_aclu_peak_map_dict(self.track_templates.get_decoders_dict(), peak_mode='CoM')
+                spearman_arrays = self.compute_shuffle_spearman_score_arrays(track_templates=self.track_templates, spikes_df=self.active_spikes_df, active_epochs_df=self.filtered_epochs_df, decoder_aclu_peak_map_dict=real_peak_map_dict, decoder_names=decoder_names)
+                self.real_score_arrays.update(spearman_arrays)
+            except Exception as e:
+                print(f'WARN: _ensure_real_score_arrays failed to compute spearman: {e}')
+        self.real_decoder_ripple_filter_epochs_decoder_result_dict = self._coerce_decoded_epochs_result_dict(self.real_decoder_ripple_filter_epochs_decoder_result_dict)
+        if self.real_decoder_ripple_filter_epochs_decoder_result_dict is None:
+            return
         if self.enable_heuristic_shuffle_scoring and (self.track_templates is not None) and ('travel' not in self.real_score_arrays):
             from pyphoplacecellanalysis.Analysis.Decoder.heuristic_replay_scoring import HeuristicReplayScoring
             heuristic_arrays = HeuristicReplayScoring.compute_shuffle_heuristic_score_arrays(track_templates=self.track_templates, a_decoded_filter_epochs_decoder_result_dict=self.real_decoder_ripple_filter_epochs_decoder_result_dict, decoder_names=decoder_names)
@@ -1031,6 +1127,11 @@ class DecodedEpochScoreShuffle(ComputedResult):
 
             decoder_ripple_weighted_corr_df_dict = compute_weighted_correlations(decoder_decoded_epochs_result_dict=decoder_ripple_filter_epochs_decoder_result_dict)
             a_shuffle_score_arrays: Dict[str, NDArray] = {'wcorr': cls._wcorr_df_dict_to_array(decoder_ripple_weighted_corr_df_dict, decoder_names=decoder_names)}
+            replay_epochs_df: Optional[pd.DataFrame] = all_templates_decode_kwargs.get('override_replay_epochs_df', None)
+            if (replay_epochs_df is not None) and (len(replay_epochs_df) > 0) and ('label' in replay_epochs_df.columns):
+                shuffled_peak_map_dict = cls._decoder_dict_to_aclu_peak_map_dict(shuffled_decoders_dict, peak_mode='CoM')
+                spearman_arrays = cls.compute_shuffle_spearman_score_arrays(track_templates=track_templates, spikes_df=spikes_df, active_epochs_df=replay_epochs_df, decoder_aclu_peak_map_dict=shuffled_peak_map_dict, decoder_names=decoder_names)
+                a_shuffle_score_arrays.update(spearman_arrays)
             if enable_heuristic_shuffle_scoring:
                 heuristic_arrays = HeuristicReplayScoring.compute_shuffle_heuristic_score_arrays(track_templates=track_templates, a_decoded_filter_epochs_decoder_result_dict=decoder_ripple_filter_epochs_decoder_result_dict, decoder_names=decoder_names) # 2026-10-27 - Extremely slow, ~minutes
                 a_shuffle_score_arrays.update(heuristic_arrays)
@@ -1997,7 +2098,7 @@ class SequenceBasedComputationsGlobalComputationFunctions(AllFunctionEnumerating
         requires_global_keys=['DirectionalLaps', 'DirectionalMergedDecoders', 'RankOrder', 'DirectionalDecodersEpochsEvaluations'], provides_global_keys=['SequenceBased'],
         validate_computation_test=validate_has_sequence_based_results, is_global=True)
     def perform_epoch_score_shuffle_analysis(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, num_shuffles:int=1024, drop_previous_result_and_compute_fresh:bool=False, enable_heuristic_shuffle_scoring: bool=True, enable_radon_shuffle_scoring: bool=False):
-        """Performs cell-identity shuffles and scores decoded ripple epochs (wcorr, heuristics, optional radon).
+        """Performs cell-identity shuffles and scores decoded ripple epochs (wcorr, spearman, heuristics, optional radon).
 
         Requires:
             ['sess']
