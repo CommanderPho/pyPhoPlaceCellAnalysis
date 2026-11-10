@@ -641,26 +641,6 @@ class DecodedEpochScoreShuffle(ComputedResult):
 
 
     @classmethod
-    def _prepare_spikes_for_spearman_scoring(cls, track_templates: TrackTemplates, spikes_df: pd.DataFrame, active_epochs_df: pd.DataFrame, decoder_aclu_peak_map_dict: Dict[str, Dict]) -> pd.DataFrame:
-        """All spikes in each epoch with `{decoder}_pf_peak_x` from the provided peak maps (no within-epoch aclu shuffle)."""
-        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.RankOrderComputations import RankOrderAnalyses
-
-        if not isinstance(active_epochs_df, pd.DataFrame):
-            active_epochs_df = active_epochs_df.to_dataframe()
-        active_epochs_df = deepcopy(active_epochs_df)
-        epoch_label_column_name: str = 'label'
-        assert epoch_label_column_name in active_epochs_df.columns, f'active_epochs_df must contain "{epoch_label_column_name}" for Probe_Epoch_id assignment'
-        active_epochs_df[epoch_label_column_name] = pd.to_numeric(active_epochs_df[epoch_label_column_name]).astype(int)
-
-        included_neuron_ids = np.array(track_templates.any_decoder_neuron_IDs)
-        spikes_df = deepcopy(spikes_df).spikes.sliced_by_neuron_id(included_neuron_ids)
-        spikes_df = spikes_df.spikes.adding_epochs_identity_column(active_epochs_df, epoch_id_key_name='Probe_Epoch_id', epoch_label_column_name=epoch_label_column_name, should_replace_existing_column=True, drop_non_epoch_spikes=True)
-
-        prepared_spikes_df: pd.DataFrame = RankOrderAnalyses._subfn_build_all_pf_peak_x_columns(track_templates, selected_spikes_df=spikes_df, override_decoder_aclu_peak_map_dict=decoder_aclu_peak_map_dict, _MODERN_INTERNAL_SHUFFLE=False)
-        return prepared_spikes_df
-
-
-    @classmethod
     def _spearman_arrays_from_prepared_spikes_df(cls, prepared_spikes_df: pd.DataFrame, active_epochs_df: pd.DataFrame, decoder_names: Optional[List[str]] = None) -> Dict[str, NDArray]:
         """Group prepared spikes by Probe_Epoch_id and build `(n_epochs, n_decoders)` spearman array aligned to `active_epochs_df` rows."""
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.RankOrderComputations import RankOrderAnalyses
@@ -698,11 +678,29 @@ class DecodedEpochScoreShuffle(ComputedResult):
     @classmethod
     def compute_shuffle_spearman_score_arrays(cls, track_templates: TrackTemplates, spikes_df: pd.DataFrame, active_epochs_df: pd.DataFrame, decoder_aclu_peak_map_dict: Optional[Dict[str, Dict]] = None, decoder_names: Optional[List[str]] = None) -> Dict[str, NDArray]:
         """Dense-ranked spike-time vs PF-peak-x Spearman for all spikes in each epoch → `{'spearman': (n_epochs, n_decoders)}`."""
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.RankOrderComputations import RankOrderAnalyses
+
+        def _subfn_prepare_spikes_for_spearman_scoring(track_templates: TrackTemplates, spikes_df: pd.DataFrame, active_epochs_df: pd.DataFrame, decoder_aclu_peak_map_dict: Dict[str, Dict]) -> pd.DataFrame:
+            """All spikes in each epoch with `{decoder}_pf_peak_x` from the provided peak maps (no within-epoch aclu shuffle)."""
+            if not isinstance(active_epochs_df, pd.DataFrame):
+                active_epochs_df = active_epochs_df.to_dataframe()
+            active_epochs_df = deepcopy(active_epochs_df)
+            epoch_label_column_name: str = 'label'
+            assert epoch_label_column_name in active_epochs_df.columns, f'active_epochs_df must contain "{epoch_label_column_name}" for Probe_Epoch_id assignment'
+            active_epochs_df[epoch_label_column_name] = pd.to_numeric(active_epochs_df[epoch_label_column_name]).astype(int)
+
+            included_neuron_ids = np.array(track_templates.any_decoder_neuron_IDs)
+            spikes_df = deepcopy(spikes_df).spikes.sliced_by_neuron_id(included_neuron_ids)
+            spikes_df = spikes_df.spikes.adding_epochs_identity_column(active_epochs_df, epoch_id_key_name='Probe_Epoch_id', epoch_label_column_name=epoch_label_column_name, should_replace_existing_column=True, drop_non_epoch_spikes=True)
+
+            prepared_spikes_df: pd.DataFrame = RankOrderAnalyses._subfn_build_all_pf_peak_x_columns(track_templates, selected_spikes_df=spikes_df, override_decoder_aclu_peak_map_dict=decoder_aclu_peak_map_dict, _MODERN_INTERNAL_SHUFFLE=False)
+            return prepared_spikes_df
+
         if decoder_names is None:
             decoder_names = deepcopy(track_templates.get_decoder_names())
         if decoder_aclu_peak_map_dict is None:
             decoder_aclu_peak_map_dict = track_templates.get_decoder_aclu_peak_map_dict(peak_mode='CoM')
-        prepared_spikes_df: pd.DataFrame = cls._prepare_spikes_for_spearman_scoring(track_templates=track_templates, spikes_df=spikes_df, active_epochs_df=active_epochs_df, decoder_aclu_peak_map_dict=decoder_aclu_peak_map_dict)
+        prepared_spikes_df: pd.DataFrame = _subfn_prepare_spikes_for_spearman_scoring(track_templates=track_templates, spikes_df=spikes_df, active_epochs_df=active_epochs_df, decoder_aclu_peak_map_dict=decoder_aclu_peak_map_dict)
         return cls._spearman_arrays_from_prepared_spikes_df(prepared_spikes_df=prepared_spikes_df, active_epochs_df=active_epochs_df, decoder_names=decoder_names)
 
 
