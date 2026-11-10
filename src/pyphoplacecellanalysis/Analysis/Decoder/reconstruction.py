@@ -1155,7 +1155,6 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
         return split_by_epoch_reverse_flattened_time_bin_indicies
 
 
-
     @function_attributes(short_name=None, tags=['single-epoch', 'indexing', 'start-time'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-01 00:00', related_items=['self.get_result_for_epoch_at_time'])
     def get_result_for_epoch(self, active_epoch_idx: int) -> SingleEpochDecodedResult:
         """ returns a container with the result from a single epoch. 
@@ -1190,6 +1189,7 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
         single_epoch_result: SingleEpochDecodedResult = SingleEpochDecodedResult(**values_dict, epoch_info_tuple=active_epoch_info_tuple, epoch_data_index=active_epoch_idx)
         return single_epoch_result
     
+
     @function_attributes(short_name=None, tags=['single-epoch', 'conversion', 'compatibility'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-12-23 00:00', related_items=['self.get_result_for_epoch'])
     @classmethod
     def init_from_single_epoch_result(cls, single_epoch_result: SingleEpochDecodedResult, decoding_time_bin_size: float, spkcount: Optional[NDArray] = None, pos_bin_edges: Optional[NDArray] = None, slideby: Optional[float] = None) -> "DecodedFilterEpochsResult":
