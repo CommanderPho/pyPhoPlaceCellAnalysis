@@ -1852,7 +1852,13 @@ class LoadedPosteriorContainer:
         
         """
         exported_posterior_data_h5_files = [Path(v).resolve() for v in exported_posterior_data_h5_files] ## should parse who name and stuff... but we don't.
-        all_sessions_exported_posteriors_list: List["LoadedPosteriorContainer"] = [cls.init_from_load_path(load_path=hdf_load_path) for hdf_load_path in exported_posterior_data_h5_files] ## need to export those globally unique identifiers for each aclu within a session
+        all_sessions_exported_posteriors_list: List["LoadedPosteriorContainer"] = []
+        for hdf_load_path in exported_posterior_data_h5_files:
+            try:
+                all_sessions_exported_posteriors_list.append(cls.init_from_load_path(load_path=hdf_load_path)) ## need to export those globally unique identifiers for each aclu within a session
+            except Exception as e:
+                print(f'WARN: failed to load decoded posteriors HDF5 file "{hdf_load_path.as_posix()}": {e}')
+        ## END for hdf_load_path in exported_posterior_data_h5_files...
         all_sessions_exported_posteriors_dict = {}
         all_sessions_exported_posteriors_data_only_dict = {}
         for v in all_sessions_exported_posteriors_list:
