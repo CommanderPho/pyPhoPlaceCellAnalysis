@@ -476,21 +476,27 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
 
         # Get the one-step decoder:
         prev_one_step_bayesian_decoder = computation_result.computed_data[one_step_decoder_key]
-        ## New 2022-09-15 direct neuropy.utils.mixins.binning_helpers.build_df_discretized_binned_position_columns version:
-        computation_result.sess.position.df, (xbin, ybin), bin_infos = build_df_discretized_binned_position_columns(computation_result.sess.position.df, 
-            bin_values=(prev_one_step_bayesian_decoder.xbin, prev_one_step_bayesian_decoder.ybin),
-            active_computation_config=computation_result.computation_config.pf_params, force_recompute=False, debug_print=debug_print)
-        active_xbins = xbin
-        active_ybins = ybin
+        if prev_one_step_bayesian_decoder is None:
+            ## no 2D:
+            print(f'ERR: _perform_two_step_position_decoding_computation(..., ndim: {ndim}): ERR: prev_one_step_bayesian_decoder is None with key one_step_decoder_key: "{}" so computation_result.computed_data["{two_step_decoder_key}"] will be None too!')
+            computation_result.computed_data[two_step_decoder_key] = None
 
-        pos_df = deepcopy(computation_result.sess.position.df).position.drop_dimensions_above(desired_ndim=ndim, inplace=False)  ## drops excess dimensions in-place. Might not fix the prev decode results though:
+        else:
+            ## New 2022-09-15 direct neuropy.utils.mixins.binning_helpers.build_df_discretized_binned_position_columns version:
+            computation_result.sess.position.df, (xbin, ybin), bin_infos = build_df_discretized_binned_position_columns(computation_result.sess.position.df, 
+                bin_values=(prev_one_step_bayesian_decoder.xbin, prev_one_step_bayesian_decoder.ybin),
+                active_computation_config=computation_result.computation_config.pf_params, force_recompute=False, debug_print=debug_print)
+            active_xbins = xbin
+            active_ybins = ybin
 
-        computation_result.computed_data[two_step_decoder_key] = _subfn_compute_two_step_decoder(active_xbins, active_ybins, prev_one_step_bayesian_decoder,
-                                                                                                  pos_df=pos_df, # computation_result.sess.position.df,
-                                                                                                  computation_config=computation_result.computation_config, debug_print=debug_print)
-        ## In this new mode we'll add the two-step properties to the original one-step decoder:
-        ## Adds the directly accessible properties to the active_one_step_decoder after they're computed in the active_two_step_decoder so that they can be plotted with the same functions/etc.
-        prev_one_step_bayesian_decoder.add_two_step_decoder_results(computation_result.computed_data[two_step_decoder_key])
+            pos_df = deepcopy(computation_result.sess.position.df).position.drop_dimensions_above(desired_ndim=ndim, inplace=False)  ## drops excess dimensions in-place. Might not fix the prev decode results though:
+
+            computation_result.computed_data[two_step_decoder_key] = _subfn_compute_two_step_decoder(active_xbins, active_ybins, prev_one_step_bayesian_decoder,
+                                                                                                    pos_df=pos_df, # computation_result.sess.position.df,
+                                                                                                    computation_config=computation_result.computation_config, debug_print=debug_print)
+            ## In this new mode we'll add the two-step properties to the original one-step decoder:
+            ## Adds the directly accessible properties to the active_one_step_decoder after they're computed in the active_two_step_decoder so that they can be plotted with the same functions/etc.
+            prev_one_step_bayesian_decoder.add_two_step_decoder_results(computation_result.computed_data[two_step_decoder_key])
 
         return computation_result
 
