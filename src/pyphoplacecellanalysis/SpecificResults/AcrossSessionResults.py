@@ -3702,19 +3702,25 @@ class OldFileArchiver:
     """ Cleans up and deletes old files and temporary pickles to recover disk space.
     
     """
-    @function_attributes(short_name=None, tags=['archive', 'cleanup', 'filesystem'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-09-02 11:30', related_items=[])
+    @function_attributes(short_name=None, tags=['archive', 'cleanup', 'filesystem'], input_requires=[], output_provides=[], uses=['parse_filename'], used_by=[], creation_date='2024-09-02 11:30', related_items=[])
     @classmethod
-    def archive_old_files(cls, collected_outputs_directory: Path, excluded_or_outdated_files_list: List[Path], is_dry_run: bool=False):
+    def archive_old_files(cls, collected_outputs_directory: Path, excluded_or_outdated_files_list: List[Path], is_dry_run: bool=False, archive_start: Optional[datetime]=None, archive_end: Optional[datetime]=None):
         """ moves old files that didn't meet the inclusion criteria into an archive directory.
-        
+
+        Optional ``archive_start`` / ``archive_end`` filter by filename ``export_datetime`` (inclusive start, exclusive end).
+        When either bound is set, unparsable filenames are skipped.
+
         from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import OldFileArchiver
-        archive_folder = OldFileArchiver.archive_old_files(collected_outputs_directory=collected_outputs_directory, excluded_or_outdated_files_list=excluded_or_outdated_files_list, is_dry_run=True)
+        archive_folder = OldFileArchiver.archive_old_files(collected_outputs_directory=collected_outputs_directory, excluded_or_outdated_files_list=excluded_or_outdated_files_list, is_dry_run=True, archive_start=datetime(2025, 1, 1), archive_end=datetime(2026, 6, 1))
         """
         ## INPUTS: collected_outputs_directory, excluded_or_outdated_files_list
-        
+
         assert collected_outputs_directory.exists(), f"collected_outputs_directory: {collected_outputs_directory} does not exist! Is the right computer's config commented out above?"
+        if (archive_start is not None) and (archive_end is not None):
+            assert archive_start < archive_end, f"archive_start ({archive_start}) must be < archive_end ({archive_end})"
         # fullwidth_path_widget(scripts_output_path, file_name_label='Scripts Output Path:')
         print(f'collected_outputs_directory: "{collected_outputs_directory}"')
+        print(f'\tarchive_start: {archive_start}  archive_end: {archive_end}')
 
         # Create a 'figures' subfolder if it doesn't exist
         archive_folder: Path = collected_outputs_directory.joinpath('OLD').resolve()
@@ -3722,12 +3728,34 @@ class OldFileArchiver:
         assert archive_folder.exists()
         print(f'\tarchive_folder: "{archive_folder}"')
 
-        for a_file_path in excluded_or_outdated_files_list:
+
+        def _subfn_export_datetime_in_range(a_path: Path) -> bool:
+            """True if path should be archived under the optional start/end bounds."""
+            if (archive_start is None) and (archive_end is None):
+                return True
+            export_datetime, *_ = parse_filename(a_path, should_print_unparsable_filenames=False, debug_print=False)
+            if export_datetime is None:
+                print(f'\tskipping unparsable path (date filter active): "{a_path}"')
+                return False
+            if (archive_start is not None) and (export_datetime < archive_start):
+                return False
+            if (archive_end is not None) and (export_datetime >= archive_end):
+                return False
+            return True
+
+
+        n_input: int = len(excluded_or_outdated_files_list)
+        filtered_files_list: List[Path] = [Path(p) for p in excluded_or_outdated_files_list if _subfn_export_datetime_in_range(Path(p))]
+        n_skipped: int = n_input - len(filtered_files_list)
+        print(f'\tarchive filter: keeping {len(filtered_files_list)} / {n_input} path(s) (skipped {n_skipped})')
+
+        for a_file_path in filtered_files_list:
             ## move the file to the archive folder
             # a_file_path.stem
             print(f'copying "{a_file_path}" to "{archive_folder}"...')
             if (not is_dry_run):
                 shutil.move(a_file_path, archive_folder)
+        ## END for a_file_path in filtered_files_list...
 
         return archive_folder
 
