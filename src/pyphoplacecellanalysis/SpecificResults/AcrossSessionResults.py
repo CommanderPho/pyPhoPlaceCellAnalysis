@@ -3053,6 +3053,52 @@ def load_across_sessions_exported_h5_files(cuttoff_date: Optional[datetime] = No
     ## OUTPUTS: (csv_files, csv_sessions), (h5_files, h5_sessions)
 
 
+@function_attributes(short_name=None, tags=['file', 'most-recent', 'non-most-recent', 'cleanup', 'old-files'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-11-10 11:29', related_items=['OldFileArchiver'])
+def is_file_most_recent(all_parsed_df: pd.DataFrame, most_recent_parsed_df: pd.DataFrame, debug_print: bool = False) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    """ given the all_df list and the most_recent_df list, returns the non-most-recent df 
+
+    Usage:
+        from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import is_file_most_recent
+
+        all_parsed_h5_files_df, non_most_recent_h5_files_df = is_file_most_recent(all_parsed_h5_files_df, most_recent_parsed_df=most_recent_parsed_h5_files_df)
+        all_parsed_csv_files_df, non_most_recent_csv_files_df = is_file_most_recent(all_parsed_csv_files_df, most_recent_parsed_df=most_recent_parsed_csv_files_df)
+
+        ## OUTPUTS: non_most_recent_h5_files_df, non_most_recent_csv_files_df
+        excluded_or_outdated_files_df: pd.DataFrame = pd.concat([non_most_recent_csv_files_df, non_most_recent_h5_files_df])
+        excluded_or_outdated_files_list.extend(non_most_recent_h5_files_df['path'].tolist())
+        excluded_or_outdated_files_list.extend(non_most_recent_csv_files_df['path'].tolist())
+        excluded_or_outdated_files_list
+
+        # all_parsed_h5_files_df, most_recent_parsed_h5_files_df
+        # non_most_recent_h5_files_df
+        # 
+        len(excluded_or_outdated_files_list)
+
+        ## OUTPUTS: excluded_or_outdated_files_df, excluded_or_outdated_files_list
+        excluded_or_outdated_files_df
+
+
+        from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import OldFileArchiver
+
+        # Preview (no moves)
+        archive_folder = OldFileArchiver.archive_old_files(
+            collected_outputs_directory=collected_outputs_directory,
+            excluded_or_outdated_files_list=excluded_or_outdated_files_list,
+            is_dry_run=True,
+            # is_dry_run=False,
+            # archive_start=datetime(2025, 1, 1),
+            archive_end=datetime(2026, 11, 1),
+        )
+
+
+    """
+    # most_recent_df['path'].tolist()
+    is_most_recent_file = all_parsed_df['path'].isin(most_recent_parsed_df['path'])
+    all_parsed_df['is_most_recent'] = is_most_recent_file
+    if debug_print:
+        print(f'len(all_parsed_df): {len(all_parsed_df)}, len(most_recent_parsed_df): {len(most_recent_parsed_df)}, np.sum(~is_most_recent_file): {np.sum(~is_most_recent_file)}')
+    return all_parsed_df, all_parsed_df[~is_most_recent_file]
+
 
 
 @function_attributes(short_name=None, tags=['MAIN', 'across_sessions'], input_requires=[], output_provides=[], uses=['find_csv_files', 'find_HDF5_files', 'find_most_recent_files', '_new_process_csv_files', '_common_cleanup_operations'], used_by=[], creation_date='2024-04-15 08:47', related_items=[])
@@ -3752,9 +3798,16 @@ class OldFileArchiver:
         for a_file_path in filtered_files_list:
             ## move the file to the archive folder
             # a_file_path.stem
-            print(f'copying "{a_file_path}" to "{archive_folder}"...')
+            print(f'moving "{a_file_path}" to "{archive_folder}"...')
             if (not is_dry_run):
-                shutil.move(a_file_path, archive_folder)
+                if not a_file_path.exists():
+                    print(f'\tskipping missing file: "{a_file_path}"')
+                    continue
+                try:
+                    shutil.move(a_file_path, archive_folder)
+                except (FileNotFoundError, OSError) as e:
+                    print(f'\tfailed to move "{a_file_path}" -> "{archive_folder}": {e}')
+                    continue
         ## END for a_file_path in filtered_files_list...
 
         return archive_folder
