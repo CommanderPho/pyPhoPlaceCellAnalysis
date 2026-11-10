@@ -455,160 +455,273 @@ class HierarchicalSessionInventory:
     @function_attributes(short_name=None, tags=['matplotlib', 'table', 'figure', 'svg', 'output'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-11-10 03:30', related_items=[])
     def export_hierarchical_table(cls, df: pd.DataFrame, output_stem="output/recording_table", width=8.0, row_height=0.25, fontsize=9, **kwargs):
         """Render contiguous animal/session groups as visually merged cells.
+        Input: one row per animal × session × period.
 
+        Required columns:
+            animal, session, pre_post,
+            lap_events, lap_bins, pbe_events, pbe_bins
+
+        Output columns:
+            animal | session |
+            pre-delta  → Laps/PBEs → events/time bins |
+            post-delta → Laps/PBEs → events/time bins
 
         Usage:
             from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import HierarchicalSessionInventory
+            from neuropy.utils.indexing_helpers import dict_with_renamed_keys
 
-            fig, ax = HierarchicalSessionInventory.export_hierarchical_table(counts_df)
+            ## INPUTS: df_filter
+            counts_df, table = HierarchicalSessionInventory.build_original_df_dict_hierarchy_inventory_table(
+                original_df_dict=dict_with_renamed_keys(df_filter.pre_predicate_df_dict, rename_key_mapping={'filtered_all_sessions_ripple_df': 'all_sessions_ripple_df',
+                        'filtered_all_sessions_ripple_time_bin_df': 'all_sessions_ripple_time_bin_df',
+                        'filtered_all_sessions_laps_df': 'all_sessions_laps_df',
+                        'filtered_all_sessions_laps_time_bin_df': 'all_sessions_laps_time_bin_df'},
+                    ),
+            )
+            # table  # styled HTML in Jupyter; plain DF via table.data
+            fig, ax, wide = HierarchicalSessionInventory.export_hierarchical_table(df=deepcopy(table.data).rename(columns=dict(zip(['Laps time bins', 'Laps events', 'PBEs time bins', 'PBEs events'], ['lap_bins', 'lap_events', 'pbe_bins', 'pbe_events'])), inplace=False))
             plt.show()
 
-        """
-        df = df.reset_index(drop=True).copy()
-        if df.empty:
-            raise ValueError("Cannot render an empty table.")
 
-        required = [
-            "animal", "session", "pre_post",
-            "lap_bins", "lap_events", "pbe_bins", "pbe_events",
-        ]
+        """
+        periods = ["pre-delta", "post-delta"]
+        metrics = ["lap_events", "lap_bins", "pbe_events", "pbe_bins"]
+        keys = ["animal", "session"]
+
+        required = keys + ["pre_post"] + metrics
         missing = set(required) - set(df.columns)
         if missing:
             raise ValueError(f"Missing columns: {sorted(missing)}")
+        if df.empty:
+            raise ValueError("Cannot render an empty table.")
 
-        # Preserve input ordering; each animal/session must be contiguous.
-        def runs(keys):
-            start = 0
-            for stop in range(1, len(df) + 1):
-                if stop == len(df) or any(
-                    df.iloc[stop][key] != df.iloc[start][key]
-                    for key in keys
-                ):
-                    yield start, stop
-                    start = stop
+        data = df[required].copy()
 
-        animal_runs = list(runs(["animal"]))
-        session_runs = list(runs(["animal", "session"]))
+        if data[keys + ["pre_post"]].isna().any().any():
+            raise ValueError("Animal, session, and period identifiers cannot be null.")
 
-        for keys, groups in [
-            (["animal"], animal_runs),
-            (["animal", "session"], session_runs),
-        ]:
-            values = [tuple(df.iloc[a][key] for key in keys) for a, _ in groups]
-            if len(values) != len(set(values)):
-                raise ValueError(f"Groups {keys} must be contiguous.")
+        if data.duplicated(keys + ["pre_post"]).any():
+            raise ValueError(
+                "Expected one row per animal × session × period; "
+                "duplicate rows were found."
+            )
 
-        # Relative widths for the seven columns.
-        widths = [0.80, 1.90, 1.15, 1.15, 1.05, 1.15, 1.10]
-        edges = [0]
+        unexpected = set(data["pre_post"]) - set(periods)
+        if unexpected:
+            raise ValueError(f"Unexpected period labels: {sorted(unexpected)}")
+
+        # Preserve the input animal/session order.
+        session_order = pd.MultiIndex.from_frame(
+            data[keys].drop_duplicates()
+        )
+
+        wide_columns = pd.MultiIndex.from_product(
+            [periods, metrics],
+            names=["period", "metric"],
+        )
+
+        wide = (
+            data.set_index(keys + ["pre_post"])[metrics]
+            .unstack("pre_post")
+            .swaplevel(0, 1, axis=1)
+            .reindex(index=session_order, columns=wide_columns)
+        )
+
+        animals = wide.index.get_level_values("animal").tolist()
+        sessions = wide.index.get_level_values("session").tolist()
+        n = len(wide)
+
+        # Find contiguous animal groups.
+        animal_runs = []
+        start = 0
+        for stop in range(1, n + 1):
+            if stop == n or animals[stop] != animals[start]:
+                animal_runs.append((start, stop))
+                start = stop
+
+        group_labels = [animals[start] for start, _ in animal_runs]
+        if len(group_labels) != len(set(group_labels)):
+            raise ValueError(
+                "Sessions belonging to each animal must be contiguous."
+            )
+
+        # Two identifier columns followed by eight numeric columns.
+        widths = [0.85, 2.20] + [0.82, 1.02, 0.82, 1.02] * 2
+        edges = [0.0]
         for value in widths:
             edges.append(edges[-1] + value)
 
-        headers = [
-            "Animal", "Recording session", "Period",
-            "Laps\nTime bins", "Laps\nEvents",
-            "PBEs\nTime bins", "PBEs\nEvents",
-        ]
-
-        n = len(df)
-        header_height = 1.65
-        total_height = n + header_height
+        # Three header tiers: period → event type → measurement.
+        header_heights = [0.85, 0.80, 0.85]
+        h1, h2, h3 = header_heights
+        header_height = sum(header_heights)
+        total_height = header_height + n
 
         fig, ax = plt.subplots(
             figsize=(width, total_height * row_height),
             facecolor="white",
         )
-        fig.subplots_adjust(left=0.015, right=0.985, top=0.99, bottom=0.01)
+        fig.subplots_adjust(left=0.01, right=0.99, top=0.99, bottom=0.01)
         ax.set_xlim(0, edges[-1])
         ax.set_ylim(total_height, 0)
         ax.axis("off")
 
-        # Header.
+        def text(x, y, label, *, ha="center", bold=False):
+            ax.text(
+                x, y, label,
+                ha=ha,
+                va="center",
+                fontsize=fontsize,
+                fontweight="bold" if bold else "normal",
+                color="#20262c",
+            )
+
+        def rule(y, left=0, right=None, color="#cdd2d7", lw=0.5):
+            ax.hlines(
+                y,
+                left,
+                edges[-1] if right is None else right,
+                color=color,
+                linewidth=lw,
+            )
+
+        # Header background.
         ax.add_patch(Rectangle(
             (0, 0), edges[-1], header_height,
             facecolor="#e9edf1", edgecolor="none",
         ))
 
-        for j, label in enumerate(headers):
-            ax.text(
-                (edges[j] + edges[j + 1]) / 2,
-                header_height / 2,
-                label,
-                ha="center", va="center",
-                fontsize=fontsize, fontweight="bold",
-                linespacing=1.25,
-            )
+        # Identifier headers span all three header tiers.
+        text(
+            (edges[0] + edges[1]) / 2,
+            header_height / 2,
+            "Animal",
+            bold=True,
+        )
+        text(
+            (edges[1] + edges[2]) / 2,
+            header_height / 2,
+            "Recording session",
+            bold=True,
+        )
 
-        # Body shading only over nonmerged columns.
-        for i, row in df.iterrows():
+        for p, period in enumerate(periods):
+            first = 2 + p * 4
+            last = first + 4
+
+            # Tier 1: pre-delta / post-delta.
+            text(
+                (edges[first] + edges[last]) / 2,
+                h1 / 2,
+                period,
+                bold=True,
+            )
+            rule(h1, edges[first] + 0.08, edges[last] - 0.08)
+
+            # Tier 2: Laps / PBEs.
+            for offset, label in [(0, "Laps"), (2, "PBEs")]:
+                j = first + offset
+                text(
+                    (edges[j] + edges[j + 2]) / 2,
+                    h1 + h2 / 2,
+                    label,
+                    bold=True,
+                )
+                rule(
+                    h1 + h2,
+                    edges[j] + 0.08,
+                    edges[j + 2] - 0.08,
+                )
+
+            # Tier 3: events / time bins.
+            for offset, label in enumerate(
+                ["events", "time bins", "events", "time bins"]
+            ):
+                j = first + offset
+                text(
+                    (edges[j] + edges[j + 1]) / 2,
+                    h1 + h2 + h3 / 2,
+                    label,
+                )
+
+        # Body: one row per recording session.
+        for i, (_, row) in enumerate(wide.iterrows()):
             y = header_height + i
-            if row["pre_post"] == "post-delta":
+
+            if i % 2:
                 ax.add_patch(Rectangle(
-                    (edges[2], y), edges[-1] - edges[2], 1,
-                    facecolor="#f1f3f5", edgecolor="none",
+                    (edges[1], y),
+                    edges[-1] - edges[1],
+                    1,
+                    facecolor="#f3f5f7",
+                    edgecolor="none",
                 ))
 
-            ax.text(
-                edges[2] + 0.10, y + 0.5, row["pre_post"],
-                ha="left", va="center", fontsize=fontsize,
+            text(
+                edges[1] + 0.12,
+                y + 0.5,
+                str(sessions[i]),
+                ha="left",
             )
 
-            for j, col in enumerate(required[3:], start=3):
-                ax.text(
-                    edges[j + 1] - 0.12, y + 0.5,
-                    f"{int(row[col]):,}",
-                    ha="right", va="center", fontsize=fontsize,
+            for j, value in enumerate(row, start=2):
+                label = "—" if pd.isna(value) else f"{int(value):,}"
+                text(
+                    edges[j + 1] - 0.12,
+                    y + 0.5,
+                    label,
+                    ha="right",
                 )
+
+            if i < n - 1:
+                rule(y + 1, edges[1], lw=0.35)
 
         # Merged animal labels.
         for start, stop in animal_runs:
-            ax.text(
+            text(
                 edges[0] + 0.10,
                 header_height + (start + stop) / 2,
-                str(df.iloc[start]["animal"]),
-                ha="left", va="center",
-                fontsize=fontsize, fontweight="bold",
+                str(animals[start]),
+                ha="left",
+                bold=True,
             )
 
-        # Merged session labels and fine session separators.
-        for start, stop in session_runs:
-            ax.text(
-                (edges[1] + edges[2]) / 2,
-                header_height + (start + stop) / 2,
-                str(df.iloc[start]["session"]),
-                ha="center", va="center", fontsize=fontsize,
-            )
             if stop < n:
-                ax.hlines(
-                    header_height + stop, edges[1], edges[-1],
-                    color="#cdd2d7", linewidth=0.45,
+                rule(
+                    header_height + stop,
+                    color="#89939d",
+                    lw=0.8,
                 )
 
-        # Stronger animal separators across the full table.
-        for _, stop in animal_runs[:-1]:
-            ax.hlines(
-                header_height + stop, 0, edges[-1],
-                color="#89939d", linewidth=0.8,
-            )
+        # Thin separator between pre and post column groups.
+        ax.vlines(
+            edges[6],
+            0,
+            total_height,
+            color="#b0b8c0",
+            linewidth=0.6,
+        )
 
-        # Top, header, and bottom rules; no vertical grid lines.
-        for y, lw in [(0, 0.9), (header_height, 0.7), (total_height, 0.9)]:
-            ax.hlines(y, 0, edges[-1], color="#46515c", linewidth=lw)
+        rule(0, color="#46515c", lw=0.9)
+        rule(header_height, color="#46515c", lw=0.8)
+        rule(total_height, color="#46515c", lw=0.9)
 
         stem = Path(output_stem)
         stem.parent.mkdir(parents=True, exist_ok=True)
 
-        for suffix in [".pdf", ".svg", ".png"]:
+        for extension in [".pdf", ".svg", ".png"]:
             fig.savefig(
-                stem.with_suffix(suffix),
+                stem.with_suffix(extension),
                 dpi=600,
                 bbox_inches="tight",
                 pad_inches=0.04,
                 facecolor="white",
             )
 
-        df.to_csv(stem.with_suffix(".csv"), index=False)
-        return fig, ax
+        # Preserve the hierarchical column headers in the CSV.
+        wide.to_csv(stem.with_suffix(".csv"))
+
+        return fig, ax, wide
 
 
 
