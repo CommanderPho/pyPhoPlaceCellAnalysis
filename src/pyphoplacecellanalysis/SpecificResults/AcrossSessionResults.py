@@ -3732,6 +3732,67 @@ class OldFileArchiver:
         return archive_folder
 
 
+    @function_attributes(short_name=None, tags=['archive', 'cleanup', 'collected_outputs', 'filesystem'], input_requires=[], output_provides=[], uses=['find_csv_files', 'find_HDF5_files', 'find_pkl_files', 'find_most_recent_files', 'archive_old_files'], used_by=[], creation_date='2026-11-10 00:00', related_items=[])
+    @classmethod
+    def cleanup_outdated_collected_outputs(cls, collected_outputs_directory: Path, *, include_csv: bool = True, include_h5: bool = True, include_pkl: bool = True, keep_n_most_recent: int = 1, is_dry_run: bool = True, debug_print: bool = False) -> Tuple[List[Path], Path]:
+        """Keep the newest export(s) per logical group under ``collected_outputs``; archive older duplicates into ``OLD/``.
+
+        Groups by ``(session, custom_replay_name, file_type, decoding_time_bin_size_str)`` via ``find_most_recent_files``.
+        Unparsable filenames (copydict CSVs, filelists, etc.) are left alone. Scans the directory root only (non-recursive).
+
+        Usage:
+            outdated_paths, archive_folder = OldFileArchiver.cleanup_outdated_collected_outputs(collected_outputs_directory=collected_outputs_path, is_dry_run=True)
+        """
+        collected_outputs_directory = Path(collected_outputs_directory).resolve()
+        assert collected_outputs_directory.exists(), f"collected_outputs_directory: {collected_outputs_directory} does not exist!"
+        assert keep_n_most_recent >= 1, f"keep_n_most_recent must be >= 1, got {keep_n_most_recent}"
+        archive_folder_name: str = 'OLD'
+
+
+        def _subfn_collect_export_paths(directory: Path) -> List[Path]:
+            found_paths: List[Path] = []
+            if include_csv:
+                found_paths.extend(find_csv_files(directory, recurrsive=False))
+            if include_h5:
+                found_paths.extend(find_HDF5_files(directory, recurrsive=False))
+            if include_pkl:
+                found_paths.extend(find_pkl_files(directory, recurrsive=False))
+            ## END if include_*...
+            found_paths = [p.resolve() for p in found_paths if (archive_folder_name not in p.parts) and p.is_file()]
+            return list(dict.fromkeys(found_paths))
+
+
+        found_paths: List[Path] = _subfn_collect_export_paths(collected_outputs_directory)
+        print(f'cleanup_outdated_collected_outputs: scanning {len(found_paths)} file(s) under {collected_outputs_directory}')
+
+        if len(found_paths) == 0:
+            archive_folder = collected_outputs_directory.joinpath(archive_folder_name)
+            print('No export files found; nothing to clean.')
+            return [], archive_folder
+
+        _, _most_recent_df, all_parsed_df = find_most_recent_files(found_session_export_paths=found_paths, cuttoff_date=None, debug_print=debug_print, should_print_unparsable_filenames=False, should_fallback_to_filesystem_modification_datetime=False)
+
+        if (all_parsed_df is None) or (len(all_parsed_df) == 0):
+            archive_folder = collected_outputs_directory.joinpath(archive_folder_name)
+            print('No parsable collected_outputs export files found; nothing to clean.')
+            return [], archive_folder
+
+        group_cols = ['session', '_comparable_custom_replay_name', 'file_type', 'decoding_time_bin_size_str']
+        sorted_df = all_parsed_df.copy()
+        sorted_df[group_cols] = sorted_df[group_cols].fillna('')
+        sorted_df = sorted_df.sort_values(group_cols + ['export_datetime'], ascending=[True, True, True, True, False]).reset_index(drop=True)
+        sorted_df['_keep_rank'] = sorted_df.groupby(group_cols, dropna=False).cumcount()  # 0 = newest
+
+        keep_mask = sorted_df['_keep_rank'] < keep_n_most_recent
+        outdated_df = sorted_df.loc[~keep_mask]
+        outdated_paths: List[Path] = [Path(p).resolve() for p in outdated_df['path'].tolist()]
+        outdated_paths = [p for p in outdated_paths if p.exists()]
+        print(f'keeping {int(keep_mask.sum())} / archiving {len(outdated_paths)} outdated version(s) (keep_n={keep_n_most_recent})')
+
+        archive_folder = cls.archive_old_files(collected_outputs_directory=collected_outputs_directory, excluded_or_outdated_files_list=outdated_paths, is_dry_run=is_dry_run)
+        return outdated_paths, archive_folder
+
+
     @function_attributes(short_name=None, tags=['filesystem', 'clean', 'delete', 'temporary'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-06 04:27', related_items=[])
     @classmethod
     def remove_backup_files_from_session_data_folders(cls, good_session_concrete_folders: List["ConcreteSessionFolder"],
