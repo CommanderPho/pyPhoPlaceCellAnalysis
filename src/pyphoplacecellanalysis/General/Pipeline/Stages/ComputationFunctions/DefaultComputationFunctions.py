@@ -478,7 +478,7 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
         prev_one_step_bayesian_decoder = computation_result.computed_data[one_step_decoder_key]
         if prev_one_step_bayesian_decoder is None:
             ## no 2D:
-            print(f'ERR: _perform_two_step_position_decoding_computation(..., ndim: {ndim}): ERR: prev_one_step_bayesian_decoder is None with key one_step_decoder_key: "{}" so computation_result.computed_data["{two_step_decoder_key}"] will be None too!')
+            print(f'ERR: _perform_two_step_position_decoding_computation(..., ndim: {ndim}): ERR: prev_one_step_bayesian_decoder is None with key one_step_decoder_key: "{one_step_decoder_key}" so computation_result.computed_data["{two_step_decoder_key}"] will be None too!')
             computation_result.computed_data[two_step_decoder_key] = None
 
         else:
