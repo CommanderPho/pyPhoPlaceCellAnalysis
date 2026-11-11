@@ -302,28 +302,27 @@ class HDF5RecoveredPosteriorRippleViewer:
         """
         assert np.allclose(scores_df[['start', 'stop']], shuffle_df[['start', 'stop']]), f"scores_df and shuffle_df must refer to exactly the same epochs"
 
+        # def _subfun_filter_epochs_to_matching_scores_df_epochs(merged_epochs_df: pd.DataFrame, scores_df: pd.DataFrame):
+        #     ## find the corresponding epochs in the loaded h5 posteriors (`merged_epochs_df`):
+        #     merged_epochs_df: pd.DataFrame = ensure_dataframe(merged_epochs_df)
+        #     merged_epochs_df
 
-        def _subfun_filter_epochs_to_matching_scores_df_epochs(merged_epochs_df: pd.DataFrame, scores_df: pd.DataFrame):
-            ## find the corresponding epochs in the loaded h5 posteriors (`merged_epochs_df`):
-            merged_epochs_df: pd.DataFrame = ensure_dataframe(merged_epochs_df)
-            merged_epochs_df
-
-            matching_score_epoch_times_to_merged_epochs_data_indicies = merged_epochs_df.epochs.find_data_indicies_from_epoch_times(epoch_times=scores_df[['start', 'stop']].to_numpy())
-            matching_score_epoch_times_to_merged_epochs_data_indicies
-            # matching_score_epoch_times_to_data_indicies_map = merged_epochs_df.epochs.find_epoch_times_to_data_indicies_map(epoch_times=scores_df[['start', 'stop']].to_numpy())
-            # matching_score_epoch_times_to_data_indicies_map
+        #     matching_score_epoch_times_to_merged_epochs_data_indicies = merged_epochs_df.epochs.find_data_indicies_from_epoch_times(epoch_times=scores_df[['start', 'stop']].to_numpy())
+        #     matching_score_epoch_times_to_merged_epochs_data_indicies
+        #     # matching_score_epoch_times_to_data_indicies_map = merged_epochs_df.epochs.find_epoch_times_to_data_indicies_map(epoch_times=scores_df[['start', 'stop']].to_numpy())
+        #     # matching_score_epoch_times_to_data_indicies_map
 
 
-            num_matching: int = len(matching_score_epoch_times_to_merged_epochs_data_indicies)
-            print(f'num_matching: {num_matching}, len(scores_df): {len(scores_df)}')
+        #     num_matching: int = len(matching_score_epoch_times_to_merged_epochs_data_indicies)
+        #     print(f'num_matching: {num_matching}, len(scores_df): {len(scores_df)}')
 
-            active_posterior_epochs_df: pd.DataFrame = deepcopy(merged_epochs_df).iloc[matching_score_epoch_times_to_merged_epochs_data_indicies]
-            active_posterior_epochs_df
+        #     active_posterior_epochs_df: pd.DataFrame = deepcopy(merged_epochs_df).iloc[matching_score_epoch_times_to_merged_epochs_data_indicies]
+        #     active_posterior_epochs_df
 
-            Assert.same_length(active_posterior_epochs_df, scores_df)
+        #     Assert.same_length(active_posterior_epochs_df, scores_df)
 
-            ## OUTPUTS: active_posterior_epochs_df
-            return active_posterior_epochs_df, matching_score_epoch_times_to_merged_epochs_data_indicies
+        #     ## OUTPUTS: active_posterior_epochs_df
+        #     return active_posterior_epochs_df, matching_score_epoch_times_to_merged_epochs_data_indicies
 
         # ==================================================================================================================================================================================================================================================================================== #
         # BEGIN FUNCTION BODY                                                                                                                                                                                                                                                                  #
@@ -391,10 +390,17 @@ class HDF5RecoveredPosteriorRippleViewer:
         filter_epochs_df = filter_epochs_df.drop(columns=['_join_start'], errors='ignore')
 
 
-        #TODO 2026-11-11 08:06: - [ ] Filter the epochs only to the matching time_bins
-        active_posterior_epochs_df, matching_score_epoch_times_to_merged_epochs_data_indicies = _subfun_filter_epochs_to_matching_scores_df_epochs(merged_epochs_df=filter_epochs_df, scores_df=scores_df)
+        # #TODO 2026-11-11 08:06: - [ ] Filter the epochs only to the matching time_bins (starting to add correct filtering of the loaded posterior h5 epochs to match the score_df/shuffle_df epochs)
+        # active_posterior_epochs_df, matching_score_epoch_times_to_merged_epochs_data_indicies = _subfun_filter_epochs_to_matching_scores_df_epochs(merged_epochs_df=filter_epochs_df, scores_df=scores_df)
+
         ## Apply the epochs:
+        #TODO 2026-11-11 08:11: - [ ] should filter the `a_result` so all the data matches its .filter_epochs
         a_result.filter_epochs = filter_epochs_df
+
+        a_result = a_result.filtered_by_epoch_times(included_epoch_start_times=scores_df[['start', 'stop']].to_numpy()) # Correctly filter a_result by the epoch times
+
+        Assert.same_length(a_result.filter_epochs, scores_df) ## post-hoc check that the filtering of a_result worked correctly
+
         return a_result
 
 
