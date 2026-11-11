@@ -111,11 +111,11 @@ class HDF5RecoveredPosteriorRippleViewer:
         viewer.decoder_ripple_dict['long_LR'].filter_epochs[['start', 'wcorr', 'wcorr_z', 'best_overall_wcorr_z', 'mseq_tcov', 'mseq_tcov_z', 'forwardicity', 'forwardicity_z']]
     """
     ## Base score / radon / heuristic names that appear as `{name}_{decoder}` on modern `ripple_EpochScoreShuffle_df` (and legacy `ripple_all_scores_merged_df`):
-    SCORE_UNSUFFIX_BASE_NAMES: ClassVar[List[str]] = ['P_decoder', 'score', 'velocity', 'intercept', 'speed', 'wcorr', 'pearsonr', 'travel', 'coverage', 'avg_jump_cm', 'max_jump', 'max_jump_cm', 'max_jump_cm_per_sec', 'ratio_jump_valid_bins', 'total_congruent_direction_change', 'longest_sequence_length', 'continuous_seq_sort', 'continuous_seq_len_ratio_no_repeats', 'main_contiguous_subsequence_len', 'mseq_len', 'mseq_len_ignoring_intrusions', 'mseq_len_ignoring_intrusions_and_repeats', 'mseq_len_ratio_ignoring_intrusions_and_repeats', 'mseq_tcov', 'mseq_dtrav', 'forwardicity']
+    SCORE_UNSUFFIX_BASE_NAMES: ClassVar[List[str]] = ['P_decoder', 'score', 'velocity', 'intercept', 'speed', 'wcorr', 'pearsonr', 'spearman', 'travel', 'coverage', 'avg_jump_cm', 'max_jump', 'max_jump_cm', 'max_jump_cm_per_sec', 'ratio_jump_valid_bins', 'total_congruent_direction_change', 'longest_sequence_length', 'continuous_seq_sort', 'continuous_seq_len_ratio_no_repeats', 'main_contiguous_subsequence_len', 'mseq_len', 'mseq_len_ignoring_intrusions', 'mseq_len_ignoring_intrusions_and_repeats', 'mseq_len_ratio_ignoring_intrusions_and_repeats', 'mseq_tcov', 'mseq_dtrav', 'forwardicity']
     ## Heuristic/shuffle metrics whose decoder-specific `{metric}_z_{decoder}` and `best_overall_{metric}_z` are merged onto overlays:
-    HEURISTIC_SHUFFLE_Z_METRIC_NAMES: ClassVar[List[str]] = ['mseq_tcov', 'forwardicity', 'mseq_len', 'mseq_len_ignoring_intrusions', 'mseq_len_ignoring_intrusions_and_repeats', 'mseq_dtrav', 'travel', 'coverage']
-    SHUFFLE_OVERLAY_KEYS: ClassVar[List[str]] = ['wcorr_z', 'best_overall_wcorr_z', 'mseq_tcov_z', 'best_overall_mseq_tcov_z', 'forwardicity_z', 'best_overall_forwardicity_z']
-    DEFAULT_OVERLAY_INCLUDED_COLUMNS: ClassVar[List[str]] = ['wcorr', 'mseq_tcov', 'forwardicity', 'wcorr_z', 'best_overall_wcorr_z', 'mseq_tcov_z', 'best_overall_mseq_tcov_z', 'forwardicity_z', 'best_overall_forwardicity_z']
+    HEURISTIC_SHUFFLE_Z_METRIC_NAMES: ClassVar[List[str]] = ['mseq_tcov', 'forwardicity', 'mseq_len', 'mseq_len_ignoring_intrusions', 'mseq_len_ignoring_intrusions_and_repeats', 'mseq_dtrav', 'travel', 'coverage', 'spearman']
+    SHUFFLE_OVERLAY_KEYS: ClassVar[List[str]] = ['wcorr_z', 'best_overall_wcorr_z', 'mseq_tcov_z', 'best_overall_mseq_tcov_z', 'forwardicity_z', 'best_overall_forwardicity_z', 'spearman_z', 'best_overall_spearman_z']
+    DEFAULT_OVERLAY_INCLUDED_COLUMNS: ClassVar[List[str]] = ['wcorr', 'mseq_tcov', 'forwardicity', 'wcorr_z', 'best_overall_wcorr_z', 'mseq_tcov_z', 'best_overall_mseq_tcov_z', 'forwardicity_z', 'best_overall_forwardicity_z', 'spearman_z']
 
     ## Loaded / plotted session state:
     active_posterior_h5_path: Path
