@@ -197,6 +197,23 @@ class HDF5RecoveredPosteriorRippleViewer:
 
 
     @classmethod
+    def resolve_epoch_start_stop_times(cls, df: pd.DataFrame) -> np.ndarray:
+        """Return (N, 2) start/stop times when stop exists, else (N,) starts for `filtered_by_epoch_times`."""
+        start_col: str = cls.resolve_epoch_start_col(df)
+        starts = pd.to_numeric(df[start_col], errors='coerce').to_numpy()
+        stop_col: Optional[str] = None
+        for a_col in ('stop', 'end', 'ripple_stop_t', 'epoch_stop_t'):
+            if a_col in df.columns:
+                stop_col = a_col
+                break
+        ## END for a_col in ('stop', 'end', 'ripple_stop_t', 'epoch_stop_t')...
+        if stop_col is None:
+            return starts
+        stops = pd.to_numeric(df[stop_col], errors='coerce').to_numpy()
+        return np.column_stack([starts, stops])
+
+
+    @classmethod
     def pick_most_recent_session_csv(cls, most_recent_parsed_csv_files_df: pd.DataFrame, *, session_str: str, file_type: str, active_tbin_str: str, active_custom_replay_name: str, matching_custom_replay_name_str: Optional[str]=None) -> Optional[Path]:
         a_df = most_recent_parsed_csv_files_df[(most_recent_parsed_csv_files_df['session'].astype(str) == session_str) & (most_recent_parsed_csv_files_df['file_type'] == file_type)].copy()
         if len(a_df) == 0:
@@ -239,13 +256,12 @@ class HDF5RecoveredPosteriorRippleViewer:
 
 
     @classmethod
-    def load_matching_session_score_and_shuffle_csvs(cls, active_posterior_h5_path: Path, *, collected_outputs_directory: Path, decoded_posteriors_parsed_h5_files_df: pd.DataFrame, matching_custom_replay_name_str: Optional[str]=None, decoding_time_bin_size_str: Optional[str]=None, cuttoff_date: Optional[datetime]=None, debug_print: bool=True) -> Tuple[Optional[pd.DataFrame], Optional[pd.DataFrame], List[str], str]:
-        """Load most-recent matching EpochScoreShuffle CSV (preferred) for the H5 session.
+    def load_matching_session_score_and_shuffle_csvs(cls, active_posterior_h5_path: Path, *, collected_outputs_directory: Path, decoded_posteriors_parsed_h5_files_df: pd.DataFrame, matching_custom_replay_name_str: Optional[str]=None, decoding_time_bin_size_str: Optional[str]=None, cuttoff_date: Optional[datetime]=None, debug_print: bool=True) -> Tuple[pd.DataFrame, Optional[pd.DataFrame], List[str], str]:
+        """Load scores (required) and optional EpochScoreShuffle CSV for the H5 session.
 
-        Modern source: ``ripple_EpochScoreShuffle_df`` already includes raw per-decoder scores
-        (``wcorr_*``, heuristics, …) plus shuffle ``*_z`` / ``*_p`` / ``*_n_extreme``.
-        Legacy ``ripple_all_scores_merged_df`` is only a fallback when EpochScoreShuffle is missing
-        or lacks those raw score columns (its epoch starts often do not align with H5 posteriors).
+        Scores are always required. Prefer modern ``ripple_EpochScoreShuffle_df`` when it carries
+        raw per-decoder scores (also supplies shuffle ``*_z`` / ``*_p``). Otherwise fall back to
+        legacy ``ripple_all_scores_merged_df``. Shuffle may be missing; then overlays omit z cols.
         """
         from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionHelpers, find_csv_files, find_most_recent_files
 
@@ -282,71 +298,45 @@ class HDF5RecoveredPosteriorRippleViewer:
             scores_df = legacy_scores_df
             scores_csv_path = legacy_scores_csv_path
             scores_source = 'ripple_all_scores_merged_df (legacy fallback)'
+        assert (scores_df is not None) and (len(scores_df) > 0), f'scores_df is required but missing for session={active_session_str!r} (tried EpochScoreShuffle + ripple_all_scores_merged_df); shuffle may be absent'
         if debug_print:
             print(f'scores_source: {scores_source}')
             print(f'scores_csv_path: {scores_csv_path}')
             print(f'shuffle_csv_path: {shuffle_csv_path}')
             print(f'legacy_scores_csv_path: {legacy_scores_csv_path}')
-            print(f'scores rows: {None if scores_df is None else len(scores_df)}; shuffle transfer cols: {epoch_score_shuffle_transfer_col_names[:12]}{"…" if len(epoch_score_shuffle_transfer_col_names) > 12 else ""}')
+            print(f'scores rows: {len(scores_df)}; shuffle rows: {None if shuffle_df is None else len(shuffle_df)}; shuffle transfer cols: {epoch_score_shuffle_transfer_col_names[:12]}{"…" if len(epoch_score_shuffle_transfer_col_names) > 12 else ""}')
         return scores_df, shuffle_df, epoch_score_shuffle_transfer_col_names, active_session_str
 
 
     @classmethod
-    def merge_score_and_shuffle_onto_decoder_result(cls, a_result: DecodedFilterEpochsResult, decoder_name: str, scores_df: Optional[pd.DataFrame], shuffle_df: Optional[pd.DataFrame], debug_print: bool=True) -> DecodedFilterEpochsResult:
-        """Left-join unsuffixed score cols + shuffle z cols onto one decoder's `filter_epochs` by start time.
-        Needs to filter first
+    def merge_score_and_shuffle_onto_decoder_result(cls, a_result: DecodedFilterEpochsResult, decoder_name: str, scores_df: pd.DataFrame, shuffle_df: Optional[pd.DataFrame]=None, debug_print: bool=True) -> DecodedFilterEpochsResult:
+        """Left-join unsuffixed score cols (required) and optional shuffle z cols onto H5 `filter_epochs`, then subset to score epochs.
 
-
-
-
+        `scores_df` is required. `shuffle_df` may be missing (no z overlays). Merge-then-`filtered_by_epoch_times`
+        keeps score columns on `filter_epochs` while posterior lists stay aligned with the filtered epoch set.
         """
-        assert np.allclose(scores_df[['start', 'stop']], shuffle_df[['start', 'stop']]), f"scores_df and shuffle_df must refer to exactly the same epochs"
+        assert (scores_df is not None) and (len(scores_df) > 0), f'scores_df is required for decoder={decoder_name}'
+        has_shuffle: bool = (shuffle_df is not None) and (len(shuffle_df) > 0)
 
-        # def _subfun_filter_epochs_to_matching_scores_df_epochs(merged_epochs_df: pd.DataFrame, scores_df: pd.DataFrame):
-        #     ## find the corresponding epochs in the loaded h5 posteriors (`merged_epochs_df`):
-        #     merged_epochs_df: pd.DataFrame = ensure_dataframe(merged_epochs_df)
-        #     merged_epochs_df
-
-        #     matching_score_epoch_times_to_merged_epochs_data_indicies = merged_epochs_df.epochs.find_data_indicies_from_epoch_times(epoch_times=scores_df[['start', 'stop']].to_numpy())
-        #     matching_score_epoch_times_to_merged_epochs_data_indicies
-        #     # matching_score_epoch_times_to_data_indicies_map = merged_epochs_df.epochs.find_epoch_times_to_data_indicies_map(epoch_times=scores_df[['start', 'stop']].to_numpy())
-        #     # matching_score_epoch_times_to_data_indicies_map
-
-
-        #     num_matching: int = len(matching_score_epoch_times_to_merged_epochs_data_indicies)
-        #     print(f'num_matching: {num_matching}, len(scores_df): {len(scores_df)}')
-
-        #     active_posterior_epochs_df: pd.DataFrame = deepcopy(merged_epochs_df).iloc[matching_score_epoch_times_to_merged_epochs_data_indicies]
-        #     active_posterior_epochs_df
-
-        #     Assert.same_length(active_posterior_epochs_df, scores_df)
-
-        #     ## OUTPUTS: active_posterior_epochs_df
-        #     return active_posterior_epochs_df, matching_score_epoch_times_to_merged_epochs_data_indicies
-
-        # ==================================================================================================================================================================================================================================================================================== #
-        # BEGIN FUNCTION BODY                                                                                                                                                                                                                                                                  #
-        # ==================================================================================================================================================================================================================================================================================== #
         filter_epochs_df = ensure_dataframe(a_result.filter_epochs).copy()
         if 'start' not in filter_epochs_df.columns:
             raise KeyError(f'reassembled filter_epochs missing start for decoder={decoder_name}')
         filter_epochs_df['_join_start'] = pd.to_numeric(filter_epochs_df['start'], errors='coerce')
 
-        if scores_df is not None and len(scores_df) > 0:
-            suffix: str = f'_{decoder_name}'
-            rename_map = {f'{base}{suffix}': base for base in cls.SCORE_UNSUFFIX_BASE_NAMES if f'{base}{suffix}' in scores_df.columns}
-            start_col = cls.resolve_epoch_start_col(scores_df)
-            right = scores_df[[start_col, *list(rename_map.keys())]].copy() if len(rename_map) > 0 else scores_df[[start_col]].copy()
-            right = right.rename(columns=rename_map)
-            right['_join_start'] = pd.to_numeric(right[start_col], errors='coerce')
-            right = right.drop(columns=[start_col]).drop_duplicates(subset=['_join_start'], keep='first')
-            n_before = len(filter_epochs_df)
-            filter_epochs_df = filter_epochs_df.merge(right, how='left', on='_join_start')
-            assert len(filter_epochs_df) == n_before, f'scores merge changed row count for {decoder_name}'
-            if debug_print:
-                print(f'  {decoder_name}: merged {len(rename_map)} score cols; non-null wcorr={filter_epochs_df["wcorr"].notna().sum() if "wcorr" in filter_epochs_df.columns else 0}/{n_before}')
+        suffix: str = f'_{decoder_name}'
+        rename_map = {f'{base}{suffix}': base for base in cls.SCORE_UNSUFFIX_BASE_NAMES if f'{base}{suffix}' in scores_df.columns}
+        start_col = cls.resolve_epoch_start_col(scores_df)
+        right = scores_df[[start_col, *list(rename_map.keys())]].copy() if len(rename_map) > 0 else scores_df[[start_col]].copy()
+        right = right.rename(columns=rename_map)
+        right['_join_start'] = pd.to_numeric(right[start_col], errors='coerce')
+        right = right.drop(columns=[start_col]).drop_duplicates(subset=['_join_start'], keep='first')
+        n_before = len(filter_epochs_df)
+        filter_epochs_df = filter_epochs_df.merge(right, how='left', on='_join_start')
+        assert len(filter_epochs_df) == n_before, f'scores merge changed row count for {decoder_name}'
+        if debug_print:
+            print(f'  {decoder_name}: merged {len(rename_map)} score cols; non-null wcorr={filter_epochs_df["wcorr"].notna().sum() if "wcorr" in filter_epochs_df.columns else 0}/{n_before}')
 
-        if shuffle_df is not None and len(shuffle_df) > 0:
+        if has_shuffle:
             start_col = cls.resolve_epoch_start_col(shuffle_df)
             per_decoder_z_col = f'wcorr_z_{decoder_name}'
             long_short_z_col = 'wcorr_z_long' if decoder_name.startswith('long') else ('wcorr_z_short' if decoder_name.startswith('short') else None)
@@ -386,26 +376,28 @@ class HDF5RecoveredPosteriorRippleViewer:
             if debug_print:
                 z_cols_present = [c for c in filter_epochs_df.columns if c.endswith('_z') or c.startswith('best_overall_')]
                 print(f'  {decoder_name}: merged shuffle cols {[c for c in right.columns if c != "_join_start"]}; non-null wcorr_z={filter_epochs_df["wcorr_z"].notna().sum() if "wcorr_z" in filter_epochs_df.columns else 0}/{n_before}; z-like cols={z_cols_present}')
+        elif debug_print:
+            print(f'  {decoder_name}: no shuffle_df; skipping z/p overlay merge')
 
         filter_epochs_df = filter_epochs_df.drop(columns=['_join_start'], errors='ignore')
-
-
-        # #TODO 2026-11-11 08:06: - [ ] Filter the epochs only to the matching time_bins (starting to add correct filtering of the loaded posterior h5 epochs to match the score_df/shuffle_df epochs)
-        # active_posterior_epochs_df, matching_score_epoch_times_to_merged_epochs_data_indicies = _subfun_filter_epochs_to_matching_scores_df_epochs(merged_epochs_df=filter_epochs_df, scores_df=scores_df)
-
-        ## Apply the epochs:
-        #TODO 2026-11-11 08:11: - [ ] should filter the `a_result` so all the data matches its .filter_epochs
         a_result.filter_epochs = filter_epochs_df
 
-        a_result = a_result.filtered_by_epoch_times(included_epoch_start_times=scores_df[['start', 'stop']].to_numpy()) # Correctly filter a_result by the epoch times
-
-        Assert.same_length(a_result.filter_epochs, scores_df) ## post-hoc check that the filtering of a_result worked correctly
-
+        ## Drop H5-only epochs so posterior lists match the required scores epoch set:
+        n_scores: int = len(scores_df)
+        score_epoch_times = cls.resolve_epoch_start_stop_times(scores_df)
+        found_data_indicies = ensure_dataframe(a_result.filter_epochs).epochs.find_data_indicies_from_epoch_times(epoch_times=score_epoch_times)
+        n_matched: int = len(found_data_indicies)
+        n_skipped: int = int(n_scores - n_matched)
+        a_result = a_result.filtered_by_epoch_times(included_epoch_start_times=score_epoch_times)
+        Assert.same_length(a_result.filter_epochs, found_data_indicies)
+        if debug_print:
+            print(f'  {decoder_name}: filtered H5 epochs to {n_matched}/{n_scores} score epochs ({n_skipped} score row(s) not found in H5)')
         return a_result
 
 
     @classmethod
-    def enrich_ripple_decoder_results_with_score_shuffle_dfs(cls, decoder_ripple_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult], scores_df: Optional[pd.DataFrame], shuffle_df: Optional[pd.DataFrame], debug_print: bool=True) -> Dict[str, DecodedFilterEpochsResult]:
+    def enrich_ripple_decoder_results_with_score_shuffle_dfs(cls, decoder_ripple_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult], scores_df: pd.DataFrame, shuffle_df: Optional[pd.DataFrame]=None, debug_print: bool=True) -> Dict[str, DecodedFilterEpochsResult]:
+        assert (scores_df is not None) and (len(scores_df) > 0), 'scores_df is required'
         for decoder_name in list(decoder_ripple_filter_epochs_decoder_result_dict.keys()):
             decoder_ripple_filter_epochs_decoder_result_dict[decoder_name] = cls.merge_score_and_shuffle_onto_decoder_result(decoder_ripple_filter_epochs_decoder_result_dict[decoder_name], decoder_name=decoder_name, scores_df=scores_df, shuffle_df=shuffle_df, debug_print=debug_print)
         ## END for decoder_name in list(decoder_ripple_filter_epochs_decoder_result_dict.keys())...
