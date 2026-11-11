@@ -3602,6 +3602,89 @@ class PrePostDeltaDistributionComparison:
         return pd.DataFrame(rows)
 
 
+    @function_attributes(short_name=None, tags=['stats', 'fig4', 'P_Short', 'dip', 'unimodality'], input_requires=[], output_provides=[], uses=['diptest'], used_by=[], creation_date='2026-11-11 13:09', related_items=['compute_mode_ratio', 'plot_four_distribution_hist_ecdf'])
+    @classmethod
+    def compute_hartigan_dip_test(cls, values, value_col='P_Short', condition_col='pre_post_delta_category',
+                                  alpha: float = 0.05, boot_pval: bool = False, n_boot: int = 10000) -> Union[Dict[str, Any], pd.DataFrame]:
+        """Hartigan & Hartigan dip test of unimodality via the `diptest` package.
+
+        Tests H0: the underlying distribution is unimodal vs H1: not unimodal.
+        A small p-value supports departure from unimodality but does not establish exactly two modes.
+        A nonsignificant result does not prove unimodality, especially with small samples.
+
+        Pass individual observations (not histogram bin counts or KDE densities). The statistic is the
+        distance from the empirical CDF to the closest unimodal distribution function.
+
+        The ordinary p-value assumes i.i.d. observations. Temporally correlated neural time bins or
+        repeated measures within animals violate that assumption; do not interpret the returned
+        p-value as if every sample were independent.
+
+        Usage:
+            from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import PrePostDeltaDistributionComparison
+
+            # 1D observations
+            result = PrePostDeltaDistributionComparison.compute_hartigan_dip_test(p_short_values)
+
+            # Per-condition DataFrame (same grouping as compute_mode_ratio)
+            dip_df = PrePostDeltaDistributionComparison.compute_hartigan_dip_test(filtered_all_sessions_laps_time_bin_df)
+
+            # Optional simulation-based p-value (more expensive)
+            result = PrePostDeltaDistributionComparison.compute_hartigan_dip_test(p_short_values, boot_pval=True, n_boot=10_000)
+        """
+        from diptest import diptest
+
+        if not (0.0 < alpha < 1.0):
+            raise ValueError(f'alpha must be in (0, 1), got {alpha!r}.')
+        if boot_pval and (int(n_boot) < 1):
+            raise ValueError('n_boot must be >= 1 when boot_pval=True.')
+
+        def _subfn_dip_one(x: np.ndarray) -> Dict[str, Any]:
+            x = np.asarray(x, dtype=float)
+            x = x[np.isfinite(x)]
+            n = int(x.size)
+            if n < 2:
+                return dict(n=n, dip=np.nan, p_value=np.nan, reject_unimodality=False, alpha=float(alpha), boot_pval=bool(boot_pval), n_boot=int(n_boot))
+            if boot_pval:
+                dip_stat, p_value = diptest(x, boot_pval=True, n_boot=int(n_boot))
+            else:
+                dip_stat, p_value = diptest(x)
+            dip_stat = float(dip_stat)
+            p_value = float(p_value)
+            return dict(
+                n=n,
+                dip=dip_stat,
+                p_value=p_value,
+                reject_unimodality=bool(p_value < float(alpha)),
+                alpha=float(alpha),
+                boot_pval=bool(boot_pval),
+                n_boot=int(n_boot),
+            )
+
+        if isinstance(values, pd.DataFrame):
+            if value_col not in values.columns:
+                raise ValueError(f'Missing required column: {value_col!r}')
+            if condition_col not in values.columns:
+                raise ValueError(f'Missing required column: {condition_col!r}')
+            work = values[[condition_col, value_col]].copy()
+            work[value_col] = pd.to_numeric(work[value_col], errors='coerce')
+            work = work.dropna(subset=[value_col])
+            rows = []
+            for condition, group in work.groupby(condition_col, dropna=False, sort=False):
+                row = _subfn_dip_one(group[value_col].to_numpy(dtype=float))
+                row[condition_col] = condition
+                rows.append(row)
+            ## END for condition, group in work.groupby(condition_col, dropna=False, sort=False)...
+
+            columns = [condition_col, 'n', 'dip', 'p_value', 'reject_unimodality', 'alpha', 'boot_pval', 'n_boot']
+            if not rows:
+                return pd.DataFrame(columns=columns)
+            return pd.DataFrame(rows)[columns]
+
+        if isinstance(values, pd.Series):
+            return _subfn_dip_one(values.to_numpy(dtype=float))
+        return _subfn_dip_one(values)
+
+
     @function_attributes(short_name=None, tags=['stats', 'fig4', 'P_Short', 'ordinal', 'proportional-odds', 'mode-ratio', 'AI'], input_requires=[], output_provides=[], uses=['OrderedModel', 'compute_mode_ratio'], used_by=['run'], creation_date='2026-10-28 08:00', related_items=['compute_mode_ratio'])
     @classmethod
     def compute_ordinal_mode_shift(cls, df: pd.DataFrame, value_col='P_Short', condition_col='pre_post_delta_category', animal_col='animal', session_col='session_name',

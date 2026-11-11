@@ -51,6 +51,7 @@ dependencies = [
     "non-local-detector>=0.6.9",
     "wandb>=0.26.1",
     "awkward>=2.8.12",
+    "diptest>=0.12.0",
 ]
 
 [dependency-groups]
