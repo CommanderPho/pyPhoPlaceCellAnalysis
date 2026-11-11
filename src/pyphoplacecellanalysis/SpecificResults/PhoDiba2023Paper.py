@@ -86,7 +86,7 @@ from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import SingleEpochDe
 from pyphoplacecellanalysis.Pho2D.data_exporting import LoadedPosteriorContainer
 from pyphoplacecellanalysis.Pho2D.stacked_epoch_slices import PhoPaginatedMultiDecoderDecodedEpochsWindow, DecodedEpochSlicesPaginatedFigureController
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import OverlayLabelsPlotData
-from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionHelpers, find_csv_files, find_most_recent_files
+
 
 
 @metadata_attributes(short_name=None, tags=['figure', 'debug', 'posterior', 'h5', 'score', 'ripple'], input_requires=[], output_provides=[], uses=['DecodedFilterEpochsResult', 'PhoPaginatedMultiDecoderDecodedEpochsWindow', 'AcrossSessionHelpers'], used_by=[], creation_date='2026-11-10 16:15', related_items=[])
@@ -96,7 +96,7 @@ class HDF5RecoveredPosteriorRippleViewer:
     Usage:
         from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import HDF5RecoveredPosteriorRippleViewer
 
-        (app, window, pagination_controller_dict, decoder_ripple_dict), overlays = HDF5RecoveredPosteriorRippleViewer.plot_session(
+        (app, window, pagination_controller_dict, decoder_ripple_dict, scores_df, shuffle_df), overlays = HDF5RecoveredPosteriorRippleViewer.plot_session(
             active_posterior_h5_path,
             collected_outputs_directory=collected_outputs_directory,
             decoded_posteriors_parsed_h5_files_df=decoded_posteriors_parsed_h5_files_df,
@@ -104,11 +104,15 @@ class HDF5RecoveredPosteriorRippleViewer:
             decoding_time_bin_size_str=decoding_time_bin_size_str,
             cuttoff_date=cuttoff_date,
         )
+        ## Debug NaN overlay z: inspect scores_df / shuffle_df join vs filter_epochs
+        decoder_ripple_dict['long_LR'].filter_epochs[['start', 'wcorr', 'wcorr_z', 'best_overall_wcorr_z', 'mseq_tcov', 'mseq_tcov_z', 'forwardicity', 'forwardicity_z']]
     """
     ## Base score / radon / heuristic names that appear as `{name}_{decoder}` on ripple_all_scores_merged_df:
     SCORE_UNSUFFIX_BASE_NAMES: List[str] = ['P_decoder', 'score', 'velocity', 'intercept', 'speed', 'wcorr', 'pearsonr', 'travel', 'coverage', 'avg_jump_cm', 'max_jump', 'max_jump_cm', 'max_jump_cm_per_sec', 'ratio_jump_valid_bins', 'total_congruent_direction_change', 'longest_sequence_length', 'continuous_seq_sort', 'continuous_seq_len_ratio_no_repeats', 'main_contiguous_subsequence_len', 'mseq_len', 'mseq_len_ignoring_intrusions', 'mseq_len_ignoring_intrusions_and_repeats', 'mseq_len_ratio_ignoring_intrusions_and_repeats', 'mseq_tcov', 'mseq_dtrav', 'forwardicity']
-    SHUFFLE_OVERLAY_KEYS: List[str] = ['wcorr_z', 'best_overall_wcorr_z']
-    DEFAULT_OVERLAY_INCLUDED_COLUMNS: List[str] = ['wcorr', 'mseq_tcov', 'forwardicity', 'wcorr_z', 'best_overall_wcorr_z']
+    ## Heuristic/shuffle metrics whose decoder-specific `{metric}_z_{decoder}` and `best_overall_{metric}_z` are merged onto overlays:
+    HEURISTIC_SHUFFLE_Z_METRIC_NAMES: List[str] = ['mseq_tcov', 'forwardicity', 'mseq_len', 'mseq_len_ignoring_intrusions', 'mseq_len_ignoring_intrusions_and_repeats', 'mseq_dtrav', 'travel', 'coverage']
+    SHUFFLE_OVERLAY_KEYS: List[str] = ['wcorr_z', 'best_overall_wcorr_z', 'mseq_tcov_z', 'best_overall_mseq_tcov_z', 'forwardicity_z', 'best_overall_forwardicity_z']
+    DEFAULT_OVERLAY_INCLUDED_COLUMNS: List[str] = ['wcorr', 'mseq_tcov', 'forwardicity', 'wcorr_z', 'best_overall_wcorr_z', 'mseq_tcov_z', 'best_overall_mseq_tcov_z', 'forwardicity_z', 'best_overall_forwardicity_z']
 
 
     @classmethod
@@ -212,10 +216,26 @@ class HDF5RecoveredPosteriorRippleViewer:
 
 
     @classmethod
+    def resolve_h5_meta_row(cls, active_posterior_h5_path: Path, decoded_posteriors_parsed_h5_files_df: pd.DataFrame) -> pd.Series:
+        active_posterior_h5_path = Path(active_posterior_h5_path).resolve()
+        matched = decoded_posteriors_parsed_h5_files_df[decoded_posteriors_parsed_h5_files_df['path'].astype(str).map(lambda p: Path(p).resolve() == active_posterior_h5_path)]
+        assert len(matched) > 0, f'no decoded_posteriors_parsed_h5_files_df row for path={active_posterior_h5_path}'
+        return matched.iloc[0]
+
+
+    @classmethod
+    def resolve_session_str_from_h5_meta(cls, active_posterior_h5_path: Path, decoded_posteriors_parsed_h5_files_df: pd.DataFrame) -> str:
+        return str(cls.resolve_h5_meta_row(active_posterior_h5_path, decoded_posteriors_parsed_h5_files_df)['session'])
+
+
+    @classmethod
     def load_matching_session_score_and_shuffle_csvs(cls, active_posterior_h5_path: Path, *, collected_outputs_directory: Path, decoded_posteriors_parsed_h5_files_df: pd.DataFrame, matching_custom_replay_name_str: Optional[str]=None, decoding_time_bin_size_str: Optional[str]=None, cuttoff_date: Optional[datetime]=None, debug_print: bool=True) -> Tuple[Optional[pd.DataFrame], Optional[pd.DataFrame], List[str], str]:
         """Load most-recent matching `ripple_all_scores_merged_df` + EpochScoreShuffle CSVs for the H5 session."""
+        from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionHelpers, find_csv_files, find_most_recent_files
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.SequenceBasedComputations import DEFAULT_SHUFFLE_DECODER_NAMES, SCORE_EXTREME_MODE
+
         active_posterior_h5_path = Path(active_posterior_h5_path).resolve()
-        active_h5_meta_row = decoded_posteriors_parsed_h5_files_df[decoded_posteriors_parsed_h5_files_df['path'].astype(str).map(lambda p: Path(p).resolve() == active_posterior_h5_path)].iloc[0]
+        active_h5_meta_row = cls.resolve_h5_meta_row(active_posterior_h5_path, decoded_posteriors_parsed_h5_files_df)
         active_session_str: str = str(active_h5_meta_row['session'])
         active_custom_replay_name: str = str(active_h5_meta_row.get('custom_replay_name', matching_custom_replay_name_str))
         active_tbin_str: str = str(active_h5_meta_row.get('decoding_time_bin_size_str', decoding_time_bin_size_str))
@@ -271,28 +291,41 @@ class HDF5RecoveredPosteriorRippleViewer:
             per_decoder_z_col = f'wcorr_z_{decoder_name}'
             long_short_z_col = 'wcorr_z_long' if decoder_name.startswith('long') else ('wcorr_z_short' if decoder_name.startswith('short') else None)
             transfer_cols = []
+            rename_to_overlay: Dict[str, str] = {}
             if per_decoder_z_col in shuffle_df.columns:
                 transfer_cols.append(per_decoder_z_col)
+                rename_to_overlay[per_decoder_z_col] = 'wcorr_z'
             elif (long_short_z_col is not None) and (long_short_z_col in shuffle_df.columns):
                 transfer_cols.append(long_short_z_col)
+                rename_to_overlay[long_short_z_col] = 'wcorr_z'
             for a_col in ('best_overall_wcorr_z', 'wcorr_z_long', 'wcorr_z_short'):
                 if (a_col in shuffle_df.columns) and (a_col not in transfer_cols):
                     transfer_cols.append(a_col)
             ## END for a_col in ('best_overall_wcorr_z', 'wcorr_z_long', 'wcorr_z_short')...
 
+            ## Heuristic shuffle z: prefer `{metric}_z_{decoder}` as overlay `{metric}_z`, plus `best_overall_{metric}_z`:
+            for metric_name in cls.HEURISTIC_SHUFFLE_Z_METRIC_NAMES:
+                metric_per_decoder_z_col: str = f'{metric_name}_z_{decoder_name}'
+                metric_best_overall_z_col: str = f'best_overall_{metric_name}_z'
+                if metric_per_decoder_z_col in shuffle_df.columns:
+                    if metric_per_decoder_z_col not in transfer_cols:
+                        transfer_cols.append(metric_per_decoder_z_col)
+                    rename_to_overlay[metric_per_decoder_z_col] = f'{metric_name}_z'
+                if (metric_best_overall_z_col in shuffle_df.columns) and (metric_best_overall_z_col not in transfer_cols):
+                    transfer_cols.append(metric_best_overall_z_col)
+            ## END for metric_name in cls.HEURISTIC_SHUFFLE_Z_METRIC_NAMES...
+
             right = shuffle_df[[start_col, *transfer_cols]].copy()
             right['_join_start'] = pd.to_numeric(right[start_col], errors='coerce')
             right = right.drop(columns=[start_col]).drop_duplicates(subset=['_join_start'], keep='first')
-            ## Prefer decoder-specific z as overlay key `wcorr_z`:
-            if per_decoder_z_col in right.columns:
-                right = right.rename(columns={per_decoder_z_col: 'wcorr_z'})
-            elif (long_short_z_col is not None) and (long_short_z_col in right.columns) and ('wcorr_z' not in right.columns):
-                right = right.rename(columns={long_short_z_col: 'wcorr_z'})
+            if len(rename_to_overlay) > 0:
+                right = right.rename(columns=rename_to_overlay)
             n_before = len(filter_epochs_df)
             filter_epochs_df = filter_epochs_df.merge(right, how='left', on='_join_start')
             assert len(filter_epochs_df) == n_before, f'shuffle merge changed row count for {decoder_name}'
             if debug_print:
-                print(f'  {decoder_name}: merged shuffle cols {[c for c in right.columns if c != "_join_start"]}; non-null wcorr_z={filter_epochs_df["wcorr_z"].notna().sum() if "wcorr_z" in filter_epochs_df.columns else 0}/{n_before}')
+                z_cols_present = [c for c in filter_epochs_df.columns if c.endswith('_z') or c.startswith('best_overall_')]
+                print(f'  {decoder_name}: merged shuffle cols {[c for c in right.columns if c != "_join_start"]}; non-null wcorr_z={filter_epochs_df["wcorr_z"].notna().sum() if "wcorr_z" in filter_epochs_df.columns else 0}/{n_before}; z-like cols={z_cols_present}')
 
         filter_epochs_df = filter_epochs_df.drop(columns=['_join_start'], errors='ignore')
         a_result.filter_epochs = filter_epochs_df
@@ -318,10 +351,14 @@ class HDF5RecoveredPosteriorRippleViewer:
 
 
     @classmethod
-    def build_paginated_multi_decoder_ripple_window(cls, decoder_ripple_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult], *, max_subplots_per_page: int=8, window_name: str='HDF5RecoveredRipplesWindow', window_title: str='HDF5-recovered Ripple Decoded Epochs', defer_show: bool=False) -> Tuple[Any, PhoPaginatedMultiDecoderDecodedEpochsWindow, Dict[str, DecodedEpochSlicesPaginatedFigureController]]:
+    def build_paginated_multi_decoder_ripple_window(cls, decoder_ripple_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult], *, session_str: Optional[str]=None, max_subplots_per_page: int=8, window_name: Optional[str]=None, window_title: Optional[str]=None, defer_show: bool=False) -> Tuple[Any, PhoPaginatedMultiDecoderDecodedEpochsWindow, Dict[str, DecodedEpochSlicesPaginatedFigureController]]:
         """Build each decoder's paginated controller (synthetic xbin, skip measured positions) and combine into one window."""
         decoder_names: List[str] = list(decoder_ripple_filter_epochs_decoder_result_dict.keys())
         assert len(decoder_names) > 0, "no ripple decoder results to plot"
+        if window_title is None:
+            window_title = f'{session_str} | HDF5-recovered Ripple Decoded Epochs' if session_str else 'HDF5-recovered Ripple Decoded Epochs'
+        if window_name is None:
+            window_name = f'HDF5RecoveredRipplesWindow[{session_str}]' if session_str else 'HDF5RecoveredRipplesWindow'
         ## Dummy measured-position DF (skipped via params; column still required by some helpers):
         global_pos_df = pd.DataFrame({'t': np.asarray([], dtype=float), 'lin_pos': np.asarray([], dtype=float)})
         controlling_decoder_name: str = decoder_names[0]
@@ -330,17 +367,40 @@ class HDF5RecoveredPosteriorRippleViewer:
             a_result: DecodedFilterEpochsResult = decoder_ripple_filter_epochs_decoder_result_dict[decoder_name]
             is_controlling_widget: bool = (decoder_name == controlling_decoder_name)
             curr_params_kwargs = dict(skip_plotting_measured_positions=True, skip_plotting_most_likely_positions=True, isPaginatorControlWidgetBackedMode=True, epochs_name='ripple', is_controlled_widget=(not is_controlling_widget), disable_y_label=(not is_controlling_widget), enable_radon_transform_info=False, enable_overlay_labels_info=False, enable_update_window_title_on_page_change=False, build_internal_callbacks=True)
-            pagination_controller_dict[decoder_name] = DecodedEpochSlicesPaginatedFigureController.init_from_decoder_data(a_result.filter_epochs, filter_epochs_decoder_result=a_result, xbin=cls.infer_xbin_from_result(a_result), global_pos_df=global_pos_df, a_name=f'DecodedEpochSlices[{decoder_name}]', active_context=IdentifyingContext(display_fn_name='DecodedEpochSlices', epochs='ripple', decoder=decoder_name), max_subplots_per_page=max_subplots_per_page, params_kwargs=curr_params_kwargs)
+            a_name: str = f'{session_str} | DecodedEpochSlices[{decoder_name}]' if session_str else f'DecodedEpochSlices[{decoder_name}]'
+            pagination_controller_dict[decoder_name] = DecodedEpochSlicesPaginatedFigureController.init_from_decoder_data(a_result.filter_epochs, filter_epochs_decoder_result=a_result, xbin=cls.infer_xbin_from_result(a_result), global_pos_df=global_pos_df, a_name=a_name, active_context=IdentifyingContext(display_fn_name='DecodedEpochSlices', epochs='ripple', decoder=decoder_name, session=session_str) if session_str else IdentifyingContext(display_fn_name='DecodedEpochSlices', epochs='ripple', decoder=decoder_name), max_subplots_per_page=max_subplots_per_page, params_kwargs=curr_params_kwargs)
         ## END for decoder_name in decoder_names...
 
         app, paginated_multi_decoder_decoded_epochs_window = PhoPaginatedMultiDecoderDecodedEpochsWindow.init_from_pagination_controller_dict(pagination_controller_dict, name=window_name, title=window_title, defer_show=defer_show)
+        ## Child matplotlib showEvent can overwrite the dock-area title; pin both to the session-aware title:
+        paginated_multi_decoder_decoded_epochs_window.setWindowTitle(window_title)
+        for decoder_name, a_ctrl in pagination_controller_dict.items():
+            if (getattr(a_ctrl.ui, 'mw', None) is not None) and hasattr(a_ctrl.ui.mw, 'params'):
+                a_ctrl.ui.mw.params.window_title = window_title
+        ## END for decoder_name, a_ctrl in pagination_controller_dict.items()...
         return app, paginated_multi_decoder_decoded_epochs_window, pagination_controller_dict
+
+    @classmethod
+    def build_shuffle_overlay_label_keys(cls, shuffle_overlay_keys: Optional[List[str]]=None) -> List[str]:
+        """Union of explicit overlay z keys plus `{metric}_z` / `best_overall_{metric}_z` for heuristic shuffle metrics."""
+        keys: List[str] = list(shuffle_overlay_keys if shuffle_overlay_keys is not None else cls.SHUFFLE_OVERLAY_KEYS)
+        for metric_name in cls.HEURISTIC_SHUFFLE_Z_METRIC_NAMES:
+            keys.extend([f'{metric_name}_z', f'best_overall_{metric_name}_z'])
+        ## END for metric_name in cls.HEURISTIC_SHUFFLE_Z_METRIC_NAMES...
+        seen: Set[str] = set()
+        unique_keys: List[str] = []
+        for k in keys:
+            if k not in seen:
+                seen.add(k)
+                unique_keys.append(k)
+        ## END for k in keys...
+        return unique_keys
 
 
     @classmethod
     def enable_shuffle_overlay_label_keys(cls, shuffle_overlay_keys: Optional[List[str]]=None) -> None:
         """Allow-list shuffle z keys and patch OverlayLabelsPlotData formatting (idempotent for the process)."""
-        shuffle_overlay_keys = list(shuffle_overlay_keys if shuffle_overlay_keys is not None else cls.SHUFFLE_OVERLAY_KEYS)
+        shuffle_overlay_keys = cls.build_shuffle_overlay_label_keys(shuffle_overlay_keys)
         for k in shuffle_overlay_keys:
             if k not in OverlayLabelsPlotData.HEURISTIC_LABEL_KEYS:
                 OverlayLabelsPlotData.HEURISTIC_LABEL_KEYS.append(k)
@@ -383,28 +443,32 @@ class HDF5RecoveredPosteriorRippleViewer:
 
     @classmethod
     @function_attributes(short_name=None, tags=['figure', 'debug', 'posterior', 'h5', 'score'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-11-10 16:15', related_items=[])
-    def plot_session(cls, active_posterior_h5_path: Path, *, collected_outputs_directory: Path, decoded_posteriors_parsed_h5_files_df: pd.DataFrame, restored_by_decoder_epochs: Optional[Dict[str, Dict[str, Dict[str, SingleEpochDecodedResult]]]]=None, matching_custom_replay_name_str: Optional[str]=None, decoding_time_bin_size_str: Optional[str]=None, cuttoff_date: Optional[datetime]=None, max_subplots_per_page: int=8, overlay_included_columns: Optional[List[str]]=None, defer_show: bool=False, window_name: str='HDF5RecoveredRipplesWindow', window_title: str='HDF5-recovered Ripple Decoded Epochs', debug_print: bool=True) -> Tuple[Tuple[Any, PhoPaginatedMultiDecoderDecodedEpochsWindow, Dict[str, DecodedEpochSlicesPaginatedFigureController], Dict[str, DecodedFilterEpochsResult]], Any]:
+    def plot_session(cls, active_posterior_h5_path: Path, *, collected_outputs_directory: Path, decoded_posteriors_parsed_h5_files_df: pd.DataFrame, restored_by_decoder_epochs: Optional[Dict[str, Dict[str, Dict[str, SingleEpochDecodedResult]]]]=None, matching_custom_replay_name_str: Optional[str]=None, decoding_time_bin_size_str: Optional[str]=None, cuttoff_date: Optional[datetime]=None, max_subplots_per_page: int=10, overlay_included_columns: Optional[List[str]]=None, defer_show: bool=False, window_name: Optional[str]=None, window_title: Optional[str]=None, debug_print: bool=True) -> Tuple[Tuple[Any, PhoPaginatedMultiDecoderDecodedEpochsWindow, Dict[str, DecodedEpochSlicesPaginatedFigureController], Dict[str, DecodedFilterEpochsResult]], Any]:
         """Reassemble one session's exported HDF5 posteriors, merge score/shuffle CSVs, and plot ripples with overlays."""
         active_posterior_h5_path = Path(active_posterior_h5_path).resolve()
+        session_str: str = cls.resolve_session_str_from_h5_meta(active_posterior_h5_path, decoded_posteriors_parsed_h5_files_df)
         if restored_by_decoder_epochs is None:
             restored_by_decoder_epochs, _save_key = cls.recover_single_epoch_decoded_results_from_hdf5(active_posterior_h5_path, debug_print=debug_print)
 
         decoding_time_bin_size: Optional[float] = LoadedPosteriorContainer.parse_time_bin_size_from_path(active_posterior_h5_path)
         assert decoding_time_bin_size is not None, f"could not parse `_tbin-…` from filename: {active_posterior_h5_path.name}"
         if debug_print:
-            print(f'decoding_time_bin_size: {decoding_time_bin_size}')
+            print(f'session_str={session_str!r}, decoding_time_bin_size: {decoding_time_bin_size}')
 
         restored_decoded_filter_epochs_results_dict = cls.reassemble_decoded_filter_epochs_results_dict(restored_by_decoder_epochs, decoding_time_bin_size=float(decoding_time_bin_size))
         decoder_ripple_filter_epochs_decoder_result_dict = cls.extract_ripple_decoder_result_dict(restored_decoded_filter_epochs_results_dict)
         if debug_print:
             print(f'ripple decoders: {list(decoder_ripple_filter_epochs_decoder_result_dict.keys())}')
 
-        scores_df, shuffle_df, _transfer_cols, _session_str = cls.load_matching_session_score_and_shuffle_csvs(active_posterior_h5_path, collected_outputs_directory=collected_outputs_directory, decoded_posteriors_parsed_h5_files_df=decoded_posteriors_parsed_h5_files_df, matching_custom_replay_name_str=matching_custom_replay_name_str, decoding_time_bin_size_str=decoding_time_bin_size_str, cuttoff_date=cuttoff_date, debug_print=debug_print)
+        scores_df, shuffle_df, _transfer_cols, session_str = cls.load_matching_session_score_and_shuffle_csvs(active_posterior_h5_path, collected_outputs_directory=collected_outputs_directory, decoded_posteriors_parsed_h5_files_df=decoded_posteriors_parsed_h5_files_df, matching_custom_replay_name_str=matching_custom_replay_name_str, decoding_time_bin_size_str=decoding_time_bin_size_str, cuttoff_date=cuttoff_date, debug_print=debug_print)
         decoder_ripple_filter_epochs_decoder_result_dict = cls.enrich_ripple_decoder_results_with_score_shuffle_dfs(decoder_ripple_filter_epochs_decoder_result_dict, scores_df=scores_df, shuffle_df=shuffle_df, debug_print=debug_print)
 
-        app, paginated_multi_decoder_decoded_epochs_window, pagination_controller_dict = cls.build_paginated_multi_decoder_ripple_window(decoder_ripple_filter_epochs_decoder_result_dict, max_subplots_per_page=max_subplots_per_page, window_name=window_name, window_title=window_title, defer_show=defer_show)
+        app, paginated_multi_decoder_decoded_epochs_window, pagination_controller_dict = cls.build_paginated_multi_decoder_ripple_window(decoder_ripple_filter_epochs_decoder_result_dict, session_str=session_str, max_subplots_per_page=max_subplots_per_page, window_name=window_name, window_title=window_title, defer_show=defer_show)
         _out_add_data_overlays = cls.add_score_shuffle_overlays(paginated_multi_decoder_decoded_epochs_window, pagination_controller_dict, decoder_ripple_filter_epochs_decoder_result_dict, overlay_included_columns=overlay_included_columns, debug_print=debug_print)
-        return (app, paginated_multi_decoder_decoded_epochs_window, pagination_controller_dict, decoder_ripple_filter_epochs_decoder_result_dict), _out_add_data_overlays
+        ## Re-assert after overlays / child showEvent (can overwrite dock title):
+        final_title: str = window_title if window_title is not None else f'{session_str} | HDF5-recovered Ripple Decoded Epochs'
+        paginated_multi_decoder_decoded_epochs_window.setWindowTitle(final_title)
+        return (app, paginated_multi_decoder_decoded_epochs_window, pagination_controller_dict, decoder_ripple_filter_epochs_decoder_result_dict, scores_df, shuffle_df), _out_add_data_overlays
 
 
 @function_attributes(short_name=None, tags=['figure', 'debug', 'posterior', 'h5', 'score'], input_requires=[], output_provides=[], uses=['HDF5RecoveredPosteriorRippleViewer'], used_by=[], creation_date='2026-11-10 16:15', related_items=[])
