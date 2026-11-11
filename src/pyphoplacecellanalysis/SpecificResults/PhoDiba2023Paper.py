@@ -114,9 +114,9 @@ class HDF5RecoveredPosteriorRippleViewer:
     ## Base score / radon / heuristic names that appear as `{name}_{decoder}` on modern `ripple_EpochScoreShuffle_df` (and legacy `ripple_all_scores_merged_df`):
     SCORE_UNSUFFIX_BASE_NAMES: ClassVar[List[str]] = ['P_decoder', 'score', 'velocity', 'intercept', 'speed', 'wcorr', 'pearsonr', 'spearman', 'travel', 'coverage', 'avg_jump_cm', 'max_jump', 'max_jump_cm', 'max_jump_cm_per_sec', 'ratio_jump_valid_bins', 'total_congruent_direction_change', 'longest_sequence_length', 'continuous_seq_sort', 'continuous_seq_len_ratio_no_repeats', 'main_contiguous_subsequence_len', 'mseq_len', 'mseq_len_ignoring_intrusions', 'mseq_len_ignoring_intrusions_and_repeats', 'mseq_len_ratio_ignoring_intrusions_and_repeats', 'mseq_tcov', 'mseq_dtrav', 'forwardicity']
     ## Heuristic/shuffle metrics whose decoder-specific `{metric}_z_{decoder}` and `best_overall_{metric}_z` are merged onto overlays:
-    HEURISTIC_SHUFFLE_Z_METRIC_NAMES: ClassVar[List[str]] = ['mseq_tcov', 'forwardicity', 'mseq_len', 'mseq_len_ignoring_intrusions', 'mseq_len_ignoring_intrusions_and_repeats', 'mseq_dtrav', 'travel', 'coverage', 'spearman']
-    SHUFFLE_OVERLAY_KEYS: ClassVar[List[str]] = ['wcorr_z', 'best_overall_wcorr_z', 'mseq_tcov_z', 'best_overall_mseq_tcov_z', 'forwardicity_z', 'best_overall_forwardicity_z', 'spearman_z', 'best_overall_spearman_z']
-    DEFAULT_OVERLAY_INCLUDED_COLUMNS: ClassVar[List[str]] = ['wcorr', 'best_overall_wcorr', 'mseq_tcov', 'forwardicity', 'wcorr_z', 'best_overall_wcorr_z', 'mseq_tcov_z', 'best_overall_mseq_tcov_z', 'forwardicity_z', 'best_overall_forwardicity_z', 'spearman_z']
+    SHUFFLE_TRANSFER_METRIC_NAMES: ClassVar[List[str]] = ['mseq_tcov', 'forwardicity', 'mseq_len', 'mseq_len_ignoring_intrusions', 'mseq_len_ignoring_intrusions_and_repeats', 'mseq_dtrav', 'travel', 'coverage', 'spearman', 'pearsonr']
+    SHUFFLE_OVERLAY_KEYS: ClassVar[List[str]] = ['wcorr_z', 'best_overall_wcorr_z', 'mseq_tcov_z', 'best_overall_mseq_tcov_z', 'forwardicity_z', 'best_overall_forwardicity_z', 'spearman_z', 'best_overall_spearman_z', 'pearsonr_z', 'best_overall_pearsonr_z']
+    DEFAULT_OVERLAY_INCLUDED_COLUMNS: ClassVar[List[str]] = ['wcorr', 'mseq_tcov', 'forwardicity', 'wcorr_z', 'mseq_tcov_z', 'spearman_z', 'pearsonr_z'] # , 'best_overall_wcorr', 'best_overall_wcorr_z', 'best_overall_mseq_tcov_z', 'forwardicity_z', 'best_overall_forwardicity_z'
 
     ## Loaded / plotted session state:
     active_posterior_h5_path: Path
@@ -392,7 +392,7 @@ class HDF5RecoveredPosteriorRippleViewer:
             ## END for a_col in ('best_overall_wcorr_z', 'wcorr_z_long', 'wcorr_z_short')...
 
             ## Heuristic shuffle z: prefer `{metric}_z_{decoder}` as overlay `{metric}_z`, plus `best_overall_{metric}_z`:
-            for metric_name in cls.HEURISTIC_SHUFFLE_Z_METRIC_NAMES:
+            for metric_name in cls.SHUFFLE_TRANSFER_METRIC_NAMES:
                 metric_per_decoder_z_col: str = f'{metric_name}_z_{decoder_name}'
                 metric_best_overall_z_col: str = f'best_overall_{metric_name}_z'
                 if metric_per_decoder_z_col in shuffle_df.columns:
@@ -544,7 +544,7 @@ class HDF5RecoveredPosteriorRippleViewer:
     def build_shuffle_overlay_label_keys(cls, shuffle_overlay_keys: Optional[List[str]]=None) -> List[str]:
         """Union of explicit overlay z keys plus `{metric}_z` / `best_overall_{metric}_z` for heuristic shuffle metrics."""
         keys: List[str] = list(shuffle_overlay_keys if shuffle_overlay_keys is not None else cls.SHUFFLE_OVERLAY_KEYS)
-        for metric_name in cls.HEURISTIC_SHUFFLE_Z_METRIC_NAMES:
+        for metric_name in cls.SHUFFLE_TRANSFER_METRIC_NAMES:
             keys.extend([f'{metric_name}_z', f'best_overall_{metric_name}_z'])
         ## END for metric_name in cls.HEURISTIC_SHUFFLE_Z_METRIC_NAMES...
         seen: Set[str] = set()
