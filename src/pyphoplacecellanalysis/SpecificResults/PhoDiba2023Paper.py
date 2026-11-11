@@ -438,7 +438,7 @@ class HDF5RecoveredPosteriorRippleViewer:
         assert (scores_df is not None) and (len(scores_df) > 0), 'scores_df is required'
         wcorr_decoder_cols: List[str] = [f'wcorr_{a_decoder_name}' for a_decoder_name in DECODER_NAMES]
         if all((c in scores_df.columns) for c in wcorr_decoder_cols):
-            scores_df = HighestOverallScoreDataframeAccessor.add_hos_columns(scores_df, score_col_names=['wcorr'])
+            scores_df = BestOverallScoreDataframeAccessor.add_bos_columns(scores_df, score_col_names=['wcorr'])
             if debug_print:
                 print(f'enrich: added best_overall_wcorr on scores_df (non-null={scores_df["best_overall_wcorr"].notna().sum()}/{len(scores_df)})')
         elif debug_print:
@@ -6612,18 +6612,18 @@ class MostLikelyDecoderDataframeAccessor:
         return out_df
 
 
-@pd.api.extensions.register_dataframe_accessor("pho_hos")
-class HighestOverallScoreDataframeAccessor:
-    """ Adds highest-overall-score (hos) `best_overall_{score}` columns on per-epoch DFs such as `all_sessions_ripple_df`.
+@pd.api.extensions.register_dataframe_accessor("pho_bos")
+class BestOverallScoreDataframeAccessor:
+    """ Adds best-overall-score (bos) `best_overall_{score}` columns on per-epoch DFs such as `all_sessions_ripple_df`.
 
     For each score, takes the abs-max across the four decoder-suffixed columns:
         `best_overall_{score} = nanmax(|{score}_long_LR|, |{score}_long_RL|, |{score}_short_LR|, |{score}_short_RL|)`
     Distinct from `pho_mld` (posterior-argmax) and from signed `HIGHEST_{score}`. Mirrors shuffle `best_overall_*_z`.
 
     Usage:
-        from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import HighestOverallScoreDataframeAccessor
+        from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import BestOverallScoreDataframeAccessor
 
-        all_sessions_ripple_df = all_sessions_ripple_df.pho_hos.adding_hos_columns()
+        all_sessions_ripple_df = all_sessions_ripple_df.pho_bos.adding_bos_columns()
         all_sessions_ripple_df[['best_overall_wcorr']]
     """
     decoder_names: Tuple[str, str, str, str] = DECODER_NAMES
@@ -6654,7 +6654,7 @@ class HighestOverallScoreDataframeAccessor:
 
 
     @classmethod
-    def add_hos_columns(cls, df: pd.DataFrame, score_col_names: Optional[Sequence[str]] = None, overwrite_existing: bool = False) -> pd.DataFrame:
+    def add_bos_columns(cls, df: pd.DataFrame, score_col_names: Optional[Sequence[str]] = None, overwrite_existing: bool = False) -> pd.DataFrame:
         """ Adds, if missing: `best_overall_{score}` abs-max columns over all four decoder-suffixed score columns. """
         if score_col_names is None:
             score_col_names = cls.default_score_col_names
@@ -6668,8 +6668,8 @@ class HighestOverallScoreDataframeAccessor:
         return out_df
 
 
-    def adding_hos_columns(self, score_col_names: Optional[Sequence[str]] = None, overwrite_existing: bool = False) -> pd.DataFrame:
-        return self.add_hos_columns(df=self._df, score_col_names=score_col_names, overwrite_existing=overwrite_existing)
+    def adding_bos_columns(self, score_col_names: Optional[Sequence[str]] = None, overwrite_existing: bool = False) -> pd.DataFrame:
+        return self.add_bos_columns(df=self._df, score_col_names=score_col_names, overwrite_existing=overwrite_existing)
 
 
 # ==================================================================================================================================================================================================================================================================================== #
