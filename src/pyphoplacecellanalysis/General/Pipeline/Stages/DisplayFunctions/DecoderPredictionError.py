@@ -1964,7 +1964,7 @@ class OverlayLabelsPlotData:
     ## class properties:
     # Outward-facing label themes: wcorr block (blue) vs heuristic scores (green)
     # ClassVar so attrs does not turn these into instance fields (cls.WCORR_LABEL_KEYS must work)
-    WCORR_LABEL_KEYS: ClassVar[List[str]] = ['wcorr', 'P_decoder', 'pearsonr']
+    WCORR_LABEL_KEYS: ClassVar[List[str]] = ['wcorr', 'best_overall_wcorr', 'P_decoder', 'pearsonr']
     HEURISTIC_LABEL_KEYS: ClassVar[List[str]] = [
         'travel', 'coverage', 'avg_jump_cm', 'max_jump', 'max_jump_cm', 'max_jump_cm_per_sec', 'ratio_jump_valid_bins',
         'total_congruent_direction_change', 'longest_sequence_length',
@@ -2031,6 +2031,7 @@ class OverlayLabelsPlotData:
 
             column_formatting_fn_dict = {'start':None, 'stop':None, 'label':None, 'duration':None,
                 'wcorr': (lambda v:f"wcorr: {default_float_formatting_fn(v)}"),
+                'best_overall_wcorr': (lambda v:f"best_overall_wcorr: {default_float_formatting_fn(v)}"),
                 'P_decoder':(lambda v:f"$P_i$: {default_float_formatting_fn(v)}"),
                 'pearsonr':(lambda v:f"$\\rho$: {default_float_formatting_fn(v)}"),
                 'travel':(lambda v:f"travel: {default_float_formatting_fn(v)}"),

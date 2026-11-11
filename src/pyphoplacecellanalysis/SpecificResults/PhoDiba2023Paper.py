@@ -116,7 +116,7 @@ class HDF5RecoveredPosteriorRippleViewer:
     ## Heuristic/shuffle metrics whose decoder-specific `{metric}_z_{decoder}` and `best_overall_{metric}_z` are merged onto overlays:
     HEURISTIC_SHUFFLE_Z_METRIC_NAMES: ClassVar[List[str]] = ['mseq_tcov', 'forwardicity', 'mseq_len', 'mseq_len_ignoring_intrusions', 'mseq_len_ignoring_intrusions_and_repeats', 'mseq_dtrav', 'travel', 'coverage', 'spearman']
     SHUFFLE_OVERLAY_KEYS: ClassVar[List[str]] = ['wcorr_z', 'best_overall_wcorr_z', 'mseq_tcov_z', 'best_overall_mseq_tcov_z', 'forwardicity_z', 'best_overall_forwardicity_z', 'spearman_z', 'best_overall_spearman_z']
-    DEFAULT_OVERLAY_INCLUDED_COLUMNS: ClassVar[List[str]] = ['wcorr', 'mseq_tcov', 'forwardicity', 'wcorr_z', 'best_overall_wcorr_z', 'mseq_tcov_z', 'best_overall_mseq_tcov_z', 'forwardicity_z', 'best_overall_forwardicity_z', 'spearman_z']
+    DEFAULT_OVERLAY_INCLUDED_COLUMNS: ClassVar[List[str]] = ['wcorr', 'best_overall_wcorr', 'mseq_tcov', 'forwardicity', 'wcorr_z', 'best_overall_wcorr_z', 'mseq_tcov_z', 'best_overall_mseq_tcov_z', 'forwardicity_z', 'best_overall_forwardicity_z', 'spearman_z']
 
     ## Loaded / plotted session state:
     active_posterior_h5_path: Path
@@ -361,7 +361,10 @@ class HDF5RecoveredPosteriorRippleViewer:
         suffix: str = f'_{decoder_name}'
         rename_map = {f'{base}{suffix}': base for base in cls.SCORE_UNSUFFIX_BASE_NAMES if f'{base}{suffix}' in scores_df.columns}
         start_col = cls.resolve_epoch_start_col(scores_df)
-        right = scores_df[[start_col, *list(rename_map.keys())]].copy() if len(rename_map) > 0 else scores_df[[start_col]].copy()
+        ## Cross-decoder raw best-overall (not `{base}_{decoder}` → `base`):
+        cross_decoder_score_cols: List[str] = [c for c in ('best_overall_wcorr',) if c in scores_df.columns]
+        right_cols: List[str] = [start_col, *list(rename_map.keys()), *cross_decoder_score_cols]
+        right = scores_df[right_cols].copy() if len(right_cols) > 1 else scores_df[[start_col]].copy()
         right = right.rename(columns=rename_map)
         right['_join_start'] = pd.to_numeric(right[start_col], errors='coerce')
         right = right.drop(columns=[start_col]).drop_duplicates(subset=['_join_start'], keep='first')
@@ -369,7 +372,7 @@ class HDF5RecoveredPosteriorRippleViewer:
         filter_epochs_df = filter_epochs_df.merge(right, how='left', on='_join_start')
         assert len(filter_epochs_df) == n_before, f'scores merge changed row count for {decoder_name}'
         if debug_print:
-            print(f'  {decoder_name}: merged {len(rename_map)} score cols; non-null wcorr={filter_epochs_df["wcorr"].notna().sum() if "wcorr" in filter_epochs_df.columns else 0}/{n_before}')
+            print(f'  {decoder_name}: merged {len(rename_map)} score cols (+{cross_decoder_score_cols}); non-null wcorr={filter_epochs_df["wcorr"].notna().sum() if "wcorr" in filter_epochs_df.columns else 0}/{n_before}')
 
         if has_shuffle:
             start_col = cls.resolve_epoch_start_col(shuffle_df)
@@ -433,6 +436,14 @@ class HDF5RecoveredPosteriorRippleViewer:
     @classmethod
     def enrich_ripple_decoder_results_with_score_shuffle_dfs(cls, decoder_ripple_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult], scores_df: pd.DataFrame, shuffle_df: Optional[pd.DataFrame]=None, debug_print: bool=True) -> Dict[str, DecodedFilterEpochsResult]:
         assert (scores_df is not None) and (len(scores_df) > 0), 'scores_df is required'
+        wcorr_decoder_cols: List[str] = [f'wcorr_{a_decoder_name}' for a_decoder_name in DECODER_NAMES]
+        if all((c in scores_df.columns) for c in wcorr_decoder_cols):
+            scores_df = HighestOverallScoreDataframeAccessor.add_hos_columns(scores_df, score_col_names=['wcorr'])
+            if debug_print:
+                print(f'enrich: added best_overall_wcorr on scores_df (non-null={scores_df["best_overall_wcorr"].notna().sum()}/{len(scores_df)})')
+        elif debug_print:
+            missing_wcorr = [c for c in wcorr_decoder_cols if c not in scores_df.columns]
+            print(f'enrich: skipping best_overall_wcorr (missing {missing_wcorr})')
         for decoder_name in list(decoder_ripple_filter_epochs_decoder_result_dict.keys()):
             decoder_ripple_filter_epochs_decoder_result_dict[decoder_name] = cls.merge_score_and_shuffle_onto_decoder_result(decoder_ripple_filter_epochs_decoder_result_dict[decoder_name], decoder_name=decoder_name, scores_df=scores_df, shuffle_df=shuffle_df, debug_print=debug_print)
         ## END for decoder_name in list(decoder_ripple_filter_epochs_decoder_result_dict.keys())...
@@ -6599,6 +6610,66 @@ class MostLikelyDecoderDataframeAccessor:
         assert len(out_df) == n_before, f'merge duplicated rows: {n_before} -> {len(out_df)}'
         out_df = out_df.drop(columns=[tmp_session_col, tmp_replay_col])
         return out_df
+
+
+@pd.api.extensions.register_dataframe_accessor("pho_hos")
+class HighestOverallScoreDataframeAccessor:
+    """ Adds highest-overall-score (hos) `best_overall_{score}` columns on per-epoch DFs such as `all_sessions_ripple_df`.
+
+    For each score, takes the abs-max across the four decoder-suffixed columns:
+        `best_overall_{score} = nanmax(|{score}_long_LR|, |{score}_long_RL|, |{score}_short_LR|, |{score}_short_RL|)`
+    Distinct from `pho_mld` (posterior-argmax) and from signed `HIGHEST_{score}`. Mirrors shuffle `best_overall_*_z`.
+
+    Usage:
+        from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import HighestOverallScoreDataframeAccessor
+
+        all_sessions_ripple_df = all_sessions_ripple_df.pho_hos.adding_hos_columns()
+        all_sessions_ripple_df[['best_overall_wcorr']]
+    """
+    decoder_names: Tuple[str, str, str, str] = DECODER_NAMES
+    default_score_col_names: Tuple[str, ...] = ('wcorr',)
+
+
+    def __init__(self, pandas_obj: pd.DataFrame):
+        self._validate(pandas_obj)
+        self._df = pandas_obj
+
+
+    @staticmethod
+    def _validate(obj):
+        if not isinstance(obj, pd.DataFrame):
+            raise ValueError(f"object must be a pandas Dataframe but is of type: {type(obj)}!\nobj: {obj}")
+
+
+    @classmethod
+    def take_best_overall_score_across_decoders(cls, df: pd.DataFrame, score_col_name: str, decoder_names: Optional[Sequence[str]] = None) -> np.ndarray:
+        """ Row-wise abs-max of `{score_col_name}_{decoder}` over all decoders (mirrors shuffle `best_overall_*_z`). NaN only where every decoder is NaN. """
+        if decoder_names is None:
+            decoder_names = cls.decoder_names
+        decoder_score_cols: List[str] = [f'{score_col_name}_{a_decoder_name}' for a_decoder_name in decoder_names]
+        missing = [c for c in decoder_score_cols if c not in df.columns]
+        if len(missing) > 0:
+            raise KeyError(f'missing decoder-suffixed columns for "{score_col_name}": {missing}')
+        return np.nanmax(np.abs(df[decoder_score_cols].to_numpy(dtype=float)), axis=1)
+
+
+    @classmethod
+    def add_hos_columns(cls, df: pd.DataFrame, score_col_names: Optional[Sequence[str]] = None, overwrite_existing: bool = False) -> pd.DataFrame:
+        """ Adds, if missing: `best_overall_{score}` abs-max columns over all four decoder-suffixed score columns. """
+        if score_col_names is None:
+            score_col_names = cls.default_score_col_names
+        out_df: pd.DataFrame = deepcopy(df)
+        for a_score_col_name in score_col_names:
+            out_col: str = f'best_overall_{a_score_col_name}'
+            if (not overwrite_existing) and (out_col in out_df.columns):
+                continue
+            out_df[out_col] = cls.take_best_overall_score_across_decoders(out_df, score_col_name=a_score_col_name)
+        ## END for a_score_col_name in score_col_names...
+        return out_df
+
+
+    def adding_hos_columns(self, score_col_names: Optional[Sequence[str]] = None, overwrite_existing: bool = False) -> pd.DataFrame:
+        return self.add_hos_columns(df=self._df, score_col_names=score_col_names, overwrite_existing=overwrite_existing)
 
 
 # ==================================================================================================================================================================================================================================================================================== #
