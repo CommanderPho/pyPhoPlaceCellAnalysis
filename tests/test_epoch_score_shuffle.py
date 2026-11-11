@@ -398,6 +398,85 @@ class TestShuffleRadonScoreArrays(unittest.TestCase):
         self.assertFalse(result_mock.last_kwargs.get('enable_return_neighbors_arr'))
 
 
+class TestShuffleComponentTiming(unittest.TestCase):
+    """_shuffle_and_decode_scores returns a stable timing summary across shuffles."""
+
+    def test_shuffle_and_decode_scores_returns_timing_summary(self):
+        from pyphoplacecellanalysis.Analysis.Decoder.heuristic_replay_scoring import HeuristicReplayScoring
+
+        n_shuffles: int = 2
+        n_epochs: int = 2
+        n_decoders: int = 4
+        neuron_ids = np.array([1, 2, 3, 4], dtype=int)
+        seq_mod = sys.modules[DecodedEpochScoreShuffle.__module__]
+
+        class _DecoderMock:
+            neuron_IDs = neuron_ids
+
+        class _TemplatesTimingMock:
+            def get_decoder_names(self):
+                return list(DEFAULT_SHUFFLE_DECODER_NAMES)
+
+            def get_decoders_dict(self):
+                return {name: _DecoderMock() for name in DEFAULT_SHUFFLE_DECODER_NAMES}
+
+        class _MergedDecodersMock:
+            class _AllDir:
+                neuron_IDs = neuron_ids
+            all_directional_pf1D_Decoder = _AllDir()
+
+        fake_wcorr_arr = np.full((n_epochs, n_decoders), 0.1, dtype=float)
+        fake_wcorr_df_dict = _wcorr_df_dict(fake_wcorr_arr)
+        fake_score = {'spearman': np.full((n_epochs, n_decoders), 0.2), 'pearsonr': np.full((n_epochs, n_decoders), 0.3)}
+        fake_heur = {'travel': np.full((n_epochs, n_decoders), 0.4), 'coverage': np.full((n_epochs, n_decoders), 0.5)}
+        fake_radon = {'radon_score': np.full((n_epochs, n_decoders), 0.6), 'radon_velocity': np.full((n_epochs, n_decoders), 1.0)}
+        shuffled_aclus = [neuron_ids.copy() for _ in range(n_shuffles)]
+        shuffle_IDXs = [np.arange(len(neuron_ids)) for _ in range(n_shuffles)]
+
+        with patch.object(seq_mod, 'build_shuffled_ids', return_value=(shuffled_aclus, shuffle_IDXs)), \
+             patch.object(DecodedEpochScoreShuffle, '_shuffle_pf1D_decoder', return_value=_DecoderMock()), \
+             patch.object(DecodedEpochScoreShuffle, '_try_all_templates_decode', return_value=(None, ({}, {name: object() for name in DEFAULT_SHUFFLE_DECODER_NAMES}))), \
+             patch.object(seq_mod, 'compute_weighted_correlations', return_value=fake_wcorr_df_dict), \
+             patch.object(DecodedEpochScoreShuffle, '_decoder_dict_to_aclu_peak_map_dict', return_value={name: {} for name in DEFAULT_SHUFFLE_DECODER_NAMES}), \
+             patch.object(DecodedEpochScoreShuffle, 'compute_shuffle_spearman_score_arrays', return_value=fake_score), \
+             patch.object(HeuristicReplayScoring, 'compute_shuffle_heuristic_score_arrays', return_value=fake_heur), \
+             patch.object(DecodedEpochScoreShuffle, 'compute_shuffle_radon_score_arrays', return_value=fake_radon):
+            wcorrs_list, score_arrays_list, full_decoded_list, timing_summary = DecodedEpochScoreShuffle._shuffle_and_decode_scores(
+                curr_active_pipeline=None,
+                track_templates=_TemplatesTimingMock(),
+                alt_directional_merged_decoders_result=_MergedDecodersMock(),
+                all_templates_decode_kwargs={'override_replay_epochs_df': _epochs_df(n_epochs).assign(label=np.arange(n_epochs, dtype=int))},
+                num_shuffles=n_shuffles,
+                spikes_df=pd.DataFrame({'t_rel_seconds': [0.0, 0.1], 'aclu': [1, 2]}),
+                enable_heuristic_shuffle_scoring=True,
+                enable_radon_shuffle_scoring=True,
+                enable_saving_entire_decoded_shuffle_result=False,
+                enable_shuffle_component_timing=True,
+            )
+
+        self.assertEqual(len(wcorrs_list), n_shuffles)
+        self.assertEqual(len(score_arrays_list), n_shuffles)
+        self.assertEqual(full_decoded_list, [])
+        self.assertIsNotNone(timing_summary)
+        self.assertEqual(timing_summary['n_shuffles'], n_shuffles)
+        self.assertIn('batch_total_s', timing_summary)
+        self.assertIn('totals_s', timing_summary)
+        self.assertIn('mean_per_shuffle_s', timing_summary)
+        expected_keys = {'shuffle_setup', 'decode', 'wcorr', 'spearman_pearsonr', 'heuristics', 'radon', 'shuffle_total'}
+        self.assertEqual(set(timing_summary['totals_s'].keys()), expected_keys)
+        self.assertEqual(set(timing_summary['mean_per_shuffle_s'].keys()), expected_keys)
+        self.assertGreaterEqual(float(timing_summary['batch_total_s']), float(timing_summary['totals_s']['shuffle_total']))
+
+
+    def test_build_shuffle_component_timing_summary_schema(self):
+        totals_s = {'shuffle_setup': 1.0, 'decode': 2.0, 'wcorr': 0.5, 'spearman_pearsonr': 0.25, 'heuristics': 3.0, 'radon': 4.0, 'shuffle_total': 10.75}
+        summary = DecodedEpochScoreShuffle._build_shuffle_component_timing_summary(totals_s=totals_s, n_shuffles=2, batch_total_s=11.0)
+        self.assertEqual(summary['n_shuffles'], 2)
+        self.assertEqual(summary['batch_total_s'], 11.0)
+        self.assertAlmostEqual(summary['mean_per_shuffle_s']['decode'], 1.0)
+        self.assertAlmostEqual(summary['mean_per_shuffle_s']['radon'], 2.0)
+
+
 class TestPickleCompat(unittest.TestCase):
     """__setstate__ old-field fill, 3/4/5/7-tuple load_and_append_shuffle_data, batch reconstruct."""
 
@@ -424,6 +503,8 @@ class TestPickleCompat(unittest.TestCase):
         self.assertTrue(obj.enable_heuristic_shuffle_scoring)
         self.assertFalse(obj.enable_radon_shuffle_scoring)
         self.assertFalse(obj.enable_saving_entire_decoded_shuffle_result)
+        self.assertTrue(obj.enable_shuffle_component_timing)
+        self.assertIsNone(obj.last_shuffle_component_timings)
 
 
     def test_load_and_append_shuffle_data_3_tuple_synthesizes_wcorr_score_arrays(self):

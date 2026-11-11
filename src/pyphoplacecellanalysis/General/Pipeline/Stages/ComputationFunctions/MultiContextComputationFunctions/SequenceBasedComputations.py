@@ -1137,8 +1137,43 @@ class DecodedEpochScoreShuffle(ComputedResult):
         
 
     @classmethod
+    def _build_shuffle_component_timing_summary(cls, totals_s: Dict[str, float], n_shuffles: int, batch_total_s: float) -> Dict[str, Any]:
+        """Build stable timing summary dict from accumulated component totals."""
+        n_shuffles_safe: int = max(int(n_shuffles), 1)
+        mean_per_shuffle_s: Dict[str, float] = {k: float(v) / float(n_shuffles_safe) for k, v in totals_s.items()}
+        return {
+            'n_shuffles': int(n_shuffles),
+            'batch_total_s': float(batch_total_s),
+            'totals_s': {k: float(v) for k, v in totals_s.items()},
+            'mean_per_shuffle_s': mean_per_shuffle_s,
+        }
+
+
+    @classmethod
+    def _print_shuffle_component_timing_summary(cls, timing_summary: Dict[str, Any]) -> None:
+        """Print one compact multi-line shuffle component timing breakdown."""
+        n_shuffles: int = int(timing_summary.get('n_shuffles', 0))
+        batch_total_s: float = float(timing_summary.get('batch_total_s', 0.0))
+        totals_s: Dict[str, float] = dict(timing_summary.get('totals_s', {}))
+        mean_per_shuffle_s: Dict[str, float] = dict(timing_summary.get('mean_per_shuffle_s', {}))
+        print(f'[SHUFFLE TIMING] n_shuffles={n_shuffles} batch_total={batch_total_s:.3f}s')
+        component_order: List[str] = ['shuffle_setup', 'decode', 'wcorr', 'spearman_pearsonr', 'heuristics', 'radon', 'shuffle_total']
+        for component_name in component_order:
+            if component_name not in totals_s:
+                continue
+            total_s: float = float(totals_s[component_name])
+            mean_s: float = float(mean_per_shuffle_s.get(component_name, 0.0))
+            pct: float = (100.0 * total_s / batch_total_s) if (batch_total_s > 0.0) else 0.0
+            print(f'  {component_name}: {total_s:.3f}s ({pct:.1f}%, {mean_s:.3f}s/shuffle)')
+        ## END for component_name in component_order...
+        if 'ensure_real_scores_s' in timing_summary:
+            print(f'  ensure_real_scores: {float(timing_summary["ensure_real_scores_s"]):.3f}s')
+
+
+    @classmethod
     def _shuffle_and_decode_scores(cls, curr_active_pipeline, track_templates: TrackTemplates, alt_directional_merged_decoders_result: DirectionalPseudo2DDecodersResult, all_templates_decode_kwargs: Dict, num_shuffles: int = 2, spikes_df: Optional[pd.DataFrame]=None,
             enable_heuristic_shuffle_scoring: bool=True, enable_radon_shuffle_scoring: bool=True, enable_saving_entire_decoded_shuffle_result: bool=False, force_disable_laps_decoding: bool = True,
+            enable_shuffle_component_timing: bool=True,
         ):
         """Shuffle cell identities, decode ripples, extract enabled score metrics.
 
@@ -1146,7 +1181,7 @@ class DecodedEpochScoreShuffle(ComputedResult):
         `is_pre_compute_mode` is left off (known to produce identical shuffles).
 
         Returns:
-            wcorr_df_dicts, score_arrays_list, optional_full_decoded_list
+            wcorr_df_dicts, score_arrays_list, optional_full_decoded_list, timing_summary (or None if timing disabled)
         """
         from pyphoplacecellanalysis.Analysis.Decoder.heuristic_replay_scoring import HeuristicReplayScoring
 
@@ -1154,6 +1189,8 @@ class DecodedEpochScoreShuffle(ComputedResult):
         _updated_output_extracted_result_wcorrs_list = []
         _updated_output_extracted_score_arrays_list: List[Dict[str, NDArray]] = []
         _updated_output_extracted_full_decoded_results_list = []
+        timing_component_keys: List[str] = ['shuffle_setup', 'decode', 'wcorr', 'spearman_pearsonr', 'heuristics', 'radon', 'shuffle_total']
+        totals_s: Dict[str, float] = {k: 0.0 for k in timing_component_keys}
 
         shuffled_aclus, shuffle_IDXs = build_shuffled_ids(alt_directional_merged_decoders_result.all_directional_pf1D_Decoder.neuron_IDs, num_shuffles=num_shuffles, seed=None)
         if spikes_df is None:
@@ -1184,50 +1221,72 @@ class DecodedEpochScoreShuffle(ComputedResult):
                 # print(f'{desired_ripple_decoding_time_bin_size = }')
 
 
+        batch_t0 = time.perf_counter()
         ## FOR EACH SHUFFLE:
         for i, a_shuffle_IDXs, a_shuffle_aclus in zip(np.arange(num_shuffles), shuffle_IDXs, shuffled_aclus):
             print(f'a_shuffle_IDXs: {a_shuffle_IDXs}, a_shuffle_aclus: {a_shuffle_aclus}')
+            shuffle_t0 = time.perf_counter()
 
             ## Filter the global shuffle to each decoder's own neuron_IDs. decoder_neuron_IDs_list is the ratemap ids, which can be longer than neuron_IDs.
+            setup_t0 = time.perf_counter()
             shuffled_decoder_specific_neuron_ids_dict = {a_name: a_shuffle_aclus[np.isin(a_shuffle_aclus, np.asarray(a_decoder.neuron_IDs))] for a_name, a_decoder in track_templates.get_decoders_dict().items()}
 
             ## Shuffle the four 1D decoders. Do not shuffle the merged decoder (unused under skip_merged_decoding=True).
             shuffled_decoders_dict: Dict[str, BasePositionDecoder] = {a_name: cls._shuffle_pf1D_decoder(a_decoder, shuffle_IDXs=a_shuffle_IDXs, shuffle_aclus=shuffled_decoder_specific_neuron_ids_dict[a_name]) for a_name, a_decoder in track_templates.get_decoders_dict().items()}
+            totals_s['shuffle_setup'] += (time.perf_counter() - setup_t0)
 
+            decode_t0 = time.perf_counter()
             _, (decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict) = cls._try_all_templates_decode(spikes_df=spikes_df, a_directional_merged_decoders_result=alt_directional_merged_decoders_result, shuffled_decoders_dict=shuffled_decoders_dict,
                                                                                                                                                                     skip_merged_decoding=True, **all_templates_decode_kwargs)
+            totals_s['decode'] += (time.perf_counter() - decode_t0)
 
+            wcorr_t0 = time.perf_counter()
             decoder_ripple_weighted_corr_df_dict = compute_weighted_correlations(decoder_decoded_epochs_result_dict=decoder_ripple_filter_epochs_decoder_result_dict)
             a_shuffle_score_arrays: Dict[str, NDArray] = {'wcorr': cls._wcorr_df_dict_to_array(decoder_ripple_weighted_corr_df_dict, decoder_names=decoder_names)}
+            totals_s['wcorr'] += (time.perf_counter() - wcorr_t0)
+
             replay_epochs_df: Optional[pd.DataFrame] = all_templates_decode_kwargs.get('override_replay_epochs_df', None)
             if (replay_epochs_df is not None) and (len(replay_epochs_df) > 0) and ('label' in replay_epochs_df.columns):
+                spearman_t0 = time.perf_counter()
                 shuffled_peak_map_dict = cls._decoder_dict_to_aclu_peak_map_dict(shuffled_decoders_dict, peak_mode='CoM')
                 spearman_arrays = cls.compute_shuffle_spearman_score_arrays(track_templates=track_templates, spikes_df=spikes_df, active_epochs_df=replay_epochs_df, decoder_aclu_peak_map_dict=shuffled_peak_map_dict, decoder_names=decoder_names)
                 a_shuffle_score_arrays.update(spearman_arrays)
+                totals_s['spearman_pearsonr'] += (time.perf_counter() - spearman_t0)
             if enable_heuristic_shuffle_scoring:
+                heuristics_t0 = time.perf_counter()
                 heuristic_arrays = HeuristicReplayScoring.compute_shuffle_heuristic_score_arrays(track_templates=track_templates, a_decoded_filter_epochs_decoder_result_dict=decoder_ripple_filter_epochs_decoder_result_dict, decoder_names=decoder_names) # 2026-10-27 - Extremely slow, ~minutes
                 a_shuffle_score_arrays.update(heuristic_arrays)
+                totals_s['heuristics'] += (time.perf_counter() - heuristics_t0)
             if enable_radon_shuffle_scoring:
+                radon_t0 = time.perf_counter()
                 radon_arrays = cls.compute_shuffle_radon_score_arrays(decoder_ripple_filter_epochs_decoder_result_dict=decoder_ripple_filter_epochs_decoder_result_dict, track_templates=track_templates, decoder_names=decoder_names)
                 a_shuffle_score_arrays.update(radon_arrays)
+                totals_s['radon'] += (time.perf_counter() - radon_t0)
 
             _updated_output_extracted_result_wcorrs_list.append(decoder_ripple_weighted_corr_df_dict)
             _updated_output_extracted_score_arrays_list.append(a_shuffle_score_arrays)
             if enable_saving_entire_decoded_shuffle_result:
                 _updated_output_extracted_full_decoded_results_list.append(decoder_ripple_filter_epochs_decoder_result_dict)
+            totals_s['shuffle_total'] += (time.perf_counter() - shuffle_t0)
         ## END for i, a_shuffle_IDXs, a_shuffle_aclus in zip(np.arange(num_shuffles), shuffle_IDXs, shuffled_aclus)....
 
-        return _updated_output_extracted_result_wcorrs_list, _updated_output_extracted_score_arrays_list, _updated_output_extracted_full_decoded_results_list
+        batch_total_s: float = time.perf_counter() - batch_t0
+        timing_summary: Optional[Dict[str, Any]] = None
+        if enable_shuffle_component_timing:
+            timing_summary = cls._build_shuffle_component_timing_summary(totals_s=totals_s, n_shuffles=num_shuffles, batch_total_s=batch_total_s)
+            cls._print_shuffle_component_timing_summary(timing_summary)
+
+        return _updated_output_extracted_result_wcorrs_list, _updated_output_extracted_score_arrays_list, _updated_output_extracted_full_decoded_results_list, timing_summary
 
 
     @classmethod
     def _shuffle_and_decode_wcorrs(cls, curr_active_pipeline, track_templates: TrackTemplates, alt_directional_merged_decoders_result: DirectionalPseudo2DDecodersResult, all_templates_decode_kwargs: Dict, num_shuffles: int = 2):
         """Compat wrapper around `_shuffle_and_decode_scores` that returns the historical 2-tuple."""
-        wcorrs_list, _score_arrays_list, full_decoded_list = cls._shuffle_and_decode_scores(curr_active_pipeline=curr_active_pipeline, track_templates=track_templates, alt_directional_merged_decoders_result=alt_directional_merged_decoders_result, all_templates_decode_kwargs=all_templates_decode_kwargs, num_shuffles=num_shuffles, enable_heuristic_shuffle_scoring=False, enable_radon_shuffle_scoring=False, enable_saving_entire_decoded_shuffle_result=True)
+        wcorrs_list, _score_arrays_list, full_decoded_list, _timing_summary = cls._shuffle_and_decode_scores(curr_active_pipeline=curr_active_pipeline, track_templates=track_templates, alt_directional_merged_decoders_result=alt_directional_merged_decoders_result, all_templates_decode_kwargs=all_templates_decode_kwargs, num_shuffles=num_shuffles, enable_heuristic_shuffle_scoring=False, enable_radon_shuffle_scoring=False, enable_saving_entire_decoded_shuffle_result=True)
         return wcorrs_list, full_decoded_list
 
 
-    def compute_shuffles(self, num_shuffles: int=100, curr_active_pipeline=None, track_templates=None, enable_heuristic_shuffle_scoring: Optional[bool]=None, enable_radon_shuffle_scoring: Optional[bool]=None) -> List:
+    def compute_shuffles(self, num_shuffles: int=100, curr_active_pipeline=None, track_templates=None, enable_heuristic_shuffle_scoring: Optional[bool]=None, enable_radon_shuffle_scoring: Optional[bool]=None, enable_shuffle_component_timing: Optional[bool]=None) -> List:
         """ Computes new shuffles and adds them to `self.output_extracted_result_wcorrs_list` / `self.output_extracted_score_arrays_list`
         """
         if (self.curr_active_pipeline is None):
@@ -1270,17 +1329,31 @@ class DecodedEpochScoreShuffle(ComputedResult):
             self.enable_heuristic_shuffle_scoring = enable_heuristic_shuffle_scoring
         if enable_radon_shuffle_scoring is not None:
             self.enable_radon_shuffle_scoring = enable_radon_shuffle_scoring
+        if enable_shuffle_component_timing is not None:
+            self.enable_shuffle_component_timing = enable_shuffle_component_timing
 
+        ensure_real_scores_t0 = time.perf_counter()
         self._ensure_real_score_arrays(decoder_names=deepcopy(self.track_templates.get_decoder_names()))
+        ensure_real_scores_s: float = time.perf_counter() - ensure_real_scores_t0
 
         spikes_df = self.active_spikes_df if (self.active_spikes_df is not None) and (len(self.active_spikes_df) > 0) else deepcopy(self.curr_active_pipeline.sess.spikes_df)
-        _updated_output_extracted_result_wcorrs_list, _updated_output_extracted_score_arrays_list, _updated_output_extracted_full_decoded_results_list = self._shuffle_and_decode_scores(curr_active_pipeline=self.curr_active_pipeline, track_templates=self.track_templates,
+        _updated_output_extracted_result_wcorrs_list, _updated_output_extracted_score_arrays_list, _updated_output_extracted_full_decoded_results_list, timing_summary = self._shuffle_and_decode_scores(curr_active_pipeline=self.curr_active_pipeline, track_templates=self.track_templates,
                                                                                   alt_directional_merged_decoders_result=deepcopy(self.curr_active_pipeline.global_computation_results.computed_data['DirectionalMergedDecoders']),
                                                                                   all_templates_decode_kwargs=self.all_templates_decode_kwargs,
                                                                                   num_shuffles=num_shuffles, spikes_df=spikes_df,
                                                                                   enable_heuristic_shuffle_scoring=self.enable_heuristic_shuffle_scoring,
                                                                                   enable_radon_shuffle_scoring=self.enable_radon_shuffle_scoring,
-                                                                                  enable_saving_entire_decoded_shuffle_result=self.enable_saving_entire_decoded_shuffle_result)
+                                                                                  enable_saving_entire_decoded_shuffle_result=self.enable_saving_entire_decoded_shuffle_result,
+                                                                                  enable_shuffle_component_timing=self.enable_shuffle_component_timing)
+
+        if timing_summary is not None:
+            timing_summary = dict(timing_summary)
+            timing_summary['ensure_real_scores_s'] = float(ensure_real_scores_s)
+            self.last_shuffle_component_timings = timing_summary
+            if self.enable_shuffle_component_timing:
+                print(f'  ensure_real_scores: {ensure_real_scores_s:.3f}s')
+        else:
+            self.last_shuffle_component_timings = None
 
         self.output_extracted_result_wcorrs_list.extend(_updated_output_extracted_result_wcorrs_list)
         self.output_extracted_score_arrays_list.extend(_updated_output_extracted_score_arrays_list)
