@@ -443,23 +443,29 @@ class HDF5RecoveredPosteriorRippleViewer:
     def sort_decoder_ripple_results_by_column(cls, decoder_ripple_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult], sort_by: str, *, ascending: bool=False, debug_print: bool=True) -> Dict[str, DecodedFilterEpochsResult]:
         """Reorder every decoder's epochs to a shared sort of `sort_by` (from the first decoder's enriched `filter_epochs`).
 
-        Uses `filtered_by_epoch_times` so posterior lists stay aligned with the sorted epoch order across decoders.
+        Uses positional `filtered_by_epochs` after `reset_index` (not `filtered_by_epoch_times`): post-enrich
+        `filter_epochs` keep sparse original labels, and a second time-based filter then fails `get_loc` after reset.
         Pass `sort_by=None` at init to leave temporal order unchanged. `best_overall_wcorr_z` is already abs-max, so `ascending=False` shows strongest first.
         """
         assert sort_by is not None and len(str(sort_by)) > 0, 'sort_by is required'
         decoder_names: List[str] = list(decoder_ripple_filter_epochs_decoder_result_dict.keys())
         assert len(decoder_names) > 0, 'no decoder results to sort'
         ref_decoder_name: str = decoder_names[0]
-        ref_df: pd.DataFrame = ensure_dataframe(decoder_ripple_filter_epochs_decoder_result_dict[ref_decoder_name].filter_epochs).copy()
+        ref_df: pd.DataFrame = ensure_dataframe(decoder_ripple_filter_epochs_decoder_result_dict[ref_decoder_name].filter_epochs).copy().reset_index(drop=True)
         assert sort_by in ref_df.columns, f'sort_by={sort_by!r} missing from {ref_decoder_name} filter_epochs columns={list(ref_df.columns)[:40]}'
-        sorted_ref_df: pd.DataFrame = ref_df.sort_values(by=sort_by, ascending=ascending, na_position='last', kind='mergesort')
-        sorted_epoch_times = cls.resolve_epoch_start_stop_times(sorted_ref_df)
+        sorted_positions: np.ndarray = ref_df.sort_values(by=sort_by, ascending=ascending, na_position='last', kind='mergesort').index.to_numpy()
         if debug_print:
-            n_non_null: int = int(pd.to_numeric(sorted_ref_df[sort_by], errors='coerce').notna().sum())
-            print(f'sorting {len(sorted_ref_df)} epochs by {sort_by!r} ascending={ascending} (non-null={n_non_null}/{len(sorted_ref_df)}; ref_decoder={ref_decoder_name!r})')
+            n_non_null: int = int(pd.to_numeric(ref_df[sort_by], errors='coerce').notna().sum())
+            print(f'sorting {len(ref_df)} epochs by {sort_by!r} ascending={ascending} (non-null={n_non_null}/{len(ref_df)}; ref_decoder={ref_decoder_name!r})')
         out: Dict[str, DecodedFilterEpochsResult] = {}
         for decoder_name, a_result in decoder_ripple_filter_epochs_decoder_result_dict.items():
-            out[decoder_name] = a_result.filtered_by_epoch_times(included_epoch_start_times=sorted_epoch_times)
+            a_subset = deepcopy(a_result)
+            a_subset.filter_epochs = ensure_dataframe(a_subset.filter_epochs).reset_index(drop=True)
+            Assert.same_length(a_subset.filter_epochs, ref_df)
+            sorted_result = a_subset.filtered_by_epochs(sorted_positions)
+            ## Contiguous index so later Epoch()/overlay joins don't revive sparse pre-sort labels:
+            sorted_result.filter_epochs = ensure_dataframe(sorted_result.filter_epochs).reset_index(drop=True)
+            out[decoder_name] = sorted_result
         ## END for decoder_name, a_result in decoder_ripple_filter_epochs_decoder_result_dict.items()...
         return out
 
@@ -472,6 +478,23 @@ class HDF5RecoveredPosteriorRippleViewer:
         first_p = np.asarray(a_result.p_x_given_n_list[0])
         n_xbins: int = int(first_p.shape[0])
         return np.arange(n_xbins + 1, dtype=float)
+
+
+    @classmethod
+    def resync_pagination_controller_epoch_order(cls, a_ctrl: DecodedEpochSlicesPaginatedFigureController, a_result: DecodedFilterEpochsResult, *, max_subplots_per_page: int) -> None:
+        """Rebuild paginator + `epoch_slices` from DataFrame row order.
+
+        `DecodedEpochSlicesPaginatedFigureController.init_from_decoder_data` wraps epochs in `Epoch()`, and
+        `EpochsAccessor` re-sorts by `start`, desyncing axis times from custom-sorted posterior lists (blank heatmaps).
+        """
+        a_result = deepcopy(a_result)
+        epochs_df: pd.DataFrame = ensure_dataframe(a_result.filter_epochs).reset_index(drop=True)
+        a_result.filter_epochs = epochs_df
+        a_ctrl.plots_data.filter_epochs_decoder_result = a_result
+        a_ctrl.plots_data.epoch_slices = epochs_df[['start', 'stop']].to_numpy()
+        active_marginal_fn = getattr(a_ctrl.plots_data, 'active_marginal_fn', None)
+        a_ctrl.plots_data.paginator = DecodedEpochSlicesPaginatedFigureController._subfn_helper_build_paginator(epochs_df, a_result, max_subplots_per_page, bool(getattr(a_ctrl.params, 'debug_print', False)), active_marginal_fn=active_marginal_fn)
+        a_ctrl.on_jump_to_page(0)
 
 
     @classmethod
@@ -493,6 +516,8 @@ class HDF5RecoveredPosteriorRippleViewer:
             curr_params_kwargs = dict(skip_plotting_measured_positions=True, skip_plotting_most_likely_positions=True, isPaginatorControlWidgetBackedMode=True, epochs_name='ripple', is_controlled_widget=(not is_controlling_widget), disable_y_label=(not is_controlling_widget), enable_radon_transform_info=False, enable_overlay_labels_info=False, enable_update_window_title_on_page_change=False, build_internal_callbacks=True)
             a_name: str = f'{session_str} | DecodedEpochSlices[{decoder_name}]' if session_str else f'DecodedEpochSlices[{decoder_name}]'
             pagination_controller_dict[decoder_name] = DecodedEpochSlicesPaginatedFigureController.init_from_decoder_data(a_result.filter_epochs, filter_epochs_decoder_result=a_result, xbin=cls.infer_xbin_from_result(a_result), global_pos_df=global_pos_df, a_name=a_name, active_context=IdentifyingContext(display_fn_name='DecodedEpochSlices', epochs='ripple', decoder=decoder_name, session=session_str) if session_str else IdentifyingContext(display_fn_name='DecodedEpochSlices', epochs='ripple', decoder=decoder_name), max_subplots_per_page=max_subplots_per_page, params_kwargs=curr_params_kwargs)
+            ## Keep custom sort order: Epoch() would re-sort by start and blank the heatmaps:
+            cls.resync_pagination_controller_epoch_order(pagination_controller_dict[decoder_name], a_result, max_subplots_per_page=max_subplots_per_page)
         ## END for decoder_name in decoder_names...
 
         app, paginated_multi_decoder_decoded_epochs_window = PhoPaginatedMultiDecoderDecodedEpochsWindow.init_from_pagination_controller_dict(pagination_controller_dict, name=window_name, title=window_title, defer_show=defer_show)

@@ -1333,13 +1333,23 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
 
     @staticmethod
     def _subfn_helper_build_paginator(active_filter_epochs, filter_epochs_decoder_result, max_subplots_per_page, debug_print, active_marginal_fn) -> Paginator:
+        ## Normalize Epoch/DataFrame first so label bootstrap works for both (custom-sort resync passes DataFrame to avoid Epoch start-resort):
+        if isinstance(active_filter_epochs, pd.DataFrame):
+            epochs_df = active_filter_epochs
+        elif isinstance(active_filter_epochs, Epoch):
+            epochs_df = active_filter_epochs.to_dataframe()
+        else:
+            raise NotImplementedError
+        n_epochs: int = len(epochs_df)
+
         epoch_labels = filter_epochs_decoder_result.epoch_description_list.copy()
-        if epoch_labels is None or len(epoch_labels) < active_filter_epochs.n_epochs:
-            if 'label' not in active_filter_epochs._df.columns:
-                active_filter_epochs._df['label'] = active_filter_epochs._df.index.to_numpy() # integer ripple indexing
+        if epoch_labels is None or len(epoch_labels) < n_epochs:
+            if 'label' not in epochs_df.columns:
+                epochs_df = epochs_df.copy()
+                epochs_df['label'] = epochs_df.index.to_numpy() # integer ripple indexing
             # active_filter_epochs.labels ?
-            active_labels = active_filter_epochs._df['label'].to_numpy()
-            # active_labels = np.arange(active_filter_epochs.n_epochs)
+            active_labels = epochs_df['label'].to_numpy()
+            # active_labels = np.arange(n_epochs)
             epoch_labels = np.array([f"Epoch[{epoch_idx}]" for epoch_idx in active_labels])
             if debug_print:
                 print(f'epoch_labels: {epoch_labels}')
@@ -1352,14 +1362,6 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
             posterior_containers = filter_epochs_decoder_result.marginal_x_list
 
         # Provide a tuple or list containing equally sized sequences of items:
-        ## Build Epochs:
-        if isinstance(active_filter_epochs, pd.DataFrame):
-            epochs_df = active_filter_epochs
-        elif isinstance(active_filter_epochs, Epoch):
-            epochs_df = active_filter_epochs.to_dataframe()
-        else:
-            raise NotImplementedError
-
         epoch_slices = epochs_df[['start', 'stop']].to_numpy()
         
         epoch_slices_paginator = Paginator.init_from_data((epoch_slices, epoch_labels, time_bin_containers, posterior_containers), max_num_columns=1, max_subplots_per_page=max_subplots_per_page, data_indicies=None, last_figure_subplots_same_layout=False)
