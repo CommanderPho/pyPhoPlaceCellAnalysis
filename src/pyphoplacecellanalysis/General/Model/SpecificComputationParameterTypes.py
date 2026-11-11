@@ -469,12 +469,12 @@ class wcorr_shuffle_analysis_Parameters(HDF_SerializationMixin, AttrsBasedClassH
     num_shuffles: int = serialized_attribute_field(default=1024)
     drop_previous_result_and_compute_fresh: bool = serialized_attribute_field(default=False)
     enable_heuristic_shuffle_scoring: bool = serialized_attribute_field(default=True)
-    enable_radon_shuffle_scoring: bool = serialized_attribute_field(default=False)
+    enable_radon_shuffle_scoring: bool = serialized_attribute_field(default=True)
     ## PARAMS - these are class properties
     num_shuffles_PARAM = param.Integer(default=1024, doc='num_shuffles param', label='num_shuffles')
     drop_previous_result_and_compute_fresh_PARAM = param.Boolean(default=False, doc='drop_previous_result_and_compute_fresh param', label='drop_previous_result_and_compute_fresh')
     enable_heuristic_shuffle_scoring_PARAM = param.Boolean(default=True, doc='enable_heuristic_shuffle_scoring param', label='enable_heuristic_shuffle_scoring')
-    enable_radon_shuffle_scoring_PARAM = param.Boolean(default=False, doc='enable_radon_shuffle_scoring param', label='enable_radon_shuffle_scoring')
+    enable_radon_shuffle_scoring_PARAM = param.Boolean(default=True, doc='enable_radon_shuffle_scoring param', label='enable_radon_shuffle_scoring')
     # HDFMixin Conformances ______________________________________________________________________________________________ #
     def to_hdf(self, file_path, key: str, **kwargs):
         """ Saves the object to key in the hdf5 file specified by file_path"""

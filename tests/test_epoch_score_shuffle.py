@@ -25,7 +25,7 @@ finally:
     from pyphoplacecellanalysis.Analysis.Decoder.heuristic_replay_scoring import HeuristicReplayScoring
     from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import InstantaneousSpikeRateGroupsComputation
-    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.SequenceBasedComputations import DEFAULT_SHUFFLE_DECODER_NAMES, DecodedEpochScoreShuffle, ExportedEpochScoreShufflesPickleFilenameParser, WCorrShuffle
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.SequenceBasedComputations import DEFAULT_SHUFFLE_DECODER_NAMES, DecodedEpochScoreShuffle, ExportedEpochScoreShufflesPickleFilenameParser, SHUFFLE_RADON_MARGIN, SHUFFLE_RADON_N_JOBS, SHUFFLE_RADON_NLINES, WCorrShuffle
     from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import loadData, saveData
 
 
@@ -321,6 +321,55 @@ class TestSpearmanScoreArrays(unittest.TestCase):
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.SequenceBasedComputations import SCORE_EXTREME_MODE
         self.assertEqual(SCORE_EXTREME_MODE['spearman'], 'abs_greater')
         self.assertEqual(SCORE_EXTREME_MODE['pearsonr'], 'abs_greater')
+        self.assertEqual(SCORE_EXTREME_MODE['radon_score'], 'greater')
+        self.assertEqual(SCORE_EXTREME_MODE['radon_velocity'], 'abs_greater')
+
+
+class TestShuffleRadonScoreArrays(unittest.TestCase):
+    """Shuffle radon must use single-threaded / reduced-nlines defaults (GL-safe)."""
+
+    def test_compute_shuffle_radon_score_arrays_passes_safe_defaults(self):
+        n_epochs: int = 2
+        n_decoders: int = 4
+        xbin_centers = np.linspace(0.0, 200.0, 9)
+
+        class _PfMock:
+            def __init__(self, centers):
+                self.bin_info = {'xstep': 3.8}
+                self.xbin_centers = centers
+
+        class _DecoderMock:
+            def __init__(self, centers):
+                self.pf = _PfMock(centers)
+                self.xbin_centers = centers
+
+        class _ResultMock:
+            def __init__(self):
+                self.num_filter_epochs = n_epochs
+                self.last_kwargs = None
+
+            def compute_radon_transforms(self, **kwargs):
+                self.last_kwargs = dict(kwargs)
+                scores = np.full(n_epochs, 0.5, dtype=float)
+                velocities = np.full(n_epochs, 10.0, dtype=float)
+                return pd.DataFrame({'score': scores, 'velocity': velocities, 'intercept': np.zeros(n_epochs), 'speed': np.abs(velocities)}), []
+
+        result_mock = _ResultMock()
+        decoder_result_dict = {name: result_mock for name in DEFAULT_SHUFFLE_DECODER_NAMES}
+        track_templates = _TemplatesMock(xbin=xbin_centers, track_length_dict={'long_LR': 200.0, 'long_RL': 200.0, 'short_LR': 140.0, 'short_RL': 140.0})
+        track_templates.get_decoders_dict = lambda: {name: _DecoderMock(xbin_centers) for name in DEFAULT_SHUFFLE_DECODER_NAMES}
+
+        out = DecodedEpochScoreShuffle.compute_shuffle_radon_score_arrays(decoder_ripple_filter_epochs_decoder_result_dict=decoder_result_dict, track_templates=track_templates, decoder_names=deepcopy(DEFAULT_SHUFFLE_DECODER_NAMES))
+        self.assertIn('radon_score', out)
+        self.assertIn('radon_velocity', out)
+        self.assertEqual(out['radon_score'].shape, (n_epochs, n_decoders))
+        self.assertEqual(result_mock.last_kwargs.get('n_jobs'), SHUFFLE_RADON_N_JOBS)
+        self.assertEqual(result_mock.last_kwargs.get('nlines'), SHUFFLE_RADON_NLINES)
+        self.assertEqual(result_mock.last_kwargs.get('margin'), SHUFFLE_RADON_MARGIN)
+        self.assertEqual(result_mock.last_kwargs.get('n_jobs'), 1)
+        self.assertEqual(result_mock.last_kwargs.get('nlines'), 1024)
+        self.assertFalse(result_mock.last_kwargs.get('debug_print'))
+        self.assertFalse(result_mock.last_kwargs.get('enable_return_neighbors_arr'))
 
 
 class TestPickleCompat(unittest.TestCase):

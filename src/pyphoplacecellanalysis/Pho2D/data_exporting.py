@@ -953,7 +953,7 @@ class PosteriorExporting:
             load_path = Path('output/2024-11-26_Lab_newest_all_decoded_epoch_posteriors.h5')
 
             ## used for reconstituting dataset:
-            dataset_type_fields = ['p_x_given_n', 'p_x_given_n_grey', 'most_likely_positions', 'most_likely_position_indicies', 'time_bin_edges', 't_bin_centers']
+            dataset_type_fields = ['p_x_given_n', 'p_x_given_n_grey', 'p_x_given_n_full', 'most_likely_positions', 'most_likely_position_indicies', 'time_bin_edges', 't_bin_centers', 'spkcount']
             decoder_names = ['long_LR', 'long_RL', 'short_LR', 'short_RL']
 
             _out_dict, (session_key_parts, custom_replay_parts) = PosteriorExporting.load_decoded_posteriors_from_HDF5(load_path=load_path, debug_print=True)
@@ -964,6 +964,8 @@ class PosteriorExporting:
             # active_var_key: str = 'p_x_given_n' # dataset_type_fields	
 
             for active_var_key in dataset_type_fields:
+                if active_var_key not in next(iter(_out_ripple_only_dict.values()), {}):
+                    continue ## skip optional/full-object fields missing from this file
                 ripple_data_field_dict[active_var_key] = {
                     a_decoder_name: [v for v in _out_ripple_only_dict[a_decoder_name][active_var_key]] for a_decoder_name in decoder_names
                 }
@@ -975,13 +977,15 @@ class PosteriorExporting:
         
         History:
             Refactored from `ComputerVisionComputations` on 2024-09-30
+            2026-11-11: accept `save_full_object=True` leafs (`p_x_given_n_full`, optional `spkcount`)
         """
         if not isinstance(load_path, Path):
             load_path = Path(load_path).resolve()
 
         assert load_path.exists(), f"load_path: '{load_path}' does not exist!"
 
-        dataset_type_fields = ['p_x_given_n', 'p_x_given_n_grey', 'most_likely_positions', 'most_likely_position_indicies', 'time_bin_edges', 't_bin_centers']
+        # Legacy export fields + round-trip fields from `SingleEpochDecodedResult.to_hdf(..., save_full_object=True)`
+        dataset_type_fields = ['p_x_given_n', 'p_x_given_n_grey', 'p_x_given_n_full', 'most_likely_positions', 'most_likely_position_indicies', 'time_bin_edges', 't_bin_centers', 'spkcount']
         attribute_type_fields = ['nbins', 'epoch_data_index', 'n_xbins', 'creation_date']
         
 
@@ -1065,6 +1069,8 @@ class PosteriorExporting:
                             # if debug_print:
                             #     print(f'\t\t\t\tarray: {type(array)}')
                             
+                            if leaf_data_key not in out_dict[decoder_prefix][known_epochs_name]:
+                                out_dict[decoder_prefix][known_epochs_name][leaf_data_key] = list() ## forward-compat: unknown/optional leaf datasets
                             out_dict[decoder_prefix][known_epochs_name][leaf_data_key].append(array) #
                             
                         # array = decoder_epochtype_group[dataset_name] #[()]

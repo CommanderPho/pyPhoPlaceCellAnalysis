@@ -221,6 +221,11 @@ SCORE_EXTREME_MODE: Dict[str, str] = {
     'travel': 'less',
 }
 
+## Shuffle-path radon defaults: single-threaded (avoids joblib freezes on GL) and fewer random test lines than pipeline (8192).
+SHUFFLE_RADON_NLINES: int = 1024
+SHUFFLE_RADON_N_JOBS: int = 1
+SHUFFLE_RADON_MARGIN: float = 8.0
+
 
 @define(slots=False, repr=False, eq=False)
 class DecodedEpochScoreShuffle(ComputedResult):
@@ -255,7 +260,7 @@ class DecodedEpochScoreShuffle(ComputedResult):
     
     enable_saving_entire_decoded_shuffle_result: bool = serialized_attribute_field(default=False, is_computable=False, repr=True)
     enable_heuristic_shuffle_scoring: bool = serialized_attribute_field(default=True, is_computable=False, repr=True)
-    enable_radon_shuffle_scoring: bool = serialized_attribute_field(default=False, is_computable=False, repr=True)
+    enable_radon_shuffle_scoring: bool = serialized_attribute_field(default=True, is_computable=False, repr=True)
 
     result_version: str = serialized_attribute_field(default='2026.11.11_0', is_computable=False, repr=False) # this field specfies the version of the result. 
 
@@ -593,10 +598,19 @@ class DecodedEpochScoreShuffle(ComputedResult):
 
 
     @classmethod
-    def compute_shuffle_radon_score_arrays(cls, decoder_ripple_filter_epochs_decoder_result_dict: DecodedEpochsResultsDict, track_templates: TrackTemplates, decoder_names: Optional[List[str]]=None) -> Dict[str, NDArray]:
-        """Extract radon `score` (and `velocity`) as (n_epochs, n_decoders) arrays. Neighbors extras are discarded."""
+    def compute_shuffle_radon_score_arrays(cls, decoder_ripple_filter_epochs_decoder_result_dict: DecodedEpochsResultsDict, track_templates: TrackTemplates, decoder_names: Optional[List[str]]=None, nlines: Optional[int]=None, margin: Optional[float]=None, n_jobs: Optional[int]=None) -> Dict[str, NDArray]:
+        """Extract radon `score` (and `velocity`) as (n_epochs, n_decoders) arrays. Neighbors extras are discarded.
+
+        Defaults to single-threaded (`SHUFFLE_RADON_N_JOBS=1`) and fewer test lines (`SHUFFLE_RADON_NLINES=1024`) than pipeline radon.
+        """
         if decoder_names is None:
             decoder_names = list(decoder_ripple_filter_epochs_decoder_result_dict.keys())
+        if nlines is None:
+            nlines = int(SHUFFLE_RADON_NLINES)
+        if margin is None:
+            margin = float(SHUFFLE_RADON_MARGIN)
+        if n_jobs is None:
+            n_jobs = int(SHUFFLE_RADON_N_JOBS)
         first_result = decoder_ripple_filter_epochs_decoder_result_dict[decoder_names[0]]
         n_epochs: int = int(first_result.num_filter_epochs)
         n_decoders: int = len(decoder_names)
@@ -612,7 +626,7 @@ class DecodedEpochScoreShuffle(ComputedResult):
             else:
                 pos_bin_size = float(np.diff(a_decoder.pf.xbin_centers).mean())
             try:
-                epochs_linear_fit_df, _extra_outputs = a_result.compute_radon_transforms(pos_bin_size=pos_bin_size, xbin_centers=a_decoder.xbin_centers, enable_return_neighbors_arr=False)
+                epochs_linear_fit_df, _extra_outputs = a_result.compute_radon_transforms(pos_bin_size=pos_bin_size, xbin_centers=a_decoder.xbin_centers, nlines=nlines, margin=margin, n_jobs=n_jobs, enable_return_neighbors_arr=False, debug_print=False)
                 radon_score_arr[:, decoder_idx] = np.asarray(epochs_linear_fit_df['score'].to_numpy(), dtype=float)
                 radon_velocity_arr[:, decoder_idx] = np.asarray(epochs_linear_fit_df['velocity'].to_numpy(), dtype=float)
             except Exception as e:
@@ -1112,7 +1126,7 @@ class DecodedEpochScoreShuffle(ComputedResult):
 
     @classmethod
     def _shuffle_and_decode_scores(cls, curr_active_pipeline, track_templates: TrackTemplates, alt_directional_merged_decoders_result: DirectionalPseudo2DDecodersResult, all_templates_decode_kwargs: Dict, num_shuffles: int = 2, spikes_df: Optional[pd.DataFrame]=None,
-            enable_heuristic_shuffle_scoring: bool=True, enable_radon_shuffle_scoring: bool=False, enable_saving_entire_decoded_shuffle_result: bool=False, force_disable_laps_decoding: bool = True,
+            enable_heuristic_shuffle_scoring: bool=True, enable_radon_shuffle_scoring: bool=True, enable_saving_entire_decoded_shuffle_result: bool=False, force_disable_laps_decoding: bool = True,
         ):
         """Shuffle cell identities, decode ripples, extract enabled score metrics.
 
@@ -2143,8 +2157,8 @@ class SequenceBasedComputationsGlobalComputationFunctions(AllFunctionEnumerating
                         input_requires=['DirectionalLaps', 'RankOrder', 'global_computation_results.computation_config.rank_order_shuffle_analysis.minimum_inclusion_fr_Hz', 'global_computation_results.computation_config.rank_order_shuffle_analysis.included_qclu_values'], output_provides=['SequenceBased'], uses=['SequenceBasedComputationsContainer', 'DecodedEpochScoreShuffle'], used_by=[], creation_date='2024-05-27 14:31', related_items=[],
         requires_global_keys=['DirectionalLaps', 'DirectionalMergedDecoders', 'RankOrder', 'DirectionalDecodersEpochsEvaluations'], provides_global_keys=['SequenceBased'],
         validate_computation_test=validate_has_sequence_based_results, is_global=True)
-    def perform_epoch_score_shuffle_analysis(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, num_shuffles:int=1024, drop_previous_result_and_compute_fresh:bool=False, enable_heuristic_shuffle_scoring: bool=True, enable_radon_shuffle_scoring: bool=False):
-        """Performs cell-identity shuffles and scores decoded ripple epochs (wcorr, spearman, heuristics, optional radon).
+    def perform_epoch_score_shuffle_analysis(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, num_shuffles:int=1024, drop_previous_result_and_compute_fresh:bool=False, enable_heuristic_shuffle_scoring: bool=True, enable_radon_shuffle_scoring: bool=True):
+        """Performs cell-identity shuffles and scores decoded ripple epochs (wcorr, spearman, pearsonr, heuristics, optional radon; shuffle radon uses n_jobs=1 / nlines=1024).
 
         Requires:
             ['sess']
@@ -2224,7 +2238,7 @@ class SequenceBasedComputationsGlobalComputationFunctions(AllFunctionEnumerating
                         input_requires=['DirectionalLaps', 'RankOrder', 'global_computation_results.computation_config.rank_order_shuffle_analysis.minimum_inclusion_fr_Hz', 'global_computation_results.computation_config.rank_order_shuffle_analysis.included_qclu_values'], output_provides=['SequenceBased'], uses=['SequenceBasedComputationsContainer', 'DecodedEpochScoreShuffle'], used_by=[], creation_date='2024-05-27 14:31', related_items=[],
         requires_global_keys=['DirectionalLaps', 'DirectionalMergedDecoders', 'RankOrder', 'DirectionalDecodersEpochsEvaluations'], provides_global_keys=['SequenceBased'],
         validate_computation_test=validate_has_sequence_based_results, is_global=True)
-    def perform_wcorr_shuffle_analysis(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, num_shuffles:int=1024, drop_previous_result_and_compute_fresh:bool=False, enable_heuristic_shuffle_scoring: bool=True, enable_radon_shuffle_scoring: bool=False):
+    def perform_wcorr_shuffle_analysis(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, num_shuffles:int=1024, drop_previous_result_and_compute_fresh:bool=False, enable_heuristic_shuffle_scoring: bool=True, enable_radon_shuffle_scoring: bool=True):
         """Compat wrapper for `perform_epoch_score_shuffle_analysis`."""
         return SequenceBasedComputationsGlobalComputationFunctions.perform_epoch_score_shuffle_analysis(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=include_includelist, debug_print=debug_print, num_shuffles=num_shuffles, drop_previous_result_and_compute_fresh=drop_previous_result_and_compute_fresh, enable_heuristic_shuffle_scoring=enable_heuristic_shuffle_scoring, enable_radon_shuffle_scoring=enable_radon_shuffle_scoring)
 
