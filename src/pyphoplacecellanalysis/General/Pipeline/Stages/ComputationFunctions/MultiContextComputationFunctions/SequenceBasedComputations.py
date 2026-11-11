@@ -204,6 +204,7 @@ DEFAULT_SHUFFLE_DECODER_NAMES: List[str] = ['long_LR', 'long_RL', 'short_LR', 's
 SCORE_EXTREME_MODE: Dict[str, str] = {
     'wcorr': 'abs_greater',
     'spearman': 'abs_greater',
+    'pearsonr': 'abs_greater',
     'radon_score': 'greater',
     'radon_velocity': 'abs_greater',
     'coverage': 'greater',
@@ -223,7 +224,7 @@ SCORE_EXTREME_MODE: Dict[str, str] = {
 
 @define(slots=False, repr=False, eq=False)
 class DecodedEpochScoreShuffle(ComputedResult):
-    """Performs cell-identity shuffles and scores decoded ripple epochs (wcorr, spearman, heuristics, optional radon).
+    """Performs cell-identity shuffles and scores decoded ripple epochs (wcorr, spearman, pearsonr, heuristics, optional radon).
 
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.SequenceBasedComputations import DecodedEpochScoreShuffle, WCorrShuffle
 
@@ -234,7 +235,7 @@ class DecodedEpochScoreShuffle(ComputedResult):
     Which epochs does it test? Just replay? where did it get these from?
 
     """
-    _VersionedResultMixin_version: str = "2026.11.09_0" # to be updated in your IMPLEMENTOR to indicate its version
+    _VersionedResultMixin_version: str = "2026.11.11_0" # to be updated in your IMPLEMENTOR to indicate its version
 
     curr_active_pipeline = non_serialized_field(default=None, repr=False) # required to continue computations
     track_templates = non_serialized_field(default=None, repr=False) # required to continue computations
@@ -256,7 +257,7 @@ class DecodedEpochScoreShuffle(ComputedResult):
     enable_heuristic_shuffle_scoring: bool = serialized_attribute_field(default=True, is_computable=False, repr=True)
     enable_radon_shuffle_scoring: bool = serialized_attribute_field(default=False, is_computable=False, repr=True)
 
-    result_version: str = serialized_attribute_field(default='2026.11.09_0', is_computable=False, repr=False) # this field specfies the version of the result. 
+    result_version: str = serialized_attribute_field(default='2026.11.11_0', is_computable=False, repr=False) # this field specfies the version of the result. 
 
     @property
     def n_epochs(self):
@@ -676,8 +677,51 @@ class DecodedEpochScoreShuffle(ComputedResult):
 
 
     @classmethod
+    def _pearsonr_arrays_from_prepared_spikes_df(cls, prepared_spikes_df: pd.DataFrame, active_epochs_df: pd.DataFrame, decoder_names: Optional[List[str]] = None) -> Dict[str, NDArray]:
+        """Group prepared spikes by Probe_Epoch_id and build `(n_epochs, n_decoders)` Simple-PF pearsonr array aligned to `active_epochs_df` rows.
+
+        Uses unranked `t_rel_seconds` vs `{decoder}_pf_peak_x` via `scipy.stats.pearsonr` (same semantics as DirectionalPseudo2DDecodersResult Simple PF PearsonR).
+        """
+        from scipy.stats import pearsonr
+
+        if decoder_names is None:
+            decoder_names = deepcopy(DEFAULT_SHUFFLE_DECODER_NAMES)
+        if not isinstance(active_epochs_df, pd.DataFrame):
+            active_epochs_df = active_epochs_df.to_dataframe()
+
+        n_epochs: int = len(active_epochs_df)
+        n_decoders: int = len(decoder_names)
+        pearsonr_arr = np.full((n_epochs, n_decoders), np.nan, dtype=float)
+        if (prepared_spikes_df is None) or (len(prepared_spikes_df) == 0):
+            return {'pearsonr': pearsonr_arr}
+
+        epoch_labels = pd.to_numeric(active_epochs_df['label']).astype(int).to_numpy()
+        grouped = prepared_spikes_df.groupby('Probe_Epoch_id')
+        for epoch_row_idx, epoch_label in enumerate(epoch_labels):
+            if epoch_label not in grouped.groups:
+                continue
+            group = grouped.get_group(epoch_label)
+            for decoder_idx, a_decoder_name in enumerate(decoder_names):
+                peak_col: str = f'{a_decoder_name}_pf_peak_x'
+                if peak_col not in group.columns:
+                    continue
+                _an_arr = group[['t_rel_seconds', peak_col]].dropna(subset=['t_rel_seconds', peak_col], inplace=False).to_numpy().T
+                if np.shape(_an_arr)[-1] < 2:
+                    continue
+                pearsonr_arr[epoch_row_idx, decoder_idx] = float(pearsonr(_an_arr[0], _an_arr[1]).statistic)
+            ## END for decoder_idx, a_decoder_name in enumerate(decoder_names)...
+        ## END for epoch_row_idx, epoch_label in enumerate(epoch_labels)...
+
+        return {'pearsonr': pearsonr_arr}
+
+
+    @classmethod
     def compute_shuffle_spearman_score_arrays(cls, track_templates: TrackTemplates, spikes_df: pd.DataFrame, active_epochs_df: pd.DataFrame, decoder_aclu_peak_map_dict: Optional[Dict[str, Dict]] = None, decoder_names: Optional[List[str]] = None) -> Dict[str, NDArray]:
-        """Dense-ranked spike-time vs PF-peak-x Spearman for all spikes in each epoch → `{'spearman': (n_epochs, n_decoders)}`."""
+        """Spike-time vs PF-peak-x correlations for all spikes in each epoch → `{'spearman': ..., 'pearsonr': ...}` each `(n_epochs, n_decoders)`.
+
+        - spearman: dense-ranked t vs peak_x (RankOrderAnalyses)
+        - pearsonr: unranked t vs peak_x via scipy.stats.pearsonr (Simple PF PearsonR)
+        """
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.RankOrderComputations import RankOrderAnalyses
 
         def _subfn_prepare_spikes_for_spearman_scoring(track_templates: TrackTemplates, spikes_df: pd.DataFrame, active_epochs_df: pd.DataFrame, decoder_aclu_peak_map_dict: Dict[str, Dict]) -> pd.DataFrame:
@@ -701,11 +745,14 @@ class DecodedEpochScoreShuffle(ComputedResult):
         if decoder_aclu_peak_map_dict is None:
             decoder_aclu_peak_map_dict = track_templates.get_decoder_aclu_peak_map_dict(peak_mode='CoM')
         prepared_spikes_df: pd.DataFrame = _subfn_prepare_spikes_for_spearman_scoring(track_templates=track_templates, spikes_df=spikes_df, active_epochs_df=active_epochs_df, decoder_aclu_peak_map_dict=decoder_aclu_peak_map_dict)
-        return cls._spearman_arrays_from_prepared_spikes_df(prepared_spikes_df=prepared_spikes_df, active_epochs_df=active_epochs_df, decoder_names=decoder_names)
+        out: Dict[str, NDArray] = {}
+        out.update(cls._spearman_arrays_from_prepared_spikes_df(prepared_spikes_df=prepared_spikes_df, active_epochs_df=active_epochs_df, decoder_names=decoder_names))
+        out.update(cls._pearsonr_arrays_from_prepared_spikes_df(prepared_spikes_df=prepared_spikes_df, active_epochs_df=active_epochs_df, decoder_names=decoder_names))
+        return out
 
 
     def _ensure_real_score_arrays(self, decoder_names: Optional[List[str]]=None):
-        """Populate `real_score_arrays` from stored real decode + wcorr, scoring spearman/heuristics/radon once."""
+        """Populate `real_score_arrays` from stored real decode + wcorr, scoring spearman/pearsonr/heuristics/radon once."""
         if self.real_score_arrays is None:
             self.real_score_arrays = {}
         if (self.real_decoder_ripple_weighted_corr_arr is not None) and ('wcorr' not in self.real_score_arrays):
@@ -715,14 +762,15 @@ class DecodedEpochScoreShuffle(ComputedResult):
                 decoder_names = deepcopy(self.track_templates.get_decoder_names())
             else:
                 decoder_names = deepcopy(DEFAULT_SHUFFLE_DECODER_NAMES)
-        ## Spearman uses spikes + peak maps only (no decoded posteriors).
-        if (self.track_templates is not None) and ('spearman' not in self.real_score_arrays) and (self.active_spikes_df is not None) and (len(self.active_spikes_df) > 0) and (self.filtered_epochs_df is not None) and (len(self.filtered_epochs_df) > 0) and hasattr(self.track_templates, 'get_decoders_dict'):
+        ## Spearman + Simple PF pearsonr use spikes + peak maps only (no decoded posteriors).
+        _needs_spike_pf_corrs: bool = (('spearman' not in self.real_score_arrays) or ('pearsonr' not in self.real_score_arrays))
+        if (self.track_templates is not None) and _needs_spike_pf_corrs and (self.active_spikes_df is not None) and (len(self.active_spikes_df) > 0) and (self.filtered_epochs_df is not None) and (len(self.filtered_epochs_df) > 0) and hasattr(self.track_templates, 'get_decoders_dict'):
             try:
                 real_peak_map_dict = self._decoder_dict_to_aclu_peak_map_dict(self.track_templates.get_decoders_dict(), peak_mode='CoM')
                 spearman_arrays = self.compute_shuffle_spearman_score_arrays(track_templates=self.track_templates, spikes_df=self.active_spikes_df, active_epochs_df=self.filtered_epochs_df, decoder_aclu_peak_map_dict=real_peak_map_dict, decoder_names=decoder_names)
                 self.real_score_arrays.update(spearman_arrays)
             except Exception as e:
-                print(f'WARN: _ensure_real_score_arrays failed to compute spearman: {e}')
+                print(f'WARN: _ensure_real_score_arrays failed to compute spearman/pearsonr: {e}')
         self.real_decoder_ripple_filter_epochs_decoder_result_dict = self._coerce_decoded_epochs_result_dict(self.real_decoder_ripple_filter_epochs_decoder_result_dict)
         if self.real_decoder_ripple_filter_epochs_decoder_result_dict is None:
             return
