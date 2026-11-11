@@ -274,6 +274,32 @@ class TestSpearmanScoreArrays(unittest.TestCase):
         np.testing.assert_allclose(spearman_arr[1, :], -np.ones(4), atol=1e-8)
 
 
+    def test_spearman_uses_first_spike_per_cell_only(self):
+        """Diba / RankOrder: extra later spikes from the same aclu must not change spearman (first spike/cell only)."""
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.RankOrderComputations import RankOrderAnalyses
+
+        n_epochs: int = 1
+        epochs_df = _epochs_df(n_epochs)
+        epochs_df['label'] = np.arange(n_epochs, dtype=int)
+        # First spikes: perfect +1 order. Late repeats of aclu=1 (peak=10) would spoil all-spike Spearman.
+        prepared_rows = [
+            {'t_rel_seconds': 0.0, 'aclu': 1, 'Probe_Epoch_id': 0, 'long_LR_pf_peak_x': 10.0, 'long_RL_pf_peak_x': 10.0, 'short_LR_pf_peak_x': 10.0, 'short_RL_pf_peak_x': 10.0},
+            {'t_rel_seconds': 0.1, 'aclu': 2, 'Probe_Epoch_id': 0, 'long_LR_pf_peak_x': 20.0, 'long_RL_pf_peak_x': 20.0, 'short_LR_pf_peak_x': 20.0, 'short_RL_pf_peak_x': 20.0},
+            {'t_rel_seconds': 0.2, 'aclu': 3, 'Probe_Epoch_id': 0, 'long_LR_pf_peak_x': 30.0, 'long_RL_pf_peak_x': 30.0, 'short_LR_pf_peak_x': 30.0, 'short_RL_pf_peak_x': 30.0},
+            {'t_rel_seconds': 0.3, 'aclu': 4, 'Probe_Epoch_id': 0, 'long_LR_pf_peak_x': 40.0, 'long_RL_pf_peak_x': 40.0, 'short_LR_pf_peak_x': 40.0, 'short_RL_pf_peak_x': 40.0},
+            {'t_rel_seconds': 0.35, 'aclu': 1, 'Probe_Epoch_id': 0, 'long_LR_pf_peak_x': 10.0, 'long_RL_pf_peak_x': 10.0, 'short_LR_pf_peak_x': 10.0, 'short_RL_pf_peak_x': 10.0},
+            {'t_rel_seconds': 0.40, 'aclu': 1, 'Probe_Epoch_id': 0, 'long_LR_pf_peak_x': 10.0, 'long_RL_pf_peak_x': 10.0, 'short_LR_pf_peak_x': 10.0, 'short_RL_pf_peak_x': 10.0},
+        ]
+        prepared_spikes_df = pd.DataFrame(prepared_rows)
+
+        all_spike_spearman_df = prepared_spikes_df.groupby('Probe_Epoch_id').apply(lambda group: RankOrderAnalyses._subfn_calculate_correlations(group, method='spearman', decoder_names=deepcopy(DEFAULT_SHUFFLE_DECODER_NAMES))).reset_index()
+        all_spike_rho = float(all_spike_spearman_df.loc[0, 'long_LR_spearman'])
+        self.assertLess(all_spike_rho, 0.999)  # late repeats break perfect all-spike Spearman
+
+        out = DecodedEpochScoreShuffle._spearman_arrays_from_prepared_spikes_df(prepared_spikes_df=prepared_spikes_df, active_epochs_df=epochs_df, decoder_names=deepcopy(DEFAULT_SHUFFLE_DECODER_NAMES))
+        np.testing.assert_allclose(out['spearman'][0, :], np.ones(4), atol=1e-8)
+
+
     def test_pearsonr_arrays_from_prepared_spikes_df_shape_and_finite(self):
         n_epochs: int = 2
         epochs_df = _epochs_df(n_epochs)

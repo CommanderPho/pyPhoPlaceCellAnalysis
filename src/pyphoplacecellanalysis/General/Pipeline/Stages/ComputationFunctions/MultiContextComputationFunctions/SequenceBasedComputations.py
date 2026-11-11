@@ -15,6 +15,7 @@ from attrs import asdict, define, field, Factory, astuple
 import numpy as np
 import pandas as pd
 from datetime import datetime, timedelta
+import time
 import scipy.ndimage as ndimage
 
 from attrs import define, field, asdict, evolve
@@ -261,6 +262,8 @@ class DecodedEpochScoreShuffle(ComputedResult):
     enable_saving_entire_decoded_shuffle_result: bool = serialized_attribute_field(default=False, is_computable=False, repr=True)
     enable_heuristic_shuffle_scoring: bool = serialized_attribute_field(default=True, is_computable=False, repr=True)
     enable_radon_shuffle_scoring: bool = serialized_attribute_field(default=True, is_computable=False, repr=True)
+    enable_shuffle_component_timing: bool = serialized_attribute_field(default=True, is_computable=False, repr=True)
+    last_shuffle_component_timings: Optional[Dict[str, Any]] = non_serialized_field(default=None, repr=False)
 
     result_version: str = serialized_attribute_field(default='2026.11.11_0', is_computable=False, repr=False) # this field specfies the version of the result. 
 
@@ -657,7 +660,10 @@ class DecodedEpochScoreShuffle(ComputedResult):
 
     @classmethod
     def _spearman_arrays_from_prepared_spikes_df(cls, prepared_spikes_df: pd.DataFrame, active_epochs_df: pd.DataFrame, decoder_names: Optional[List[str]] = None) -> Dict[str, NDArray]:
-        """Group prepared spikes by Probe_Epoch_id and build `(n_epochs, n_decoders)` spearman array aligned to `active_epochs_df` rows."""
+        """Group prepared spikes by Probe_Epoch_id and build `(n_epochs, n_decoders)` spearman array aligned to `active_epochs_df` rows.
+
+        Diba / RankOrder style: only the **first spike per cell** within each epoch is used (`rank_alignment='first'` via `RankOrderAnalyses.select_chosen_spikes`).
+        """
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.RankOrderComputations import RankOrderAnalyses
 
         if decoder_names is None:
@@ -671,7 +677,13 @@ class DecodedEpochScoreShuffle(ComputedResult):
         if (prepared_spikes_df is None) or (len(prepared_spikes_df) == 0):
             return {'spearman': spearman_arr}
 
-        spearman_df: pd.DataFrame = prepared_spikes_df.groupby('Probe_Epoch_id').apply(lambda group: RankOrderAnalyses._subfn_calculate_correlations(group, method='spearman', decoder_names=decoder_names)).reset_index()
+        ## Ensure chronological order so groupby.first() is the earliest spike per (epoch, aclu):
+        prepared_spikes_df = deepcopy(prepared_spikes_df).sort_values(['Probe_Epoch_id', 't_rel_seconds', 'aclu'])
+        _selected_spikes, first_spike_per_cell_df = RankOrderAnalyses.select_chosen_spikes(active_spikes_df=prepared_spikes_df, rank_alignment='first', time_variable_name_override='t_rel_seconds')
+        if (first_spike_per_cell_df is None) or (len(first_spike_per_cell_df) == 0):
+            return {'spearman': spearman_arr}
+
+        spearman_df: pd.DataFrame = first_spike_per_cell_df.groupby('Probe_Epoch_id').apply(lambda group: RankOrderAnalyses._subfn_calculate_correlations(group, method='spearman', decoder_names=decoder_names)).reset_index()
         if 'Probe_Epoch_id' not in spearman_df.columns:
             return {'spearman': spearman_arr}
         spearman_df = spearman_df.set_index('Probe_Epoch_id')
@@ -731,15 +743,15 @@ class DecodedEpochScoreShuffle(ComputedResult):
 
     @classmethod
     def compute_shuffle_spearman_score_arrays(cls, track_templates: TrackTemplates, spikes_df: pd.DataFrame, active_epochs_df: pd.DataFrame, decoder_aclu_peak_map_dict: Optional[Dict[str, Dict]] = None, decoder_names: Optional[List[str]] = None) -> Dict[str, NDArray]:
-        """Spike-time vs PF-peak-x correlations for all spikes in each epoch → `{'spearman': ..., 'pearsonr': ...}` each `(n_epochs, n_decoders)`.
+        """Spike-time vs PF-peak-x correlations per epoch → `{'spearman': ..., 'pearsonr': ...}` each `(n_epochs, n_decoders)`.
 
-        - spearman: dense-ranked t vs peak_x (RankOrderAnalyses)
-        - pearsonr: unranked t vs peak_x via scipy.stats.pearsonr (Simple PF PearsonR)
+        - spearman: Diba / RankOrder style — **first spike per cell** only, then dense-ranked t vs peak_x
+        - pearsonr: Simple PF PearsonR — **all spikes**, unranked t vs peak_x via scipy.stats.pearsonr
         """
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.RankOrderComputations import RankOrderAnalyses
 
         def _subfn_prepare_spikes_for_spearman_scoring(track_templates: TrackTemplates, spikes_df: pd.DataFrame, active_epochs_df: pd.DataFrame, decoder_aclu_peak_map_dict: Dict[str, Dict]) -> pd.DataFrame:
-            """All spikes in each epoch with `{decoder}_pf_peak_x` from the provided peak maps (no within-epoch aclu shuffle)."""
+            """Epoch-labeled spikes with `{decoder}_pf_peak_x` from the provided peak maps (no within-epoch aclu shuffle). Spearman later keeps first spike/cell only."""
             if not isinstance(active_epochs_df, pd.DataFrame):
                 active_epochs_df = active_epochs_df.to_dataframe()
             active_epochs_df = deepcopy(active_epochs_df)
@@ -1928,6 +1940,10 @@ class DecodedEpochScoreShuffle(ComputedResult):
             state['enable_radon_shuffle_scoring'] = False
         if 'enable_saving_entire_decoded_shuffle_result' not in state:
             state['enable_saving_entire_decoded_shuffle_result'] = False
+        if 'enable_shuffle_component_timing' not in state:
+            state['enable_shuffle_component_timing'] = True
+        if 'last_shuffle_component_timings' not in state:
+            state['last_shuffle_component_timings'] = None
         if 'result_version' not in state:
             state['result_version'] = '2026.10.26_0'
 

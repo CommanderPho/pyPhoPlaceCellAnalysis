@@ -953,7 +953,9 @@ class PosteriorExporting:
             load_path = Path('output/2024-11-26_Lab_newest_all_decoded_epoch_posteriors.h5')
 
             ## used for reconstituting dataset:
-            dataset_type_fields = ['p_x_given_n', 'p_x_given_n_grey', 'p_x_given_n_full', 'most_likely_positions', 'most_likely_position_indicies', 'time_bin_edges', 't_bin_centers', 'spkcount']
+            required_dataset_type_fields = ['p_x_given_n', 'p_x_given_n_grey', 'most_likely_positions', 'most_likely_position_indicies', 'time_bin_edges', 't_bin_centers']
+            optional_full_object_fields = ['p_x_given_n_full', 'spkcount'] ## present only when saved with save_full_object=True
+            dataset_type_fields = required_dataset_type_fields + optional_full_object_fields
             decoder_names = ['long_LR', 'long_RL', 'short_LR', 'short_RL']
 
             _out_dict, (session_key_parts, custom_replay_parts) = PosteriorExporting.load_decoded_posteriors_from_HDF5(load_path=load_path, debug_print=True)
@@ -964,7 +966,7 @@ class PosteriorExporting:
             # active_var_key: str = 'p_x_given_n' # dataset_type_fields	
 
             for active_var_key in dataset_type_fields:
-                if active_var_key not in next(iter(_out_ripple_only_dict.values()), {}):
+                if (active_var_key in optional_full_object_fields) and (len(next(iter(_out_ripple_only_dict.values())).get(active_var_key, [])) == 0):
                     continue ## skip optional/full-object fields missing from this file
                 ripple_data_field_dict[active_var_key] = {
                     a_decoder_name: [v for v in _out_ripple_only_dict[a_decoder_name][active_var_key]] for a_decoder_name in decoder_names
@@ -977,20 +979,21 @@ class PosteriorExporting:
         
         History:
             Refactored from `ComputerVisionComputations` on 2024-09-30
-            2026-11-11: accept `save_full_object=True` leafs (`p_x_given_n_full`, optional `spkcount`)
+            2026-11-11: accept optional `save_full_object=True` leafs (`p_x_given_n_full`, `spkcount`); warn on old-format files missing `p_x_given_n_full`
         """
         if not isinstance(load_path, Path):
             load_path = Path(load_path).resolve()
 
         assert load_path.exists(), f"load_path: '{load_path}' does not exist!"
 
-        # Legacy export fields + round-trip fields from `SingleEpochDecodedResult.to_hdf(..., save_full_object=True)`
-        dataset_type_fields = ['p_x_given_n', 'p_x_given_n_grey', 'p_x_given_n_full', 'most_likely_positions', 'most_likely_position_indicies', 'time_bin_edges', 't_bin_centers', 'spkcount']
-        attribute_type_fields = ['nbins', 'epoch_data_index', 'n_xbins', 'creation_date']
-        
-
+        import warnings
         import h5py
         from pyphocorehelpers.Filesystem.HDF5.hdf5_file_helpers import HDF5_Helper
+
+        # Legacy export fields (always expected) + optional round-trip fields from `SingleEpochDecodedResult.to_hdf(..., save_full_object=True)`
+        required_dataset_type_fields = ['p_x_given_n', 'p_x_given_n_grey', 'most_likely_positions', 'most_likely_position_indicies', 'time_bin_edges', 't_bin_centers']
+        optional_full_object_fields = ['p_x_given_n_full', 'spkcount'] # optional: only present for save_full_object=True exports
+        attribute_type_fields = ['nbins', 'epoch_data_index', 'n_xbins', 'creation_date']
 
         # Usage
         found_groups = HDF5_Helper.find_groups_by_name(load_path, 'save_decoded_posteriors_to_HDF5')
@@ -1028,6 +1031,7 @@ class PosteriorExporting:
 
 
         out_dict: Dict = {}
+        saw_p_x_given_n_full: bool = False
 
         with h5py.File(load_path, 'r') as f:            
             main_save_group = f[_save_key]
@@ -1049,8 +1053,8 @@ class PosteriorExporting:
                         
                     decoder_epochtype_group = decoder_group[known_epochs_name]
                     
-                    ## allocate outputs:
-                    out_dict[decoder_prefix][known_epochs_name] = {k:list() for k in dataset_type_fields} # allocate a dict of empty lists for each item in `dataset_type_fields`
+                    ## allocate required outputs; optional full-object leafs are added only when present in the file
+                    out_dict[decoder_prefix][known_epochs_name] = {k:list() for k in required_dataset_type_fields}
                     
                     for dataset_name in decoder_epochtype_group.keys():
                         # if debug_print:
@@ -1070,8 +1074,10 @@ class PosteriorExporting:
                             #     print(f'\t\t\t\tarray: {type(array)}')
                             
                             if leaf_data_key not in out_dict[decoder_prefix][known_epochs_name]:
-                                out_dict[decoder_prefix][known_epochs_name][leaf_data_key] = list() ## forward-compat: unknown/optional leaf datasets
+                                out_dict[decoder_prefix][known_epochs_name][leaf_data_key] = list() ## optional/unknown leaf datasets (e.g. p_x_given_n_full, spkcount)
                             out_dict[decoder_prefix][known_epochs_name][leaf_data_key].append(array) #
+                            if leaf_data_key == 'p_x_given_n_full':
+                                saw_p_x_given_n_full = True
                             
                         # array = decoder_epochtype_group[dataset_name] #[()]
                         
@@ -1091,6 +1097,15 @@ class PosteriorExporting:
                     # out_dict[epochs_name][decoder_prefix] = arrays_list
                     
         # END open
+
+        if not saw_p_x_given_n_full:
+            warnings.warn(
+                f"Old-format decoded posteriors HDF5 (missing 'p_x_given_n_full'): '{load_path.as_posix()}'. "
+                f"Loaded legacy fields only; `SingleEpochDecodedResult.read_hdf` round-trip may use x-marginal `p_x_given_n` instead of the full posterior. "
+                f"Re-export with `save_full_object=True` to include 'p_x_given_n_full'/'spkcount'.",
+                UserWarning,
+                stacklevel=2,
+            )
 
         return out_dict, (session_key_parts, custom_replay_parts)
 
