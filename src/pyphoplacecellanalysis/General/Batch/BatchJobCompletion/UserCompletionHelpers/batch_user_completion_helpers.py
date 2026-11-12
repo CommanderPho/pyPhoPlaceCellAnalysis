@@ -38,6 +38,15 @@ from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpe
 a_dummy = SimpleBatchComputationDummy(BATCH_DATE_TO_USE, collected_outputs_path, True)
 
 
+## Shared ``@function_attributes(..., tags=[...])`` vocabulary for completion functions in this file
+# Apply these tags to functions as their properties are established. Intended later use: decide which completion
+# functions can safely run in parallel for one pipeline, or as multiple GreatLakes jobs for the same session.
+#
+# shuffles-indep
+#     does not depend on shuffling results and can be ran independently from shuffles
+# pure
+#     running has no side-effects on the pipeline and produces no outputs that later effect the pipeline state
+
 """
 
 # %% [markdown]
@@ -1678,7 +1687,7 @@ def compute_and_export_session_epoch_score_shuffles_completion_function(self, gl
 # ==================================================================================================================== #
 # cell_first_spikes_characteristics                                                                                    #
 # ==================================================================================================================== #
-@function_attributes(short_name=None, tags=['first-spikes', 'neurons', 'HDF5', 'export'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-01 18:30', related_items=[])
+@function_attributes(short_name=None, tags=['first-spikes', 'neurons', 'HDF5', 'export', 'shuffles-indep', 'pure'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-01 18:30', related_items=[])
 def compute_and_export_cell_first_spikes_characteristics_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict) -> dict:
     """ Exports this session's cell first-firing information (HDF5) with custom suffix derived from parameters
     
@@ -1743,7 +1752,7 @@ def compute_and_export_cell_first_spikes_characteristics_completion_function(sel
     return across_session_results_extended_dict
 
 
-@function_attributes(short_name=None, tags=['first-spikes'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-07 21:31', related_items=[])
+@function_attributes(short_name=None, tags=['first-spikes', 'shuffles-indep', 'pure'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-07 21:31', related_items=[])
 def figures_plot_cell_first_spikes_characteristics_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, later_appearing_cell_lap_start_id: int=4) -> dict:
     from pyphoplacecellanalysis.General.Mixins.ExportHelpers import FileOutputManager, FigureOutputLocation, ContextToPathMode	
     from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import CellsFirstSpikeTimes
@@ -1782,7 +1791,7 @@ def figures_plot_cell_first_spikes_characteristics_completion_function(self, glo
 # Unsorted                                                                                                             #
 # ==================================================================================================================== #
 
-@function_attributes(short_name=None, tags=['recomputed_inst_firing_rate', 'inst_fr', 'independent'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-01 00:00', related_items=[])
+@function_attributes(short_name=None, tags=['recomputed_inst_firing_rate', 'inst_fr', 'independent', 'shuffles-indep', 'pure'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-01 00:00', related_items=[])
 def compute_and_export_session_instantaneous_spike_rates_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict,
                                                                             #  instantaneous_time_bin_size_seconds_list:List[float]=[0.0005, 0.0009, 0.0015, 0.0025, 0.025], epoch_handling_mode:str='DropShorterMode',
                                                                             instantaneous_time_bin_size_seconds_list:List[float]=[1000.0], minimum_inclusion_fr_Hz: Optional[float]=0.0, epoch_handling_mode:str='UseAllEpochsMode', # single-bin per epoch
@@ -2649,7 +2658,7 @@ def save_custom_session_files_completion_function(self, global_data_root_parent_
     return across_session_results_extended_dict
 
 
-@function_attributes(short_name=None, tags=['backup', 'versioning', 'copy'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-09-25 06:22', related_items=[])
+@function_attributes(short_name=None, tags=['backup', 'versioning', 'copy', 'pure'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-09-25 06:22', related_items=[])
 def backup_previous_session_files_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, desired_suffix: str = 'Pre2024-07-16') -> dict:
     """ Makes a backup copy of the pipeline's files (pkl, HDF5) with desired suffix
     
@@ -2726,7 +2735,7 @@ def backup_previous_session_files_completion_function(self, global_data_root_par
     return across_session_results_extended_dict
 
 
-@function_attributes(short_name=None, tags=['export'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-01 00:00', related_items=[])
+@function_attributes(short_name=None, tags=['export', 'shuffles-indep', 'pure'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-01 00:00', related_items=[])
 def determine_computation_datetimes_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict) -> dict:
     """ 
     from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import determine_computation_datetimes_completion_function
@@ -2759,7 +2768,7 @@ def determine_computation_datetimes_completion_function(self, global_data_root_p
     return across_session_results_extended_dict
 
 
-@function_attributes(short_name=None, tags=['t_delta', 'export'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-01 00:00', related_items=[])
+@function_attributes(short_name=None, tags=['t_delta', 'export', 'shuffles-indep', 'pure'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-01 00:00', related_items=[])
 def determine_session_t_delta_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict) -> dict:
     """ 
     from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import determine_computation_datetimes_completion_function
@@ -2788,7 +2797,7 @@ def determine_session_t_delta_completion_function(self, global_data_root_parent_
     return across_session_results_extended_dict
 
 
-@function_attributes(short_name=None, tags=['all_neuron_stats_table', 'neuron_replay_stats_df_CSV', 'final-publication', 'JSON', 'CSV', 'peak', 'pf', 'peak_promenance'], input_requires=[], output_provides=[], uses=['AcrossSessionsResults.build_neuron_identities_df_for_CSV'], used_by=[], creation_date='2024-01-01 00:00', related_items=[])
+@function_attributes(short_name=None, tags=['all_neuron_stats_table', 'neuron_replay_stats_df_CSV', 'final-publication', 'JSON', 'CSV', 'peak', 'pf', 'peak_promenance', 'shuffles-indep', 'pure'], input_requires=[], output_provides=[], uses=['AcrossSessionsResults.build_neuron_identities_df_for_CSV'], used_by=[], creation_date='2024-01-01 00:00', related_items=[])
 def compute_and_export_session_extended_placefield_peak_information_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict,
                                                                              save_csv:bool=True, save_json:bool=False) -> dict:
     """  Extracts peak information for the placefields for each neuron. Responsible for outputting the combined neuron information CSV used in the final paper results by merging the three+ informationt tables into one `all_neuron_stats_table`
@@ -3143,6 +3152,8 @@ def export_decoded_variables_evaluation_completion_function(self, global_data_ro
 
     Run after ``generalized_decode_epochs_dict_and_export_results_completion_function`` so ``EpochComputations`` is populated.
     Uncertainty and Fig5 exports use separate try/except blocks so one failure does not erase the other.
+
+    See module docstring for shared tags ``shuffles-indep`` and ``pure``.
     """
     from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import apply_export_filename_extra_suffix_parts_to_pipeline
     from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import determine_decoded_context_uncertainty_as_fn_of_position
@@ -3191,7 +3202,7 @@ def export_decoded_variables_evaluation_completion_function(self, global_data_ro
 # Bapun Train-Test Decoder Error                                                                                       #
 # ==================================================================================================================== #
 
-@function_attributes(short_name=None, tags=['bapun', 'train-test', 'decoder', 'context-decoding', 'CSV', 'error'], input_requires=[], output_provides=[], uses=['BapunPositionDecodingPerformance', 'evaluate_bapun_context_decoder_performance', 'BapunContextDecoderPerformanceResult'], used_by=[], creation_date='2026-06-19 12:00', related_items=['figures_plot_bapun_train_test_decoder_error_distance_completion_function', 'evaluate_bapun_context_decoder_performance', 'BapunContextDecoderPerformanceResult'])
+@function_attributes(short_name=None, tags=['bapun', 'train-test', 'decoder', 'context-decoding', 'CSV', 'error', 'shuffles-indep', 'pure'], input_requires=[], output_provides=[], uses=['BapunPositionDecodingPerformance', 'evaluate_bapun_context_decoder_performance', 'BapunContextDecoderPerformanceResult'], used_by=[], creation_date='2026-06-19 12:00', related_items=['figures_plot_bapun_train_test_decoder_error_distance_completion_function', 'evaluate_bapun_context_decoder_performance', 'BapunContextDecoderPerformanceResult'])
 def compute_and_export_bapun_train_test_decoder_error_distance_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict,
         training_data_portion: float = 9.0/10.0, laps_decoding_time_bin_size: float = 0.250, maze_epoch_names: Optional[List[str]] = None, use_clusterless_decoders: Optional[bool] = None, save_csv: bool = True, evaluate_context_decoder: bool = True, debug_print: bool = False) -> dict:
     """Computes Bapun train/test lap decoder error and two-maze context decoder performance; exports CSVs to collected_outputs.
@@ -3312,7 +3323,7 @@ def compute_and_export_bapun_train_test_decoder_error_distance_completion_functi
 
 
 
-@function_attributes(short_name=None, tags=['bapun', 'train-test', 'decoder', 'figure', 'batch'], input_requires=[], output_provides=[], uses=['BapunPositionDecodingPerformance', 'build_and_write_to_file'], used_by=[], creation_date='2026-06-19 12:00', related_items=['compute_and_export_bapun_train_test_decoder_error_distance_completion_function'])
+@function_attributes(short_name=None, tags=['bapun', 'train-test', 'decoder', 'figure', 'batch', 'shuffles-indep', 'pure'], input_requires=[], output_provides=[], uses=['BapunPositionDecodingPerformance', 'build_and_write_to_file'], used_by=[], creation_date='2026-06-19 12:00', related_items=['compute_and_export_bapun_train_test_decoder_error_distance_completion_function'])
 def figures_plot_bapun_train_test_decoder_error_distance_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, write_png: bool = True, write_vector_format: bool = False, force_recompute: bool = False,
         training_data_portion: float = 9.0/10.0, laps_decoding_time_bin_size: float = 0.250, maze_epoch_names: Optional[List[str]] = None, use_clusterless_decoders: Optional[bool] = None, y_col_name: str='err_cm', debug_print: bool = False) -> dict:
     """Plots and exports Bapun train/test decoder squared-error scatter figure. Loads prior CSV export when available."""
@@ -3449,7 +3460,7 @@ def compute_and_pickle_clusterless_decoder_completion_function(self, global_data
 # Bapun Clusterless Plotting                                                                                           #
 # ==================================================================================================================== #
 
-@function_attributes(short_name=None, tags=['bapun', 'train-test', 'decoder', 'figure', 'batch', 'clusterless'], input_requires=[], output_provides=[], uses=['BapunPositionDecodingPerformance', 'build_and_write_to_file'], used_by=[], creation_date='2026-06-30 12:00', related_items=['compute_and_export_bapun_train_test_decoder_error_distance_completion_function'])
+@function_attributes(short_name=None, tags=['bapun', 'train-test', 'decoder', 'figure', 'batch', 'clusterless', 'shuffles-indep', 'pure'], input_requires=[], output_provides=[], uses=['BapunPositionDecodingPerformance', 'build_and_write_to_file'], used_by=[], creation_date='2026-06-30 12:00', related_items=['compute_and_export_bapun_train_test_decoder_error_distance_completion_function'])
 def figures_plot_bapun_clusterless_train_test_decoder_error_distance_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, write_png: bool = True, write_vector_format: bool = False, force_recompute: bool = False,
         training_data_portion: float = 9.0/10.0, laps_decoding_time_bin_size: float = 0.250, maze_epoch_names: Optional[List[str]] = None, use_clusterless_decoders: Optional[bool] = True, y_col_name: str='err_cm', debug_print: bool = False) -> dict:
     """Plots and exports Bapun clusterless train/test decoder squared-error scatter figure."""
@@ -3630,7 +3641,7 @@ def compute_and_pickle_spyglass_clusterless_decoder_completion_function(self, gl
 # Bapun Spyglass Clusterless Plotting                                                                                  #
 # ==================================================================================================================== #
 
-@function_attributes(short_name=None, tags=['bapun', 'train-test', 'decoder', 'figure', 'batch', 'clusterless', 'spyglass'], input_requires=[], output_provides=[], uses=['BapunPositionDecodingPerformance', 'build_and_write_to_file'], used_by=[], creation_date='2026-07-07 15:00', related_items=['compute_and_pickle_spyglass_clusterless_decoder_completion_function'])
+@function_attributes(short_name=None, tags=['bapun', 'train-test', 'decoder', 'figure', 'batch', 'clusterless', 'spyglass', 'shuffles-indep', 'pure'], input_requires=[], output_provides=[], uses=['BapunPositionDecodingPerformance', 'build_and_write_to_file'], used_by=[], creation_date='2026-07-07 15:00', related_items=['compute_and_pickle_spyglass_clusterless_decoder_completion_function'])
 def figures_plot_bapun_spyglass_clusterless_train_test_decoder_error_distance_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, write_png: bool = True, write_vector_format: bool = False, force_recompute: bool = False,
         training_data_portion: float = 9.0/10.0, laps_decoding_time_bin_size: float = 0.250, maze_epoch_names: Optional[List[str]] = None, use_spyglass_clusterless_decoders: Optional[bool] = True, y_col_name: str='err_cm', debug_print: bool = False) -> dict:
     """Plots and exports Bapun Spyglass clusterless train/test decoder squared-error scatter figure."""
