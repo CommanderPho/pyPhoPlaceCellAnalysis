@@ -385,11 +385,12 @@ class PlotlyFigureContainer:
         import plotly.graph_objs as go
 
         if use_latex_labels:
-            pre_delta_label: str = r'"$\\text{Pre-}\Delta$"'
-            post_delta_label: str = r'"$\\text{Post-}\Delta$"'
+            # Match Figure 2 publication xticklabels (`PaperFigureTwo._apply_publication_grouped_xticklabels`: pre-$\Delta$ / post-$\Delta$)
+            pre_delta_label: str = r'$\text{pre-}\Delta$'
+            post_delta_label: str = r'$\text{post-}\Delta$'
         else:
-            pre_delta_label: str = 'Pre-delta'
-            post_delta_label: str = 'Post-delta'
+            pre_delta_label: str = 'pre-Δ'
+            post_delta_label: str = 'post-Δ'
 
         # ==================================================================================================================== #
         # Build Figure                                                                                                         #
@@ -755,11 +756,12 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
     _PRE_PREDICATE_BG_LEGENDGROUP: str = '__pre_predicate_bg__'
     
     if use_latex_labels:
-        pre_delta_label: str = r'"$\\text{Pre-}\Delta$"'
-        post_delta_label: str = r'"$\\text{Post-}\Delta$"'
+        # Match Figure 2 publication xticklabels (`PaperFigureTwo._apply_publication_grouped_xticklabels`: pre-$\Delta$ / post-$\Delta$)
+        pre_delta_label: str = r'$\text{pre-}\Delta$'
+        post_delta_label: str = r'$\text{post-}\Delta$'
     else:
-        pre_delta_label: str = 'Pre-delta'
-        post_delta_label: str = 'Post-delta'
+        pre_delta_label: str = 'pre-Δ'
+        post_delta_label: str = 'post-Δ'
 
     # figure_context_dict ________________________________________________________________________________________________ #
     if data_context is None:
@@ -1508,7 +1510,7 @@ def _helper_build_figure(data_results_df: pd.DataFrame, histogram_bins:int=25, e
         print(f'num_cols: {num_cols}')
         is_col_included = np.array([enable_histograms, enable_scatter_plot, enable_histograms])
         column_widths = list(np.array([0.1, 0.8, 0.1])[is_col_included])
-        column_titles = ["Pre-delta", f"{scatter_title} - Across Sessions ({num_unique_sessions} Sessions) - {num_unique_time_bin_sizes} Time Bin Sizes", "Post-delta"]
+        column_titles = ["pre-Δ", f"{scatter_title} - Across Sessions ({num_unique_sessions} Sessions) - {num_unique_time_bin_sizes} Time Bin Sizes", "post-Δ"]
 
         # sp_make_subplots_kwargs = {'rows': 1, 'cols': 3, 'column_widths': [0.1, 0.8, 0.1], 'horizontal_spacing': 0.01, 'shared_yaxes': True, 'column_titles': column_titles}
         sp_make_subplots_kwargs = {'rows': 1, 'cols': num_cols, 'column_widths': column_widths, 'horizontal_spacing': 0.01, 'shared_yaxes': True, 'column_titles': list(np.array(column_titles)[is_col_included])}
@@ -1520,7 +1522,7 @@ def _helper_build_figure(data_results_df: pd.DataFrame, histogram_bins:int=25, e
     elif (main_plot_mode == 'separate_facet_row_per_session'):
         # main_plot_mode: str = 'separate_facet_row_per_session'
         raise NotImplementedError(f"DOES NOT WORK")
-        sp_make_subplots_kwargs = {'rows': 1, 'cols': 3, 'column_widths': [0.1, 0.8, 0.1], 'horizontal_spacing': 0.01, 'shared_yaxes': True, 'column_titles': ["Pre-delta",f"{scatter_title} - Across Sessions ({num_unique_sessions} Sessions) - {num_unique_time_bin_sizes} Time Bin Sizes", "Post-delta"]}
+        sp_make_subplots_kwargs = {'rows': 1, 'cols': 3, 'column_widths': [0.1, 0.8, 0.1], 'horizontal_spacing': 0.01, 'shared_yaxes': True, 'column_titles': ["pre-Δ",f"{scatter_title} - Across Sessions ({num_unique_sessions} Sessions) - {num_unique_time_bin_sizes} Time Bin Sizes", "post-Δ"]}
         px_scatter_kwargs = {'x': 'delta_aligned_start_t', 'y': variable_name, 'color': 'time_bin_size', 'title': scatter_title, 'range_y': [0.0, 1.0],
                             'facet_row': 'session_name', 'facet_row_spacing': 0.04, # 'facet_col_wrap': 2, 'facet_col_spacing': 0.04,
                             'height': (num_unique_sessions*200), 'width': 1024,
@@ -1533,13 +1535,13 @@ def _helper_build_figure(data_results_df: pd.DataFrame, histogram_bins:int=25, e
     elif (main_plot_mode == 'separate_row_per_session'):
         # main_plot_mode: str = 'separate_row_per_session'
         # , subplot_titles=("Plot 1", "Plot 2")
-        # column_titles = ["Pre-delta", f"{scatter_title} - Across Sessions ({num_unique_sessions} Sessions) - {num_unique_time_bins} Time Bin Sizes", "Post-delta"]
-        column_titles = ["Pre-delta", f"{scatter_title}", "Post-delta"]
+        # column_titles = ["pre-Δ", f"{scatter_title} - Across Sessions ({num_unique_sessions} Sessions) - {num_unique_time_bins} Time Bin Sizes", "post-Δ"]
+        column_titles = ["pre-Δ", f"{scatter_title}", "post-Δ"]
         session_titles = [str(v) for v in unique_sessions]
         subplot_titles = []
         for a_row_title in session_titles:
-            subplot_titles.extend(["Pre-delta", f"{a_row_title}", "Post-delta"])
-        # subplot_titles = [["Pre-delta", f"{a_row_title}", "Post-delta"] for a_row_title in session_titles].flatten()
+            subplot_titles.extend(["pre-Δ", f"{a_row_title}", "post-Δ"])
+        # subplot_titles = [["pre-Δ", f"{a_row_title}", "post-Δ"] for a_row_title in session_titles].flatten()
 
         sp_make_subplots_kwargs = {'rows': num_unique_sessions, 'cols': 3, 'column_widths': [0.1, 0.8, 0.1], 'horizontal_spacing': 0.01, 'vertical_spacing': 0.04, 'shared_yaxes': True,
                                     'column_titles': column_titles,
@@ -1554,7 +1556,7 @@ def _helper_build_figure(data_results_df: pd.DataFrame, histogram_bins:int=25, e
         raise ValueError(f'main_plot_mode is not a known mode: main_plot_mode: "{main_plot_mode}", known modes: known_main_plot_modes: {known_main_plot_modes}')
 
 
-    def __sub_subfn_plot_histogram(fig, histogram_data_df, hist_title="Post-delta", row=1, col=3):
+    def __sub_subfn_plot_histogram(fig, histogram_data_df, hist_title="post-Δ", row=1, col=3):
         """ captures: px_histogram_kwargs, histogram_kwargs
 
         """
@@ -1587,14 +1589,14 @@ def _helper_build_figure(data_results_df: pd.DataFrame, histogram_bins:int=25, e
             for a_session_i, a_session_name in enumerate(unique_sessions):
                 row_index: int = a_session_i + 1 # 1-indexed
                 a_session_pre_delta_df: pd.DataFrame = pre_delta_df[pre_delta_df['session_name'] == a_session_name]
-                __sub_subfn_plot_histogram(fig, histogram_data_df=a_session_pre_delta_df, hist_title="Pre-delta", row=row_index, col=histogram_col_idx)
+                __sub_subfn_plot_histogram(fig, histogram_data_df=a_session_pre_delta_df, hist_title="pre-Δ", row=row_index, col=histogram_col_idx)
                 fig.update_yaxes(title_text=f"{a_session_name}", row=row_index, col=1, range=[0, 1], # Set the desired range
                     autorange=False,      # Disable autorange
                     fixedrange=True       # Prevent zooming/panning (optional)
                 )
 
         else:
-            __sub_subfn_plot_histogram(fig, histogram_data_df=pre_delta_df, hist_title="Pre-delta", row=1, col=histogram_col_idx)
+            __sub_subfn_plot_histogram(fig, histogram_data_df=pre_delta_df, hist_title="pre-Δ", row=1, col=histogram_col_idx)
         next_subplot_col_idx = next_subplot_col_idx + 1 # increment the next column
 
     # Scatter Plot _______________________________________________________________________________________________________ #
@@ -1653,9 +1655,9 @@ def _helper_build_figure(data_results_df: pd.DataFrame, histogram_bins:int=25, e
             for a_session_i, a_session_name in enumerate(unique_sessions):
                 row_index: int = a_session_i + 1 # 1-indexed
                 a_session_post_delta_df: pd.DataFrame = post_delta_df[post_delta_df['session_name'] == a_session_name]
-                __sub_subfn_plot_histogram(fig, histogram_data_df=a_session_post_delta_df, hist_title="Post-delta", row=row_index, col=histogram_col_idx)
+                __sub_subfn_plot_histogram(fig, histogram_data_df=a_session_post_delta_df, hist_title="post-Δ", row=row_index, col=histogram_col_idx)
         else:
-            __sub_subfn_plot_histogram(fig, histogram_data_df=post_delta_df, hist_title="Post-delta", row=1, col=histogram_col_idx)
+            __sub_subfn_plot_histogram(fig, histogram_data_df=post_delta_df, hist_title="post-Δ", row=1, col=histogram_col_idx)
 
         next_subplot_col_idx = next_subplot_col_idx + 1 # increment the next column
 
