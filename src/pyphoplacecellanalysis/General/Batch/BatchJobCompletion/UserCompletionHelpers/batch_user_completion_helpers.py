@@ -3170,7 +3170,7 @@ def export_decoded_variables_evaluation_completion_function(self, global_data_ro
     callback_outputs = {'partition_keys': None, 'error': None, 'fig5_occupancy_csv_path': None, 'fig5_occupancy_error': None}
 
     try:
-        _out = determine_decoded_context_uncertainty_as_fn_of_position(curr_active_pipeline, time_bin_size=time_bin_size, enable_export_path=self.collected_outputs_path.resolve(), show_pos_by_ctxt_joint_figure=show_pos_by_ctxt_joint_figure)
+        _out = determine_decoded_context_uncertainty_as_fn_of_position(curr_active_pipeline, time_bin_size=time_bin_size, enable_export_path=self.collected_outputs_path.resolve(), show_pos_by_ctxt_joint_figure=show_pos_by_ctxt_joint_figure, output_date_str=self.BATCH_DATE_TO_USE)
         callback_outputs['partition_keys'] = list(_out.keys()) if _out is not None else []
         callback_outputs['error'] = None
     except Exception as e:

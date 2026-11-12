@@ -14400,14 +14400,16 @@ class MeasuredVsDecodedOccupancy:
 
 
 @function_attributes(short_name=None, tags=['decoding', 'context', 'position', 'performance'], input_requires=[], output_provides=['optional_decoded_marginal_posterior_partition_csvs', 'optional_pos_by_ctxt_joint_pngs'], uses=[], used_by=[], creation_date='2026-04-08 13:51', related_items=[])
-def determine_decoded_context_uncertainty_as_fn_of_position(curr_active_pipeline, time_bin_size: float=0.060, enable_export_path: Optional[Path]=None, show_pos_by_ctxt_joint_figure: bool=True, a_target_context: Optional[IdentifyingContext]=None) -> Dict[str, pd.DataFrame]:
+def determine_decoded_context_uncertainty_as_fn_of_position(curr_active_pipeline, time_bin_size: float=0.060, enable_export_path: Optional[Path]=None, show_pos_by_ctxt_joint_figure: bool=True, a_target_context: Optional[IdentifyingContext]=None, output_date_str: Optional[str]=None) -> Dict[str, pd.DataFrame]:
     """ sees if some positions consistently decode to ambiguous context/etc
 
     If ``enable_export_path`` is set, per-partition decoded marginal posterior DataFrames are written as CSV under
-    ``<enable_export_path>/output/`` (directory created if needed), ``curr_active_pipeline.register_output_file`` is
-    called for each successful write, and export failures are logged without aborting the rest of the function.
-    The same folder receives an optional matplotlib PNG: a single figure with ``result_pos_by_ctxt_joint`` heatmaps
-    side-by-side for all pre/post-delta partitions (shared colormap, one colorbar), registered on success.
+    ``enable_export_path`` using the standard batch ingest filename:
+    ``{date}-{session}__{custom_replay}-(meas_decoded_occupancy_{pre|post}_delta)_tbin-{size}.csv``.
+    ``curr_active_pipeline.register_output_file`` is called for each successful write; export failures are logged
+    without aborting the rest of the function. The same folder receives an optional matplotlib PNG: a single figure
+    with ``result_pos_by_ctxt_joint`` heatmaps side-by-side for all pre/post-delta partitions (shared colormap, one
+    colorbar), registered on success.
 
     Returns ``pre_post_delta_a_decoded_marginal_posterior_df_dict`` (partition key to DataFrame).
 
@@ -14553,27 +14555,31 @@ def determine_decoded_context_uncertainty_as_fn_of_position(curr_active_pipeline
 
     ## OUTPUTS: pre_post_delta_a_decoded_marginal_posterior_df_dict
     pre_post_delta_result_pos_by_ctxt_joint_dict: Dict[str, NDArray] = {}
-    csv_export_out_dir: Optional[Path] = None
+    export_parent_path: Optional[Path] = None
     if enable_export_path is not None:
-        csv_export_out_dir = Path(enable_export_path).joinpath('output')
-        csv_export_out_dir.mkdir(parents=True, exist_ok=True)
+        from pyphocorehelpers.print_helpers import get_now_rounded_time_str
+        export_parent_path = Path(enable_export_path).resolve()
+        export_parent_path.mkdir(parents=True, exist_ok=True)
+        if output_date_str is None:
+            output_date_str = get_now_rounded_time_str(rounded_minutes=10)
+    ## END if enable_export_path is not None...
     for a_pre_post_delta, a_decoded_marginal_posterior_df in pre_post_delta_a_decoded_marginal_posterior_df_dict.items():
         result_pos_by_ctxt_joint = _subfn_compute_pre_post_delta_pos_by_ctxt_joint(active_decoded_marginal_posterior_df=a_decoded_marginal_posterior_df)
         pre_post_delta_result_pos_by_ctxt_joint_dict[a_pre_post_delta] = result_pos_by_ctxt_joint
 
-        if csv_export_out_dir is not None:
-            _sess = sanitize_filename_for_Windows(getattr(curr_active_pipeline, 'session_name', None) or 'unknown_session')
-            _delta_part = sanitize_filename_for_Windows(str(a_pre_post_delta))
-            _date = datetime.now().strftime('%Y-%m-%d')
-            _tbin = str(time_bin_size).replace('.', 'p')
-            export_csv_path = csv_export_out_dir.joinpath(f'{_date}_{_sess}_decoded_marginal_posterior_with_meas_pos_{_delta_part}_tbin{_tbin}.csv')
+        if export_parent_path is not None:
+            _delta_file_part: str = str(a_pre_post_delta).replace('-', '_')
+            data_identifier_str: str = f'(meas_decoded_occupancy_{_delta_file_part})_tbin-{float(time_bin_size)}'
+            export_csv_path, _out_filename, _out_basename = curr_active_pipeline.build_complete_session_identifier_filename_string(output_date_str=output_date_str, data_identifier_str=data_identifier_str, parent_output_path=export_parent_path, out_extension='.csv')
             try:
-                export_resolved = export_csv_path.resolve()
+                export_resolved = Path(export_csv_path).resolve()
                 a_decoded_marginal_posterior_df.to_csv(export_resolved, index=False)
                 print(f'exported decoded marginal posterior CSV: {export_resolved}')
                 curr_active_pipeline.register_output_file(output_path=export_resolved, output_metadata=dict(kind='decoded_marginal_posterior_df_csv', pre_post_delta=a_pre_post_delta, time_bin_size=time_bin_size, source_fn='determine_decoded_context_uncertainty_as_fn_of_position'))
             except Exception as e:
                 print(f'WARN: failed to export CSV to {export_csv_path}: {e}')
+        ## END if export_parent_path is not None...
+    ## END for a_pre_post_delta, a_decoded_marginal_posterior_df in pre_post_delta_a_decoded_marginal_posterior_df_dict.items()...
 
     ## OUTPUTS: pre_post_delta_result_pos_by_ctxt_joint_dict
     # pre_post_delta_result_pos_by_ctxt_joint_dict
@@ -14581,7 +14587,7 @@ def determine_decoded_context_uncertainty_as_fn_of_position(curr_active_pipeline
 
     ## OUTPUTS: a_decoded_marginal_posterior_df
 
-    if (csv_export_out_dir is not None) or show_pos_by_ctxt_joint_figure:
+    if (export_parent_path is not None) or show_pos_by_ctxt_joint_figure:
         import matplotlib.pyplot as plt
         from pyphoplacecellanalysis.Pho2D.matplotlib.visualize_heatmap import visualize_heatmap
         
@@ -14591,12 +14597,11 @@ def determine_decoded_context_uncertainty_as_fn_of_position(curr_active_pipeline
         _ordered_pre_post_deltas.extend(sorted(k for k in pre_post_delta_result_pos_by_ctxt_joint_dict.keys() if k not in _preferred_pre_post_order))
         if _ordered_pre_post_deltas:
             _png_save_path: Optional[Path] = None
-            if csv_export_out_dir is not None:
-                _sess = sanitize_filename_for_Windows(getattr(curr_active_pipeline, 'session_name', None) or 'unknown_session')
-                _date = datetime.now().strftime('%Y-%m-%d')
-                _tbin = str(time_bin_size).replace('.', 'p')
-                _delta_slug = '_'.join(sanitize_filename_for_Windows(str(k)) for k in _ordered_pre_post_deltas)
-                _png_save_path = csv_export_out_dir.joinpath(f'{_date}_{_sess}_pos_by_ctxt_joint_{_delta_slug}_tbin{_tbin}.png')
+            if export_parent_path is not None:
+                _png_data_identifier_str: str = f'(pos_by_ctxt_joint)_tbin-{float(time_bin_size)}'
+                _png_save_path, _png_filename, _png_basename = curr_active_pipeline.build_complete_session_identifier_filename_string(output_date_str=output_date_str, data_identifier_str=_png_data_identifier_str, parent_output_path=export_parent_path, out_extension='.png')
+                _png_save_path = Path(_png_save_path)
+            ## END if export_parent_path is not None...
             try:
                 _imgs = [np.asarray(pre_post_delta_result_pos_by_ctxt_joint_dict[k], dtype=float).T for k in _ordered_pre_post_deltas]
                 _stack = np.concatenate([im.ravel() for im in _imgs])
