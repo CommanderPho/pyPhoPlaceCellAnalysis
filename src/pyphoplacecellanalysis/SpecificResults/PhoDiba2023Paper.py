@@ -7340,9 +7340,29 @@ class Figure5:
             return measured_epoch_occupancy_seconds_dict_dict, measured_epoch_occupancy_fractional_dict_dict
 
         def _plot_occupancy_mosaic(fig, decoded_seconds_dict_dict, measured_seconds_dict_dict):
-            """2x3 laps/PBEs × pre/post/all mosaic on `fig`. Decoded on primary (left) y-axis; measured on twin right y-axis (independent autoscale)."""
-            # ax_dict = fig.subplot_mosaic([['laps_pre-delta', 'laps_post-delta'], ['PBEs_pre-delta', 'PBEs_post-delta']], sharex=True, sharey=True)
-            ax_dict = fig.subplot_mosaic([['laps_pre-delta', 'laps_post-delta', 'laps_all'], ['PBEs_pre-delta', 'PBEs_post-delta', 'PBEs_all']], sharex=True, sharey=True)
+            """2x3 laps/PBEs × pre/post/all mosaic on `fig`. Decoded on primary (left) y-axis; measured on twin right y-axis (independent autoscale).
+
+            Leftmost mosaic column holds whole-row epoch labels (``Laps`` / ``PBEs``).
+            """
+            # Narrow first column for row labels so they sit left of the "decoded (s)" ylabel without colliding.
+            ax_dict = fig.subplot_mosaic(
+                [['row_laps', 'laps_pre-delta', 'laps_post-delta', 'laps_all'],
+                 ['row_PBEs', 'PBEs_pre-delta', 'PBEs_post-delta', 'PBEs_all']],
+                width_ratios=[0.08, 1, 1, 1],
+            )
+            _data_ax_keys = ['laps_pre-delta', 'laps_post-delta', 'laps_all', 'PBEs_pre-delta', 'PBEs_post-delta', 'PBEs_all']
+            _share_ref_ax = ax_dict[_data_ax_keys[0]]
+            for _ax_key in _data_ax_keys[1:]:
+                ax_dict[_ax_key].sharex(_share_ref_ax)
+                ax_dict[_ax_key].sharey(_share_ref_ax)
+            ## END for _ax_key in _data_ax_keys[1:]...
+
+            for _row_ax_key, _row_label in (('row_laps', 'Laps'), ('row_PBEs', 'PBEs')):
+                _row_ax = ax_dict[_row_ax_key]
+                _row_ax.set_axis_off()
+                _row_ax.text(0.5, 0.5, _row_label, transform=_row_ax.transAxes, rotation=90, va='center', ha='center', fontsize=12, fontweight='bold')
+            ## END for _row_ax_key, _row_label in (('row_laps', 'Laps'), ('row_PBEs', 'PBEs'))...
+
             # _plot_kwargs = dict(plot_pos_bin_axes=False, should_max_normalize=False)
             _plot_kwargs = dict(plot_pos_bin_axes=plot_pos_bin_axes, should_max_normalize=should_max_normalize)
 
@@ -7359,14 +7379,19 @@ class Figure5:
                 if linewidth is not None:
                     patch.set_linewidth(linewidth)
 
+            ## Same display strings as Figure 2 publication xticklabels (`PaperFigureTwo._apply_publication_grouped_xticklabels`)
+            _pre_post_display_label = {'pre-delta': r'pre-$\Delta$', 'post-delta': r'post-$\Delta$', 'all': 'all'}
+
             legend_handles = None
             legend_labels = None
-            for lap_PBEs_plus_pre_post, ax in ax_dict.items():
+            for lap_PBEs_plus_pre_post in _data_ax_keys:
+                ax = ax_dict[lap_PBEs_plus_pre_post]
                 a_lap_pbe_epoch_name, pre_post = lap_PBEs_plus_pre_post.split('_')
+                pre_post_label: str = _pre_post_display_label.get(pre_post, pre_post)
                 decoded_active = decoded_seconds_dict_dict.get(pre_post, {}).get(a_lap_pbe_epoch_name)
                 measured_active = measured_seconds_dict_dict.get(pre_post, {}).get(a_lap_pbe_epoch_name)
                 if (decoded_active is None) and (measured_active is None):
-                    ax.set_title(f"{pre_post} | {a_lap_pbe_epoch_name}  (no data)")
+                    ax.set_title(f"{pre_post_label}  (no data)")
                     continue
 
                 # xbin_edges = np.linspace(loaded_track_limits['long_xlim'][0], loaded_track_limits['long_xlim'][1], n_pos + 1) ## I think always using 'long*' here is why both tracks are stretched to the long track length, but it would make since because they both use the same pos bins right? Oh, the bins aren't right from the bounds alone.
@@ -7415,13 +7440,13 @@ class Figure5:
                 else:
                     ax_measured.set_ylabel('')
                 ax_measured.set_title('')  # perform_plot_occupancy sets a per-call title on the twin
-                ax.set_title(f"{pre_post} | {a_lap_pbe_epoch_name}  (decoded={decoded_total_s:0.1f}s, measured={measured_total_s:0.1f}s)")
+                ax.set_title(f"{pre_post_label}  (decoded={decoded_total_s:0.1f}s, measured={measured_total_s:0.1f}s)")
                 if legend_handles is None:
                     decoded_handles, _ = ax.get_legend_handles_labels()
                     measured_handles, _ = ax_measured.get_legend_handles_labels()
                     legend_handles = list(measured_handles) + list(decoded_handles)
                     legend_labels = ['measured'] + _decoded_legend_labels  # perform_plot_occupancy hardcodes stairs label='1D Placefield Occupancy'
-            ## END for lap_PBEs_plus_pre_post, ax in ax_dict.items()....
+            ## END for lap_PBEs_plus_pre_post in _data_ax_keys...
 
             if legend_handles is not None:
                 fig.legend(legend_handles, legend_labels, loc='outside right', frameon=True)
@@ -13792,15 +13817,15 @@ def _plot_recreated_figure():
     fig.add_vline(x=0, line_width=1.5, line_dash="dash", line_color="black", row=2, col=1)
     fig.add_vline(x=0, line_width=1.5, line_dash="dash", line_color="black", row=1, col=1)
 
-    # Annotations for "Pre-delta" and "Post-delta"
+    # Annotations for "pre-Δ" and "post-Δ" (same symbols as Figure 2 publication xticklabels)
     fig.add_annotation(
         x=-500, y=1.02, xref="x", yref="y domain",
-        text="Pre-delta", showarrow=False,
+        text="pre-Δ", showarrow=False,
         font=dict(size=ANNOTATION_FONT_SIZE, family=FONT_FAMILY, color="black")
     )
     fig.add_annotation(
         x=500, y=1.02, xref="x", yref="y domain",
-        text="Post-delta", showarrow=False,
+        text="post-Δ", showarrow=False,
         font=dict(size=ANNOTATION_FONT_SIZE, family=FONT_FAMILY, color="black")
     )
 
