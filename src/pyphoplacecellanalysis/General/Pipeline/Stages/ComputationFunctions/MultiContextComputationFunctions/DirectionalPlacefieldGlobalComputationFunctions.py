@@ -8258,14 +8258,35 @@ def _helper_add_interpolated_position_columns_to_decoded_result_df(a_result: Dec
 
     ## OUTPUTS: measured_positions_df, decoded_positions_df
 
+    n_df: int = len(a_decoded_marginal_posterior_df)
+    if (len(measured_positions_df) != n_df) or (len(decoded_positions_df) != n_df):
+        ## Fallback when a_result timebins and posterior DF diverge (common with nan_filled / best-match context mismatches): interpolate onto DF t_bin_center.
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import TrainTestLapsSplitting
+        if 't_bin_center' not in a_decoded_marginal_posterior_df.columns:
+            raise ValueError(f'_helper_add_interpolated_position_columns_to_decoded_result_df: length mismatch (measured={len(measured_positions_df)}, decoded={len(decoded_positions_df)}, df={n_df}) and no t_bin_center for fallback alignment')
+        print(f'WARN: _helper_add_interpolated_position_columns_to_decoded_result_df length mismatch (measured={len(measured_positions_df)}, decoded={len(decoded_positions_df)}, df={n_df}); interpolating measured onto t_bin_center')
+        sample_times = a_decoded_marginal_posterior_df['t_bin_center'].to_numpy(dtype=float)
+        measured_positions_df = TrainTestLapsSplitting.interpolate_positions(deepcopy(global_measured_position_df), sample_times)
+        measured_positions_df = measured_positions_df.position.adding_binned_position_columns(xbin_edges=xbin_edges, ybin_edges=ybin_edges, active_computation_config=active_computation_config)
+        measured_positions_df = measured_positions_df.rename(columns={'x': 'x_meas', 'y': 'y_meas', 'binned_x': 'binned_x_meas', 'binned_y': 'binned_y_meas'}, inplace=False)
+        measured_positions_df = measured_positions_df.drop(columns=[c for c in ['t'] if c in measured_positions_df.columns], inplace=False)
+        if 'most_likely_positions_1D' in a_decoded_marginal_posterior_df.columns:
+            decoded_positions_df = pd.DataFrame({'x_decoded_most_likely': a_decoded_marginal_posterior_df['most_likely_positions_1D'].to_numpy(dtype=float)})
+            decoded_positions_df = decoded_positions_df.position.adding_binned_position_columns(xbin_edges=xbin_edges, ybin_edges=ybin_edges, active_computation_config=active_computation_config)
+            decoded_positions_df = decoded_positions_df.rename(columns={'binned_x': 'binned_x_decoded_most_likely'}, inplace=False)
+            decoded_positions_df = decoded_positions_df.drop(columns=[c for c in ['x', 'y', 'binned_y', 't'] if c in decoded_positions_df.columns], inplace=False)
+        else:
+            decoded_positions_df = pd.DataFrame(index=np.arange(n_df))
+
     ## Add directly to `a_decoded_marginal_posterior_df` (concatenating columns to existing rows)
     a_decoded_marginal_posterior_df = PandasHelpers.adding_additional_df_columns(original_df=a_decoded_marginal_posterior_df,
                                                                                 additional_cols_df=measured_positions_df,
                                                                                 )
 
-    a_decoded_marginal_posterior_df = PandasHelpers.adding_additional_df_columns(original_df=a_decoded_marginal_posterior_df,
-                                                                                additional_cols_df=decoded_positions_df,
-                                                                                )
+    if len(decoded_positions_df.columns) > 0:
+        a_decoded_marginal_posterior_df = PandasHelpers.adding_additional_df_columns(original_df=a_decoded_marginal_posterior_df,
+                                                                                    additional_cols_df=decoded_positions_df,
+                                                                                    )
     return a_decoded_marginal_posterior_df
 
 
