@@ -7,13 +7,13 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 {% if should_use_largemem | default(false) %}
-#SBATCH --mem=92000m
+#SBATCH --mem={{ slurm_mem | default('92000m') }}
 #SBATCH --partition=largemem
 {% else %}
-#SBATCH --mem=82000m
+#SBATCH --mem={{ slurm_mem | default('82000m') }}
 #SBATCH --partition=standard
 {% endif %}
-#SBATCH --time=12:00:00
+#SBATCH --time={{ slurm_time | default('12:00:00') }}
 #SBATCH --account=kdiba99
 
 export PYTHON_KEYRING_BACKEND=keyring.backends.null.Keyring
