@@ -3147,11 +3147,22 @@ def generalized_decode_epochs_dict_and_export_results_completion_function(self, 
 
 
 @function_attributes(short_name=None, tags=['decoding', 'context', 'position', 'batch', 'export', 'fig5', 'occupancy', 'shuffles-indep', 'pure'], input_requires=['EpochComputations'], output_provides=['export_decoded_variables_evaluation_completion_function'], uses=['determine_decoded_context_uncertainty_as_fn_of_position', 'Figure5.export_session_occupancy_csv'], used_by=[], creation_date='2026-04-08 14:30', related_items=['generalized_decode_epochs_dict_and_export_results_completion_function'])
-def export_decoded_variables_evaluation_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, time_bin_size: float = 0.025, show_pos_by_ctxt_joint_figure: bool = True, export_filename_extra_suffix_parts: Optional[List[str]]=None) -> dict:
-    """Batch hook for ``determine_decoded_context_uncertainty_as_fn_of_position`` (CSV/PNG under ``collected_outputs/output/``) plus Figure 5 occupancy CSV under ``collected_outputs/``.
+def export_decoded_variables_evaluation_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, time_bin_size: float = 0.025,
+         export_sess_meas_decoded_occupancy: bool = True, export_decoded_ctxt_by_pos_uncertainty: bool = False,
+        show_pos_by_ctxt_joint_figure: bool = False, export_filename_extra_suffix_parts: Optional[List[str]]=None) -> dict:
+    """Batch hook for ``determine_decoded_context_uncertainty_as_fn_of_position`` plus ``Figure5.export_session_occupancy_csv``.
 
     Run after ``generalized_decode_epochs_dict_and_export_results_completion_function`` so ``EpochComputations`` is populated.
     Uncertainty and Fig5 exports use separate try/except blocks so one failure does not erase the other.
+
+    Writes under ``self.collected_outputs_path`` (standard ``build_complete_session_identifier_filename_string`` names; ``output_date_str=self.BATCH_DATE_TO_USE``):
+
+    - Uncertainty CSVs (one per pre/post-delta partition):
+      ``{date}-{session}__{custom_replay}-(meas_decoded_occupancy_{pre_delta|post_delta})_tbin-{time_bin_size}.csv``
+    - Uncertainty heatmap PNG (when export succeeds):
+      ``{date}-{session}__{custom_replay}-(pos_by_ctxt_joint)_tbin-{time_bin_size}.png``
+    - Figure 5 occupancy long CSV:
+      ``{date}-{session}__{custom_replay}-(fig5_occupancy)_tbin-{time_bin_size}.csv``
 
     See module docstring for shared tags ``shuffles-indep`` and ``pure``.
     """
@@ -3163,35 +3174,48 @@ def export_decoded_variables_evaluation_completion_function(self, global_data_ro
     if across_session_results_extended_dict is None:
         across_session_results_extended_dict = {}
     print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
-    print(f'export_decoded_variables_evaluation_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...)')
+    print(f'export_decoded_variables_evaluation_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, export_decoded_ctxt_by_pos_uncertainty: {export_decoded_ctxt_by_pos_uncertainty}, export_sess_meas_decoded_occupancy: {export_sess_meas_decoded_occupancy}, ...)')
     assert self.collected_outputs_path.exists()
     apply_export_filename_extra_suffix_parts_to_pipeline(curr_active_pipeline, export_filename_extra_suffix_parts=export_filename_extra_suffix_parts) ## disambiguates variant export filenames (e.g. appending '-variant_trackBodyPeakOnly')
 
     callback_outputs = {'partition_keys': None, 'error': None, 'fig5_occupancy_csv_path': None, 'fig5_occupancy_error': None}
 
-    try:
-        _out = determine_decoded_context_uncertainty_as_fn_of_position(curr_active_pipeline, time_bin_size=time_bin_size, enable_export_path=self.collected_outputs_path.resolve(), show_pos_by_ctxt_joint_figure=show_pos_by_ctxt_joint_figure, output_date_str=self.BATCH_DATE_TO_USE)
-        callback_outputs['partition_keys'] = list(_out.keys()) if _out is not None else []
-        callback_outputs['error'] = None
-    except Exception as e:
-        print(f'WARN: export_decoded_variables_evaluation_completion_function (uncertainty) failed for {curr_session_context}: {e}')
-        callback_outputs['partition_keys'] = None
-        callback_outputs['error'] = repr(e)
-        if self.fail_on_exception:
-            across_session_results_extended_dict[_callback_key] = callback_outputs
-            raise
+    if export_decoded_ctxt_by_pos_uncertainty:
+        try:
+            _out = determine_decoded_context_uncertainty_as_fn_of_position(curr_active_pipeline, time_bin_size=time_bin_size, enable_export_path=self.collected_outputs_path.resolve(), show_pos_by_ctxt_joint_figure=show_pos_by_ctxt_joint_figure, output_date_str=self.BATCH_DATE_TO_USE)
+            callback_outputs['partition_keys'] = list(_out.keys()) if _out is not None else []
+            callback_outputs['error'] = None
+        except Exception as e:
+            print(f'WARN: export_decoded_variables_evaluation_completion_function (uncertainty) failed for {curr_session_context}: {e}')
+            callback_outputs['partition_keys'] = None
+            callback_outputs['error'] = repr(e)
+            if self.fail_on_exception:
+                across_session_results_extended_dict[_callback_key] = callback_outputs
+                raise
 
-    try:
-        fig5_csv_path = Figure5.export_session_occupancy_csv(curr_active_pipeline=curr_active_pipeline, parent_output_path=self.collected_outputs_path.resolve(), time_bin_size=time_bin_size, output_date_str=self.BATCH_DATE_TO_USE)
-        callback_outputs['fig5_occupancy_csv_path'] = str(fig5_csv_path)
-        callback_outputs['fig5_occupancy_error'] = None
-    except Exception as e:
-        print(f'WARN: export_decoded_variables_evaluation_completion_function (fig5_occupancy) failed for {curr_session_context}: {e}')
+    else:
+        print(f'\tINFO: export_decoded_variables_evaluation_completion_function (pos_by_ctxt_joint) was skipped for {curr_session_context} because `export_decoded_ctxt_by_pos_uncertainty == False`')
+        callback_outputs['partition_keys'] = None
+        callback_outputs['error'] = None
+
+
+    if export_sess_meas_decoded_occupancy:
+        try:
+            fig5_csv_path = Figure5.export_session_occupancy_csv(curr_active_pipeline=curr_active_pipeline, parent_output_path=self.collected_outputs_path.resolve(), time_bin_size=time_bin_size, output_date_str=self.BATCH_DATE_TO_USE)
+            callback_outputs['fig5_occupancy_csv_path'] = str(fig5_csv_path)
+            callback_outputs['fig5_occupancy_error'] = None
+        except Exception as e:
+            print(f'\tWARN: export_decoded_variables_evaluation_completion_function (fig5_occupancy) failed for {curr_session_context}: {e}')
+            callback_outputs['fig5_occupancy_csv_path'] = None
+            callback_outputs['fig5_occupancy_error'] = repr(e)
+            if self.fail_on_exception:
+                across_session_results_extended_dict[_callback_key] = callback_outputs
+                raise
+    else:
+        print(f'\tINFO: export_decoded_variables_evaluation_completion_function (fig5_occupancy) was skipped for {curr_session_context} because `export_sess_meas_decoded_occupancy == False`')
         callback_outputs['fig5_occupancy_csv_path'] = None
-        callback_outputs['fig5_occupancy_error'] = repr(e)
-        if self.fail_on_exception:
-            across_session_results_extended_dict[_callback_key] = callback_outputs
-            raise
+        callback_outputs['fig5_occupancy_error'] = None
+
 
     across_session_results_extended_dict[_callback_key] = callback_outputs
     print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
