@@ -10495,7 +10495,213 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
             
         }
         return graphics_output_dict
-    
+
+
+
+    @function_attributes(short_name='laps_correct_decoder_side_by_side_posteriors', tags=['laps', 'posterior', 'four-decoder', 'groundtruth', 'export', 'Agg', 'headless', 'NON-VISUAL', 'NO-DISPLAY', 'batch'],
+                          conforms_to=['output_registering', 'figure_saving'], input_requires=['DirectionalLaps', 'DirectionalDecodersEpochsEvaluations'], output_provides=[],
+                          uses=['_subfn_export_laps_four_decoder_gt_boxed_combined_figure', 'plot_1D_most_likely_position_comparsions', 'add_laps_groundtruth_information_to_dataframe', 'vertical_image_stack'],
+                          used_by=['figures_export_laps_correct_decoder_side_by_side_completion_function'], creation_date='2026-11-12 00:00', related_items=[], is_global=True)
+    def _display_laps_correct_decoder_side_by_side_posteriors(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True, parent_output_folder: Optional[Path] = None,
+                                                             max_subplots_per_page: int = 8, variable_name: str = 'lin_pos', posterior_masking_value: float = 0.0075, dpi: int = 150, combined_image_basename: Optional[str] = None, **kwargs):
+        """Headless Agg export of all laps as 4-decoder side-by-side posteriors with a green axis box on the session-lap ground-truth decoder; pages are vertical-stacked into one PNG.
+
+        Usage:
+            curr_active_pipeline.reload_default_display_functions()
+            _out = curr_active_pipeline.display('_display_laps_correct_decoder_side_by_side_posteriors', defer_render=True, save_figure=True)
+        """
+        from pathlib import Path
+        from PIL import Image
+        import matplotlib
+        matplotlib.use('Agg', force=False)
+        import matplotlib.pyplot as plt
+        plt.ioff()
+
+        from matplotlib.patches import FancyBboxPatch
+        from neuropy.utils.matplotlib_helpers import get_heatmap_cmap, set_ax_emphasis_color
+        from pyphocorehelpers.plotting.media_output_helpers import vertical_image_stack
+        from pyphoplacecellanalysis.General.Mixins.ExportHelpers import try_discover_default_collected_outputs_dir
+        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_1D_most_likely_position_comparsions
+
+        # @function_attributes(short_name=None, tags=['laps', 'groundtruth', 'decoder', 'headless', 'Agg'], input_requires=[], output_provides=[], uses=['add_laps_groundtruth_information_to_dataframe', 'TrackTemplates.get_decoder_names'], used_by=['_subfn_plot_laps_four_decoder_posterior_page', '_subfn_export_laps_four_decoder_gt_boxed_combined_figure'], creation_date='2026-11-12 00:00', related_items=[])
+        def _subfn_build_laps_groundtruth_decoder_names_df(curr_active_pipeline, decoder_laps_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult], decoder_names: Optional[List[str]] = None) -> pd.DataFrame:
+            """Attach session-lap ground truth (`maze_id`, `is_LR_dir`, `true_decoder_index`, `truth_decoder_name`) to the decoded-laps epochs df.
+
+            Uses `add_laps_groundtruth_information_to_dataframe` (from `sess.laps`), not decode-result `filter_epochs.lap_dir`.
+            """
+            if decoder_names is None:
+                decoder_names = list(TrackTemplates.get_decoder_names())
+            ref_name: str = decoder_names[0]
+            laps_epochs_df = ensure_dataframe(deepcopy(decoder_laps_filter_epochs_decoder_result_dict[ref_name].active_filter_epochs))
+            laps_epochs_df = add_laps_groundtruth_information_to_dataframe(curr_active_pipeline=curr_active_pipeline, result_laps_epochs_df=laps_epochs_df)
+            laps_epochs_df['truth_decoder_name'] = np.asarray(decoder_names)[laps_epochs_df['true_decoder_index'].to_numpy().astype(int)]
+            return laps_epochs_df
+
+        def _subfn_draw_green_groundtruth_axis_box(ax, emphasis_color: str = 'limegreen', linewidth: float = 3.0):
+            """Draw a green axis box around `ax` (spines + FancyBboxPatch in axes coordinates)."""
+            set_ax_emphasis_color(ax, emphasis_color=emphasis_color, defer_draw=True)
+            for spine in ax.spines.values():
+                spine.set_visible(True)
+                spine.set_linewidth(linewidth)
+                spine.set_color(emphasis_color)
+            ## END for spine in ax.spines.values()...
+            rect = FancyBboxPatch((0.0, 0.0), 1.0, 1.0, transform=ax.transAxes, boxstyle='square,pad=0', fill=False, edgecolor=emphasis_color, linewidth=linewidth, clip_on=False, zorder=1000)
+            ax.add_patch(rect)
+            return rect
+
+        def _subfn_dim_non_groundtruth_axis(ax, dim_color: str = 'dimgrey', linewidth: float = 0.8):
+            set_ax_emphasis_color(ax, emphasis_color=dim_color, defer_draw=True)
+            for spine in ax.spines.values():
+                spine.set_linewidth(linewidth)
+                spine.set_color(dim_color)
+            ## END for spine in ax.spines.values()...
+
+        # @function_attributes(short_name=None, tags=['laps', 'posterior', 'four-decoder', 'matplotlib', 'Agg', 'headless'], input_requires=[], output_provides=[], uses=['plot_1D_most_likely_position_comparsions', '_subfn_draw_green_groundtruth_axis_box'], used_by=['_subfn_export_laps_four_decoder_gt_boxed_combined_figure'], creation_date='2026-11-12 00:00', related_items=[])
+        def _subfn_plot_laps_four_decoder_posterior_page(decoder_laps_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult], decoder_xbin_dict: Dict[str, NDArray], global_pos_df: pd.DataFrame,
+                                                         page_lap_indicies: NDArray, truth_decoder_names_for_page: NDArray, decoder_names: Optional[List[str]] = None, variable_name: str = 'lin_pos',
+                                                         posterior_masking_value: float = 0.0075, figsize_per_row: float = 1.6, figsize_width: float = 16.0, dpi: int = 150, **kwargs) -> Tuple[plt.Figure, NDArray]:
+            """Plot one page: rows = laps on this page, columns = four directional decoders; green-box the ground-truth decoder per row.
+
+            `page_lap_indicies`: positional indices into each decoder's DecodedFilterEpochsResult lists (shared lap order).
+            `truth_decoder_names_for_page`: length == len(page_lap_indicies), values in decoder_names.
+            """
+            if decoder_names is None:
+                decoder_names = list(TrackTemplates.get_decoder_names())
+            n_rows: int = int(len(page_lap_indicies))
+            n_cols: int = int(len(decoder_names))
+            assert n_rows == len(truth_decoder_names_for_page)
+
+            cmap = kwargs.pop('cmap', get_heatmap_cmap(cmap='Oranges', bad_color='white', under_color='white', over_color='red'))
+            posterior_heatmap_imshow_kwargs = kwargs.pop('posterior_heatmap_imshow_kwargs', dict(cmap=cmap, vmin=posterior_masking_value, vmax=1.0))
+            skip_plotting_most_likely_positions: bool = kwargs.pop('skip_plotting_most_likely_positions', True)
+            skip_plotting_measured_positions: bool = kwargs.pop('skip_plotting_measured_positions', False)
+
+            fig, axs = plt.subplots(nrows=n_rows, ncols=n_cols, figsize=(figsize_width, max(figsize_per_row * float(n_rows), 2.0)), dpi=dpi, squeeze=False, sharex=False, sharey=False, constrained_layout=True)
+            for row_i, lap_idx in enumerate(page_lap_indicies):
+                truth_name: str = str(truth_decoder_names_for_page[row_i])
+                for col_i, a_decoder_name in enumerate(decoder_names):
+                    ax = axs[row_i, col_i]
+                    a_result: DecodedFilterEpochsResult = decoder_laps_filter_epochs_decoder_result_dict[a_decoder_name]
+                    curr_time_bins = a_result.time_bin_containers[int(lap_idx)].centers
+                    curr_posterior = a_result.marginal_x_list[int(lap_idx)].p_x_given_n
+                    curr_most_likely = None if skip_plotting_most_likely_positions else a_result.marginal_x_list[int(lap_idx)].most_likely_positions_1D
+                    plot_1D_most_likely_position_comparsions(global_pos_df, time_window_centers=curr_time_bins, xbin=decoder_xbin_dict[a_decoder_name], ax=ax, posterior=curr_posterior,
+                                                            active_most_likely_positions_1D=curr_most_likely, variable_name=variable_name, enable_flat_line_drawing=False,
+                                                            skip_plotting_measured_positions=skip_plotting_measured_positions, skip_plotting_most_likely_positions=skip_plotting_most_likely_positions,
+                                                            posterior_heatmap_imshow_kwargs=posterior_heatmap_imshow_kwargs)
+                    epoch_slice = ensure_dataframe(a_result.active_filter_epochs).iloc[int(lap_idx)][['start', 'stop']].to_numpy()
+                    ax.set_xlim(*epoch_slice)
+                    ax.set_title(f'{a_decoder_name}' if row_i == 0 else '')
+                    if a_decoder_name == truth_name:
+                        _subfn_draw_green_groundtruth_axis_box(ax)
+                    else:
+                        _subfn_dim_non_groundtruth_axis(ax)
+                ## END for col_i, a_decoder_name in enumerate(decoder_names)...
+            ## END for row_i, lap_idx in enumerate(page_lap_indicies)...
+            return fig, axs
+
+        # @function_attributes(short_name=None, tags=['laps', 'export', 'combined', 'four-decoder', 'groundtruth', 'Agg', 'headless', 'batch'], input_requires=[], output_provides=[],
+        #                       uses=['_subfn_build_laps_groundtruth_decoder_names_df', '_subfn_plot_laps_four_decoder_posterior_page', 'vertical_image_stack'], used_by=['_display_laps_correct_decoder_side_by_side_posteriors'], creation_date='2026-11-12 00:00', related_items=[])
+        def _subfn_export_laps_four_decoder_gt_boxed_combined_figure(curr_active_pipeline, decoder_laps_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult], track_templates,
+                                                                     output_dir, combined_image_basename: str = 'laps_4decoder_gt_boxed', max_subplots_per_page: int = 8, variable_name: str = 'lin_pos',
+                                                                     posterior_masking_value: float = 0.0075, dpi: int = 150, write_png: bool = True, debug_print: bool = False, **kwargs) -> Dict[str, Any]:
+            """Headless Agg export: paginate all laps as 4-decoder side-by-side pages with GT green boxes, then vertical-stack PNGs into one combined figure.
+
+            Returns dict with keys: `laps_epochs_df`, `page_png_paths`, `combined_img_out_path`, `n_pages`, `n_laps`.
+            """
+            output_dir = Path(output_dir).resolve()
+            output_dir.mkdir(parents=True, exist_ok=True)
+            pages_dir = output_dir.joinpath('pages')
+            pages_dir.mkdir(parents=True, exist_ok=True)
+
+            decoder_names = list(TrackTemplates.get_decoder_names())
+            laps_epochs_df: pd.DataFrame = _subfn_build_laps_groundtruth_decoder_names_df(curr_active_pipeline, decoder_laps_filter_epochs_decoder_result_dict, decoder_names=decoder_names)
+            n_laps: int = int(len(laps_epochs_df))
+            assert n_laps > 0, 'No laps found for 4-decoder GT-boxed export.'
+
+            long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+            global_pos_df = deepcopy(curr_active_pipeline.filtered_sessions[global_epoch_name].position.to_dataframe())
+            decoder_xbin_dict: Dict[str, NDArray] = {a_name: deepcopy(a_decoder.xbin) for a_name, a_decoder in track_templates.get_decoders_dict().items()}
+
+            all_lap_indicies = np.arange(n_laps, dtype=int)
+            truth_names_all = laps_epochs_df['truth_decoder_name'].to_numpy()
+            page_chunks = [all_lap_indicies[i:i + max_subplots_per_page] for i in range(0, n_laps, max_subplots_per_page)]
+            n_pages: int = int(len(page_chunks))
+            if debug_print:
+                print(f'_subfn_export_laps_four_decoder_gt_boxed_combined_figure: n_laps={n_laps}, n_pages={n_pages}, max_subplots_per_page={max_subplots_per_page}, output_dir={output_dir}')
+
+            page_png_paths = []
+            for page_idx, page_lap_indicies in enumerate(page_chunks):
+                truth_for_page = truth_names_all[page_lap_indicies]
+                fig, axs = _subfn_plot_laps_four_decoder_posterior_page(decoder_laps_filter_epochs_decoder_result_dict=decoder_laps_filter_epochs_decoder_result_dict, decoder_xbin_dict=decoder_xbin_dict, global_pos_df=global_pos_df,
+                                                                       page_lap_indicies=page_lap_indicies, truth_decoder_names_for_page=truth_for_page, decoder_names=decoder_names, variable_name=variable_name,
+                                                                       posterior_masking_value=posterior_masking_value, dpi=dpi, **kwargs)
+                page_png_path = pages_dir.joinpath(f'{combined_image_basename}_page{page_idx:03d}_of{n_pages:03d}.png')
+                if write_png:
+                    fig.savefig(page_png_path, dpi=dpi, bbox_inches='tight', facecolor='white')
+                    page_png_paths.append(page_png_path)
+                plt.close(fig)
+                if debug_print:
+                    print(f'\tsaved page {page_idx + 1}/{n_pages}: {page_png_path}')
+            ## END for page_idx, page_lap_indicies in enumerate(page_chunks)...
+
+            combined_img_out_path = None
+            if write_png and (len(page_png_paths) > 0):
+                page_imgs = [Image.open(p) for p in page_png_paths]
+                combined_img = vertical_image_stack(page_imgs, padding=4)
+                combined_img_out_path = output_dir.joinpath(f'{combined_image_basename}.png')
+                combined_img.save(combined_img_out_path)
+                if debug_print:
+                    print(f'\tcombined figure: {combined_img_out_path}')
+            ## END if write_png and (len(page_png_paths) > 0)...
+
+            return dict(laps_epochs_df=laps_epochs_df, page_png_paths=page_png_paths, combined_img_out_path=combined_img_out_path, n_pages=n_pages, n_laps=n_laps, output_dir=output_dir)
+
+        defer_render: bool = kwargs.pop('defer_render', True)
+        debug_print: bool = kwargs.pop('debug_print', False)
+
+        rank_order_results = global_computation_results.computed_data.get('RankOrder', None)
+        if rank_order_results is not None:
+            minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
+            included_qclu_values: List[int] = rank_order_results.included_qclu_values
+        else:
+            minimum_inclusion_fr_Hz: float = global_computation_results.computation_config.rank_order_shuffle_analysis.minimum_inclusion_fr_Hz
+            included_qclu_values: List[int] = global_computation_results.computation_config.rank_order_shuffle_analysis.included_qclu_values
+
+        directional_laps_results: DirectionalLapsResult = global_computation_results.computed_data['DirectionalLaps']
+        track_templates: TrackTemplates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values)
+
+        directional_decoders_epochs_decode_result: DecoderDecodedEpochsResult = global_computation_results.computed_data['DirectionalDecodersEpochsEvaluations']
+        directional_decoders_epochs_decode_result.add_all_extra_epoch_columns(owning_pipeline_reference, track_templates=track_templates, required_min_percentage_of_active_cells=0.33333333, debug_print=False)
+        decoder_laps_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult] = directional_decoders_epochs_decode_result.decoder_laps_filter_epochs_decoder_result_dict
+        assert decoder_laps_filter_epochs_decoder_result_dict is not None, 'DirectionalDecodersEpochsEvaluations.decoder_laps_filter_epochs_decoder_result_dict is required'
+
+        complete_session_context, (session_context, additional_session_context) = owning_pipeline_reference.get_complete_session_context()
+        active_context = kwargs.pop('active_context', None)
+        if active_context is None:
+            active_context = deepcopy(complete_session_context)
+        display_context = active_context.adding_context('display_fn', display_fn_name='laps_correct_decoder_side_by_side_posteriors')
+
+        if parent_output_folder is None:
+            parent_output_folder = try_discover_default_collected_outputs_dir()
+            if parent_output_folder is None:
+                parent_output_folder = Path('output').resolve()
+        parent_output_folder = Path(parent_output_folder).resolve()
+        parent_output_folder.mkdir(parents=True, exist_ok=True)
+        session_key: str = session_context.get_description(separator='_')
+        output_dir = parent_output_folder.joinpath('laps_correct_decoder_side_by_side', session_key)
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        if combined_image_basename is None:
+            combined_image_basename = f'{session_key}_laps_4decoder_gt_boxed'
+
+        export_out = _subfn_export_laps_four_decoder_gt_boxed_combined_figure(curr_active_pipeline=owning_pipeline_reference, decoder_laps_filter_epochs_decoder_result_dict=decoder_laps_filter_epochs_decoder_result_dict, track_templates=track_templates,
+                                                                              output_dir=output_dir, combined_image_basename=combined_image_basename, max_subplots_per_page=max_subplots_per_page, variable_name=variable_name,
+                                                                              posterior_masking_value=posterior_masking_value, dpi=dpi, write_png=bool(save_figure), debug_print=debug_print, **kwargs)
+
+        graphics_output_dict = dict(display_context=display_context, output_dir=output_dir, combined_img_out_path=export_out.get('combined_img_out_path'), page_png_paths=export_out.get('page_png_paths'), n_pages=export_out.get('n_pages'), n_laps=export_out.get('n_laps'), laps_epochs_df=export_out.get('laps_epochs_df'), defer_render=defer_render)
+        return {display_context: graphics_output_dict}
+
 
 
 # ==================================================================================================================== #

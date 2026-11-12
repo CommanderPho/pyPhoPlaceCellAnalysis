@@ -4190,4 +4190,3 @@ def _temp_debug_draw_update_predicted_position_difference(predicted_positions, m
         active_arrow.set_positions(tuple(predicted_point), tuple(measured_point))
     plt.draw()
     # fig.canvas.draw_idle() # TODO: is this somehow better?
-
