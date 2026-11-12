@@ -14441,6 +14441,29 @@ def determine_decoded_context_uncertainty_as_fn_of_position(curr_active_pipeline
 
     best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df = a_new_fully_generic_result.get_results_best_matching_context(context_query=a_target_context, debug_print=False)
     ## OUTPUTS: a_result, a_decoder, a_decoded_marginal_posterior_df
+    ## Local-only: if independently matched a_result length disagrees with posterior DF, prefer exact/best keys under best_matching_context.
+    if (best_matching_context is not None) and (a_result is not None) and (a_decoded_marginal_posterior_df is not None):
+        try:
+            n_t_probe, _flat_probe, _p_probe = a_result.flatten()
+            lengths_disagree = (int(n_t_probe) != len(a_decoded_marginal_posterior_df))
+        except Exception:
+            lengths_disagree = True
+        if lengths_disagree:
+            result_dict = a_new_fully_generic_result.filter_epochs_specific_decoded_result
+            decoder_dict = a_new_fully_generic_result.decoders
+            if best_matching_context in result_dict:
+                a_result = result_dict[best_matching_context]
+            else:
+                _ctx, _res = GenericDecoderDictDecodedEpochsDictResult._subfn_get_value_with_context_matching(result_dict, best_matching_context, "a_result", return_multiple_matches=False, debug_print=False)
+                if _res is not None:
+                    a_result = _res
+            if best_matching_context in decoder_dict:
+                a_decoder = decoder_dict[best_matching_context]
+            else:
+                _ctx, _dec = GenericDecoderDictDecodedEpochsDictResult._subfn_get_value_with_context_matching(decoder_dict, best_matching_context, "a_decoder", return_multiple_matches=False, debug_print=False)
+                if _dec is not None:
+                    a_decoder = _dec
+            print(f'WARN: determine_decoded_context_uncertainty_as_fn_of_position: aligned a_result/a_decoder to best_matching_context={best_matching_context}')
     ## INPUTS: curr_active_pipeline, a_result, a_decoder, a_decoded_marginal_posterior_df
     global_measured_position_df: pd.DataFrame = deepcopy(curr_active_pipeline.sess.position.to_dataframe())
     a_decoded_marginal_posterior_df = _helper_add_interpolated_position_columns_to_decoded_result_df(a_result=a_result, a_decoder=a_decoder, a_decoded_marginal_posterior_df=a_decoded_marginal_posterior_df, global_measured_position_df=global_measured_position_df)

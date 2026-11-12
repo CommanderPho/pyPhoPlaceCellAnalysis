@@ -7585,16 +7585,37 @@ class Figure5:
                 print(f'WARN: Figure5.compute_session_occupancy_long_df_from_pipeline: no match for {epoch_query_name} @ tbin={time_bin_size}: {e}')
                 continue
 
-            ## If flatten length still disagrees with marginal DF, re-fetch result/decoder from the posterior key before helper/occupancy.
-            try:
-                n_timebins_probe, _flat_probe, _p_probe = a_result.flatten()
-                if (best_matching_context is not None) and (int(n_timebins_probe) != len(a_decoded_marginal_posterior_df)):
-                    print(f'WARN: Figure5.compute_session_occupancy_long_df_from_pipeline: flatten n_t={n_timebins_probe} != len(df)={len(a_decoded_marginal_posterior_df)} for {epoch_query_name}; re-fetching result/decoder from best_matching_context={best_matching_context}')
-                    _refetch_ctx, a_result, a_decoder, _refetch_df = a_new_fully_generic_result.get_results_best_matching_context(context_query=best_matching_context, debug_print=debug_print)
-                    if _refetch_df is not None:
-                        a_decoded_marginal_posterior_df = _refetch_df
-            except Exception as e:
-                print(f'WARN: Figure5.compute_session_occupancy_long_df_from_pipeline: length probe/re-fetch failed for {epoch_query_name}: {e}')
+            ## Local-only alignment: independently matched a_result/a_decoder can disagree with the posterior DF row count.
+            ## Prefer exact keys under best_matching_context (usually the longest / posterior key); do not change shared get_results_matching_contexts.
+            def _subfn_align_result_decoder_to_best_context(align_ctx, a_result, a_decoder, a_decoded_marginal_posterior_df):
+                if align_ctx is None or a_decoded_marginal_posterior_df is None:
+                    return a_result, a_decoder
+                try:
+                    n_t_probe, _flat_probe, _p_probe = a_result.flatten()
+                    lengths_agree = (int(n_t_probe) == len(a_decoded_marginal_posterior_df))
+                except Exception:
+                    lengths_agree = False
+                if lengths_agree:
+                    return a_result, a_decoder
+                result_dict = a_new_fully_generic_result.filter_epochs_specific_decoded_result
+                decoder_dict = a_new_fully_generic_result.decoders
+                if align_ctx in result_dict:
+                    a_result = result_dict[align_ctx]
+                else:
+                    _ctx, _res = GenericDecoderDictDecodedEpochsDictResult._subfn_get_value_with_context_matching(result_dict, align_ctx, "a_result", return_multiple_matches=False, debug_print=False)
+                    if _res is not None:
+                        a_result = _res
+                if align_ctx in decoder_dict:
+                    a_decoder = decoder_dict[align_ctx]
+                else:
+                    _ctx, _dec = GenericDecoderDictDecodedEpochsDictResult._subfn_get_value_with_context_matching(decoder_dict, align_ctx, "a_decoder", return_multiple_matches=False, debug_print=False)
+                    if _dec is not None:
+                        a_decoder = _dec
+                print(f'WARN: Figure5.compute_session_occupancy_long_df_from_pipeline: aligned a_result/a_decoder to best_matching_context={align_ctx} for {epoch_query_name}')
+                return a_result, a_decoder
+            ## END def _subfn_align_result_decoder_to_best_context...
+
+            a_result, a_decoder = _subfn_align_result_decoder_to_best_context(best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df)
 
             a_decoded_marginal_posterior_df = _helper_add_interpolated_position_columns_to_decoded_result_df(a_result=a_result, a_decoder=a_decoder, a_decoded_marginal_posterior_df=a_decoded_marginal_posterior_df, global_measured_position_df=global_measured_position_df)
             if 'delta_aligned_start_t' not in a_decoded_marginal_posterior_df.columns:

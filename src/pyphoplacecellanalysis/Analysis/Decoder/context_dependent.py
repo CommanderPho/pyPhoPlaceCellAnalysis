@@ -1661,22 +1661,19 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
             result_context, a_result = self._subfn_get_value_with_context_matching(self.filter_epochs_specific_decoded_result, context_query, "a_result", return_multiple_matches=return_multiple_matches, debug_print=debug_print)
             decoder_context, a_decoder = self._subfn_get_value_with_context_matching(self.decoders, context_query, "a_decoder", return_multiple_matches=return_multiple_matches, debug_print=debug_print)
             posterior_context, a_decoded_marginal_posterior_df = self._subfn_get_value_with_context_matching(self.filter_epochs_decoded_track_marginal_posterior_df_dict, context_query, "a_decoded_marginal_posterior_df", return_multiple_matches=return_multiple_matches, debug_print=debug_print)
-
-            initial_contexts = [c for c in [result_context, decoder_context, posterior_context] if c is not None]
-            ## Posterior DF keys include data_grain / fill-type; prefer them so a_result/a_decoder match DF row counts.
-            if posterior_context is not None:
-                best_matching_context = posterior_context
-                result_context, a_result = self._subfn_get_value_with_context_matching(self.filter_epochs_specific_decoded_result, posterior_context, "a_result", return_multiple_matches=False, debug_print=debug_print)
-                decoder_context, a_decoder = self._subfn_get_value_with_context_matching(self.decoders, posterior_context, "a_decoder", return_multiple_matches=False, debug_print=debug_print)
-            elif initial_contexts:
-                context_lenghts = np.array([len(v.to_dict()) for v in initial_contexts])
+            
+            # Determine the best matching context
+            contexts = [c for c in [result_context, decoder_context, posterior_context] if c is not None]
+            if contexts:
+                context_lenghts = np.array([len(v.to_dict()) for v in contexts])
+                max_context_length = np.max(context_lenghts)
                 max_context_length_idx = np.argmax(context_lenghts)
-                best_matching_context = initial_contexts[max_context_length_idx]
+                best_matching_context = contexts[max_context_length_idx]
             else:
                 best_matching_context = None
 
-            resolved_contexts = [c for c in [result_context, decoder_context, posterior_context] if c is not None]
-            if len(set(resolved_contexts)) > 1:
+            # Optionally add a warning for different contexts
+            if debug_print and len(set(contexts)) > 1:
                 print(f"Warning: Different contexts matched: result={result_context}, decoder={decoder_context}, posterior={posterior_context}")
 
             return best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df
