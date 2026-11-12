@@ -10503,8 +10503,10 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
                           uses=['_subfn_export_laps_four_decoder_gt_boxed_combined_figure', 'plot_1D_most_likely_position_comparsions', 'add_laps_groundtruth_information_to_dataframe', 'vertical_image_stack'],
                           used_by=['figures_export_laps_correct_decoder_side_by_side_completion_function'], creation_date='2026-11-12 00:00', related_items=[], is_global=True)
     def _display_laps_correct_decoder_side_by_side_posteriors(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True, parent_output_folder: Optional[Path] = None,
-                                                             max_subplots_per_page: int = 8, variable_name: str = 'lin_pos', posterior_masking_value: float = 0.0075, dpi: int = 150, combined_image_basename: Optional[str] = None, **kwargs):
+                                                             max_subplots_per_page: int = 8, variable_name: str = 'lin_pos', posterior_masking_value: float = 0.0, dpi: int = 150, combined_image_basename: Optional[str] = None, **kwargs):
         """Headless Agg export of all laps as 4-decoder side-by-side posteriors with a green axis box on the session-lap ground-truth decoder; pages are vertical-stacked into one PNG.
+
+        `posterior_masking_value` is imshow `vmin` (default 0.0 = no under-threshold whitening). Non-zero values clip low-P to `under_color` and dominate low/high-P contrast.
 
         Usage:
             curr_active_pipeline.reload_default_display_functions()
@@ -10559,11 +10561,12 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
         # @function_attributes(short_name=None, tags=['laps', 'posterior', 'four-decoder', 'matplotlib', 'Agg', 'headless'], input_requires=[], output_provides=[], uses=['plot_1D_most_likely_position_comparsions', '_subfn_draw_green_groundtruth_axis_box'], used_by=['_subfn_export_laps_four_decoder_gt_boxed_combined_figure'], creation_date='2026-11-12 00:00', related_items=[])
         def _subfn_plot_laps_four_decoder_posterior_page(decoder_laps_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult], decoder_xbin_dict: Dict[str, NDArray], global_pos_df: pd.DataFrame,
                                                          page_lap_indicies: NDArray, truth_decoder_names_for_page: NDArray, decoder_names: Optional[List[str]] = None, variable_name: str = 'lin_pos',
-                                                         posterior_masking_value: float = 0.0075, figsize_per_row: float = 1.6, figsize_width: float = 16.0, dpi: int = 150, **kwargs) -> Tuple[plt.Figure, NDArray]:
+                                                         posterior_masking_value: float = 0.0, figsize_per_row: float = 1.6, figsize_width: float = 16.0, dpi: int = 150, **kwargs) -> Tuple[plt.Figure, NDArray]:
             """Plot one page: rows = laps on this page, columns = four directional decoders; green-box the ground-truth decoder per row.
 
             `page_lap_indicies`: positional indices into each decoder's DecodedFilterEpochsResult lists (shared lap order).
             `truth_decoder_names_for_page`: length == len(page_lap_indicies), values in decoder_names.
+            `posterior_masking_value`: imshow vmin; keep 0.0 so low-P stays on the colormap (non-zero + under_color white washes out P contrast).
             """
             if decoder_names is None:
                 decoder_names = list(TrackTemplates.get_decoder_names())
@@ -10571,8 +10574,9 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
             n_cols: int = int(len(decoder_names))
             assert n_rows == len(truth_decoder_names_for_page)
 
+            # under/over still set for out-of-range; with vmin=0.0 low-P uses the Oranges floor instead of white clipping
             cmap = kwargs.pop('cmap', get_heatmap_cmap(cmap='Oranges', bad_color='white', under_color='white', over_color='red'))
-            posterior_heatmap_imshow_kwargs = kwargs.pop('posterior_heatmap_imshow_kwargs', dict(cmap=cmap, vmin=posterior_masking_value, vmax=1.0))
+            posterior_heatmap_imshow_kwargs = kwargs.pop('posterior_heatmap_imshow_kwargs', dict(cmap=cmap, vmin=float(posterior_masking_value), vmax=1.0))
             skip_plotting_most_likely_positions: bool = kwargs.pop('skip_plotting_most_likely_positions', True)
             skip_plotting_measured_positions: bool = kwargs.pop('skip_plotting_measured_positions', False)
 
@@ -10585,13 +10589,24 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
                     curr_time_bins = a_result.time_bin_containers[int(lap_idx)].centers
                     curr_posterior = a_result.marginal_x_list[int(lap_idx)].p_x_given_n
                     curr_most_likely = None if skip_plotting_most_likely_positions else a_result.marginal_x_list[int(lap_idx)].most_likely_positions_1D
-                    plot_1D_most_likely_position_comparsions(global_pos_df, time_window_centers=curr_time_bins, xbin=decoder_xbin_dict[a_decoder_name], ax=ax, posterior=curr_posterior,
+                    _fig, _ax, _artists = plot_1D_most_likely_position_comparsions(global_pos_df, time_window_centers=curr_time_bins, xbin=decoder_xbin_dict[a_decoder_name], ax=ax, posterior=curr_posterior,
                                                             active_most_likely_positions_1D=curr_most_likely, variable_name=variable_name, enable_flat_line_drawing=False,
                                                             skip_plotting_measured_positions=skip_plotting_measured_positions, skip_plotting_most_likely_positions=skip_plotting_most_likely_positions,
-                                                            posterior_heatmap_imshow_kwargs=posterior_heatmap_imshow_kwargs)
+                                                            posterior_heatmap_imshow_kwargs=posterior_heatmap_imshow_kwargs, return_created_artists=True)
+                    # measured traj default is #ff000066 @ 0.35; solid red @ 0.3 so posterior shows through
+                    _measured_lines = _artists.get('line_measured_position')
+                    if _measured_lines is not None:
+                        for _ln in (_measured_lines if isinstance(_measured_lines, (list, tuple)) else [_measured_lines]):
+                            _ln.set_color('#ff0000')
+                            _ln.set_alpha(0.3)
+                        ## END for _ln in (_measured_lines if isinstance(_measured_lines, (list, tuple)) else [_measured_lines])...
+                    ## END if _measured_lines is not None...
                     epoch_slice = ensure_dataframe(a_result.active_filter_epochs).iloc[int(lap_idx)][['start', 'stop']].to_numpy()
                     ax.set_xlim(*epoch_slice)
                     ax.set_title(f'{a_decoder_name}' if row_i == 0 else '')
+                    if col_i != 0:
+                        ax.set_ylabel('')
+                        ax.tick_params(axis='y', labelleft=False)  # y labels only on leftmost column
                     if a_decoder_name == truth_name:
                         _subfn_draw_green_groundtruth_axis_box(ax)
                     else:
@@ -10604,10 +10619,11 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
         #                       uses=['_subfn_build_laps_groundtruth_decoder_names_df', '_subfn_plot_laps_four_decoder_posterior_page', 'vertical_image_stack'], used_by=['_display_laps_correct_decoder_side_by_side_posteriors'], creation_date='2026-11-12 00:00', related_items=[])
         def _subfn_export_laps_four_decoder_gt_boxed_combined_figure(curr_active_pipeline, decoder_laps_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult], track_templates,
                                                                      output_dir, combined_image_basename: str = 'laps_4decoder_gt_boxed', max_subplots_per_page: int = 8, variable_name: str = 'lin_pos',
-                                                                     posterior_masking_value: float = 0.0075, dpi: int = 150, write_png: bool = True, debug_print: bool = False, **kwargs) -> Dict[str, Any]:
+                                                                     posterior_masking_value: float = 0.0, dpi: int = 150, write_png: bool = True, debug_print: bool = False, **kwargs) -> Dict[str, Any]:
             """Headless Agg export: paginate all laps as 4-decoder side-by-side pages with GT green boxes, then vertical-stack PNGs into one combined figure.
 
             Returns dict with keys: `laps_epochs_df`, `page_png_paths`, `combined_img_out_path`, `n_pages`, `n_laps`.
+            `posterior_masking_value` default 0.0 disables under-threshold whitening (pass >0 only if intentional clipping is desired).
             """
             output_dir = Path(output_dir).resolve()
             output_dir.mkdir(parents=True, exist_ok=True)
