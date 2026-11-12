@@ -8254,7 +8254,7 @@ def _helper_add_interpolated_position_columns_to_decoded_result_df(a_result: Dec
 
     decoded_positions_df: pd.DataFrame = pd.concat(deepcopy(global_all_directional_decoder_result.measured_decoded_position_comparion.decoded_positions_df_list), ignore_index=True)
     decoded_positions_df = decoded_positions_df.position.adding_binned_position_columns(xbin_edges=xbin_edges, ybin_edges=ybin_edges, active_computation_config=active_computation_config)
-    decoded_positions_df = decoded_positions_df.rename(columns={'x':'x_decoded_most_likely', 'binned_x':'binned_x_decoded_most_likely'}, inplace=False).drop(columns=['t'], inplace=False) ## decoded most likely
+    decoded_positions_df = decoded_positions_df.rename(columns={'x':'x_decoded_most_likely', 'binned_x':'binned_x_decoded_most_likely'}, inplace=False).drop(columns=['t'], inplace=False) ## decoded most likely — drop t only after binning; posterior DF already has time cols
 
     ## OUTPUTS: measured_positions_df, decoded_positions_df
 
@@ -8269,14 +8269,11 @@ def _helper_add_interpolated_position_columns_to_decoded_result_df(a_result: Dec
         measured_positions_df = measured_positions_df.position.adding_binned_position_columns(xbin_edges=xbin_edges, ybin_edges=ybin_edges, active_computation_config=active_computation_config)
         measured_positions_df = measured_positions_df.rename(columns={'x': 'x_meas', 'y': 'y_meas', 'binned_x': 'binned_x_meas', 'binned_y': 'binned_y_meas'}, inplace=False)
         measured_positions_df = measured_positions_df.drop(columns=[c for c in ['t'] if c in measured_positions_df.columns], inplace=False)
-        if 'most_likely_positions_1D' in a_decoded_marginal_posterior_df.columns:
-            decoded_positions_df = pd.DataFrame({'x': a_decoded_marginal_posterior_df['most_likely_positions_1D'].to_numpy(dtype=float)})
-            decoded_positions_df = decoded_positions_df.position.adding_binned_position_columns(xbin_edges=xbin_edges, ybin_edges=ybin_edges, active_computation_config=active_computation_config)
-            decoded_positions_df = decoded_positions_df.rename(columns={'x': 'x_decoded_most_likely', 'binned_x': 'binned_x_decoded_most_likely'}, inplace=False)
-            decoded_positions_df = decoded_positions_df.drop(columns=[c for c in ['y', 'binned_y', 't'] if c in decoded_positions_df.columns], inplace=False)
-        else:
-            decoded_positions_df = pd.DataFrame(index=np.arange(n_df))
-        ## END if 'most_likely_positions_1D' in a_decoded_marginal_posterior_df.columns...
+        assert 'most_likely_positions_1D' in a_decoded_marginal_posterior_df.columns, f'_helper_add_interpolated_position_columns_to_decoded_result_df: length-mismatch fallback requires most_likely_positions_1D (df cols={list(a_decoded_marginal_posterior_df.columns)})'
+        decoded_positions_df = pd.DataFrame({'t': sample_times, 'x': a_decoded_marginal_posterior_df['most_likely_positions_1D'].to_numpy(dtype=float)})
+        decoded_positions_df = decoded_positions_df.position.adding_binned_position_columns(xbin_edges=xbin_edges, ybin_edges=ybin_edges, active_computation_config=active_computation_config)
+        decoded_positions_df = decoded_positions_df.rename(columns={'x': 'x_decoded_most_likely', 'binned_x': 'binned_x_decoded_most_likely'}, inplace=False)
+        decoded_positions_df = decoded_positions_df.drop(columns=[c for c in ['y', 'binned_y', 't'] if c in decoded_positions_df.columns], inplace=False)
     ## END if (len(measured_positions_df) != n_df) or (len(decoded_positions_df) != n_df)...
 
     ## Add directly to `a_decoded_marginal_posterior_df` (concatenating columns to existing rows)
