@@ -7505,6 +7505,222 @@ class Figure5:
         return (fig, ax_dict), (measured_epoch_occupancy_seconds_dict_dict, measured_epoch_occupancy_fractional_dict_dict), None
 
 
+    @classmethod
+    def compute_session_occupancy_long_df_from_pipeline(cls, curr_active_pipeline, time_bin_size: float, decoder_names: Optional[Sequence[str]] = None, measured_x_col: str = 'binned_x_meas', debug_print: bool = False) -> pd.DataFrame:
+        """Build a long-form Figure 5 occupancy DataFrame for one live pipeline session (laps + PBEs, simultaneous decoder-split decoded + measured).
+
+        Requires ``EpochComputations`` with Pseudo2D ``per_time_bin`` results at ``time_bin_size`` and ``masked_time_bin_fill_type='nan_filled'``.
+        """
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import _helper_add_interpolated_position_columns_to_decoded_result_df
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import EpochComputationsComputationsContainer
+        from pyphoplacecellanalysis.Analysis.Decoder.context_dependent import GenericDecoderDictDecodedEpochsDictResult
+
+        if decoder_names is None:
+            decoder_names = list(DECODER_NAMES)
+        else:
+            decoder_names = list(decoder_names)
+
+        valid_EpochComputations_result: EpochComputationsComputationsContainer = curr_active_pipeline.global_computation_results.computed_data['EpochComputations']
+        assert valid_EpochComputations_result is not None, "EpochComputations missing; run generalized_decode_epochs_dict_and_export_results_completion_function first"
+        a_new_fully_generic_result: GenericDecoderDictDecodedEpochsDictResult = valid_EpochComputations_result.a_generic_decoder_dict_decoded_epochs_dict_result
+        assert a_new_fully_generic_result is not None
+
+        t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
+        sess_ctxt: IdentifyingContext = curr_active_pipeline.get_session_context()
+        a_sess_name: str = sess_ctxt.get_description(separator='_')
+        a_sess_global_uid: str = sess_ctxt.get_description_as_session_global_uid()
+        format_name: str = getattr(sess_ctxt, 'format_name', None) or ''
+        animal: str = getattr(sess_ctxt, 'animal', None) or ''
+        exper_name: str = getattr(sess_ctxt, 'exper_name', None) or ''
+
+        global_measured_position_df: pd.DataFrame = deepcopy(curr_active_pipeline.sess.position.to_dataframe())
+        common_constraint_dict = dict(trained_compute_epochs='laps', time_bin_size=float(time_bin_size), masked_time_bin_fill_type='nan_filled')
+        # EpochComputations key -> Figure5 panel name
+        epoch_query_to_panel: Dict[str, str] = {'laps': 'laps', 'pbe': 'PBEs'}
+        pre_post_all_epoch_names = ['pre-delta', 'post-delta', 'all']
+        rows: List[Dict[str, Any]] = []
+
+        def _subfn_measured_occ_seconds(df: pd.DataFrame, xbin_bin_ids: NDArray) -> NDArray:
+            sub = df.dropna(subset=[measured_x_col])
+            if len(sub) == 0:
+                return np.zeros((len(xbin_bin_ids),), dtype=float)
+            bin_ids = sub[measured_x_col].astype(int)
+            if 'time_bin_size' in sub.columns:
+                occ_seconds = sub.groupby(bin_ids)['time_bin_size'].sum()
+            else:
+                occ_seconds = bin_ids.value_counts() * float(time_bin_size)
+            return occ_seconds.reindex(xbin_bin_ids, fill_value=0.0).to_numpy(dtype=float)
+
+
+        def _subfn_append_source_rows(epoch_type: str, pre_post: str, source: str, occ_seconds: NDArray, xbin_bin_ids: NDArray, xbin_centers: NDArray):
+            occ_sum = float(np.nansum(occ_seconds))
+            occ_frac = (occ_seconds / occ_sum) if (occ_sum > 0) else occ_seconds
+            n_pos_local = len(occ_seconds)
+            for i in range(n_pos_local):
+                rows.append({
+                    'session_name': a_sess_name,
+                    'session_uid': a_sess_global_uid,
+                    'format_name': format_name,
+                    'animal': animal,
+                    'exper_name': exper_name,
+                    't_delta': float(t_delta) if t_delta is not None else np.nan,
+                    'time_bin_size': float(time_bin_size),
+                    'n_pos': int(n_pos_local),
+                    'epoch_type': epoch_type,
+                    'pre_post_delta': pre_post,
+                    'source': source,
+                    'pos_bin_idx': int(xbin_bin_ids[i]),
+                    'occupancy_seconds': float(occ_seconds[i]),
+                    'occupancy_frac': float(occ_frac[i]),
+                    'xbin_center': float(xbin_centers[i]) if (xbin_centers is not None and i < len(xbin_centers)) else np.nan,
+                })
+            ## END for i in range(n_pos_local)...
+
+
+        for epoch_query_name, epoch_panel_name in epoch_query_to_panel.items():
+            a_target_context: IdentifyingContext = IdentifyingContext(known_named_decoding_epochs_type=epoch_query_name, data_grain='per_time_bin', decoder_identifier='pseudo2D', **common_constraint_dict)
+            try:
+                best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df = a_new_fully_generic_result.get_results_best_matching_context(context_query=a_target_context, debug_print=debug_print)
+            except Exception as e:
+                print(f'WARN: Figure5.compute_session_occupancy_long_df_from_pipeline: no match for {epoch_query_name} @ tbin={time_bin_size}: {e}')
+                continue
+
+            a_decoded_marginal_posterior_df = _helper_add_interpolated_position_columns_to_decoded_result_df(a_result=a_result, a_decoder=a_decoder, a_decoded_marginal_posterior_df=a_decoded_marginal_posterior_df, global_measured_position_df=global_measured_position_df)
+            if 'delta_aligned_start_t' not in a_decoded_marginal_posterior_df.columns:
+                if 't_bin_center' in a_decoded_marginal_posterior_df.columns:
+                    a_decoded_marginal_posterior_df['delta_aligned_start_t'] = a_decoded_marginal_posterior_df['t_bin_center'] - float(t_delta)
+                else:
+                    raise KeyError(f"decoded marginal df for {epoch_query_name} missing delta_aligned_start_t and t_bin_center")
+
+            is_post_delta = (a_decoded_marginal_posterior_df['delta_aligned_start_t'].to_numpy() > 0.0)
+            a_decoded_marginal_posterior_df = a_decoded_marginal_posterior_df.copy()
+            a_decoded_marginal_posterior_df['pre_post_delta_category'] = np.where(is_post_delta, 'post-delta', 'pre-delta')
+
+            n_timebins, flat_time_bin_containers, timebins_p_x_given_n = a_result.flatten()
+            if timebins_p_x_given_n.ndim == 2:
+                # independent 1D stacked unexpectedly — treat as single decoder
+                timebins_p_x_given_n = timebins_p_x_given_n[:, np.newaxis, :]
+            assert timebins_p_x_given_n.ndim == 3, f"expected (n_pos, n_decoders, n_t), got {np.shape(timebins_p_x_given_n)}"
+            n_pos, n_decoders, n_t = np.shape(timebins_p_x_given_n)
+            assert n_t == len(a_decoded_marginal_posterior_df), f"flatten n_t={n_t} != len(df)={len(a_decoded_marginal_posterior_df)} for {epoch_query_name}"
+            assert n_decoders == len(decoder_names), f"n_decoders={n_decoders} != len(decoder_names)={len(decoder_names)}"
+
+            xbin_centers = np.asarray(getattr(a_decoder, 'xbin_centers', None), dtype=float)
+            if (xbin_centers is None) or (len(xbin_centers) != n_pos):
+                xbin_centers = np.arange(n_pos, dtype=float) + 0.5
+            xbin_bin_ids = np.arange(n_pos, dtype=int) + 1
+
+            period_masks = {
+                'pre-delta': np.logical_not(is_post_delta),
+                'post-delta': is_post_delta,
+                'all': np.ones((n_t,), dtype=bool),
+            }
+            df_by_pre_post = a_decoded_marginal_posterior_df.pho.partition_df_dict('pre_post_delta_category')
+            df_by_pre_post['all'] = deepcopy(a_decoded_marginal_posterior_df)
+
+            for pre_post in pre_post_all_epoch_names:
+                t_mask = period_masks[pre_post]
+                for d_idx, decoder_name in enumerate(decoder_names):
+                    occ_seconds = np.nansum(timebins_p_x_given_n[:, d_idx, :][:, t_mask], axis=-1) * float(time_bin_size)
+                    _subfn_append_source_rows(epoch_panel_name, pre_post, decoder_name, occ_seconds, xbin_bin_ids, xbin_centers)
+                ## END for d_idx, decoder_name in enumerate(decoder_names)...
+
+                measured_df = df_by_pre_post.get(pre_post, a_decoded_marginal_posterior_df.iloc[0:0])
+                measured_occ = _subfn_measured_occ_seconds(measured_df, xbin_bin_ids)
+                _subfn_append_source_rows(epoch_panel_name, pre_post, 'measured', measured_occ, xbin_bin_ids, xbin_centers)
+            ## END for pre_post in pre_post_all_epoch_names...
+        ## END for epoch_query_name, epoch_panel_name in epoch_query_to_panel.items()...
+
+        if len(rows) == 0:
+            raise ValueError(f"Figure5.compute_session_occupancy_long_df_from_pipeline: no occupancy rows for session={a_sess_name}, tbin={time_bin_size}")
+        return pd.DataFrame(rows)
+
+
+    @classmethod
+    def export_session_occupancy_csv(cls, curr_active_pipeline, parent_output_path: Path, time_bin_size: float, output_date_str: Optional[str] = None, decoder_names: Optional[Sequence[str]] = None, measured_x_col: str = 'binned_x_meas', debug_print: bool = False) -> Path:
+        """Compute session Figure 5 occupancy and write ``*(fig5_occupancy)_tbin-...*.csv`` under ``parent_output_path``."""
+        from pyphocorehelpers.print_helpers import get_now_rounded_time_str
+
+        occupancy_df: pd.DataFrame = cls.compute_session_occupancy_long_df_from_pipeline(curr_active_pipeline=curr_active_pipeline, time_bin_size=time_bin_size, decoder_names=decoder_names, measured_x_col=measured_x_col, debug_print=debug_print)
+        parent_output_path = Path(parent_output_path).resolve()
+        parent_output_path.mkdir(parents=True, exist_ok=True)
+        if output_date_str is None:
+            output_date_str = get_now_rounded_time_str(rounded_minutes=10)
+        data_identifier_str: str = f'(fig5_occupancy)_tbin-{float(time_bin_size)}'
+        out_path, out_filename, out_basename = curr_active_pipeline.build_complete_session_identifier_filename_string(output_date_str=output_date_str, data_identifier_str=data_identifier_str, parent_output_path=parent_output_path, out_extension='.csv')
+        occupancy_df.to_csv(out_path, index=False)
+        print(f'exported Figure5 occupancy CSV: {out_path}')
+        try:
+            curr_active_pipeline.register_output_file(output_path=Path(out_path).resolve(), output_metadata=dict(kind='fig5_occupancy_csv', time_bin_size=float(time_bin_size), source_fn='Figure5.export_session_occupancy_csv'))
+        except Exception as e:
+            print(f'WARN: register_output_file failed for {out_path}: {e}')
+        return Path(out_path).resolve()
+
+
+    @classmethod
+    def load_occupancy_long_csvs_to_session_nested_dicts(cls, csv_paths: Sequence[Union[str, Path]], decoder_names: Optional[Sequence[str]] = None) -> Tuple[Dict[str, Dict[str, Dict[str, Any]]], Dict[str, Dict[str, Dict[str, NDArray]]]]:
+        """Load one-or-more ``(fig5_occupancy)`` long CSVs into session-nested dicts for ``Figure5.main(..., split_by_session=True)``.
+
+        Returns
+        -------
+        decoded_seconds_by_session
+            ``{session_name: {pre-delta|post-delta|all: {laps|PBEs: {decoder_name: (n_pos,)}}}}``
+        measured_seconds_by_session
+            ``{session_name: {pre-delta|post-delta|all: {laps|PBEs: (n_pos,)}}}``
+        """
+        if decoder_names is None:
+            decoder_names = list(DECODER_NAMES)
+        else:
+            decoder_names = list(decoder_names)
+
+        frames: List[pd.DataFrame] = []
+        for csv_path in csv_paths:
+            frames.append(pd.read_csv(Path(csv_path)))
+        ## END for csv_path in csv_paths...
+
+        assert len(frames) > 0, "no csv_paths provided"
+        occ_df: pd.DataFrame = pd.concat(frames, ignore_index=True)
+        required_cols = {'session_name', 'epoch_type', 'pre_post_delta', 'source', 'pos_bin_idx', 'occupancy_seconds', 'n_pos'}
+        missing = required_cols.difference(occ_df.columns)
+        assert len(missing) == 0, f"fig5_occupancy CSV missing columns: {missing}"
+
+        decoded_seconds_by_session: Dict[str, Dict[str, Dict[str, Any]]] = {}
+        measured_seconds_by_session: Dict[str, Dict[str, Dict[str, NDArray]]] = {}
+        pre_post_all_epoch_names = ['pre-delta', 'post-delta', 'all']
+
+        for session_name, sess_df in occ_df.groupby('session_name', sort=False):
+            n_pos = int(sess_df['n_pos'].iloc[0])
+            xbin_bin_ids = np.arange(n_pos, dtype=int) + 1
+            decoded_seconds_by_session[session_name] = {}
+            measured_seconds_by_session[session_name] = {}
+            for pre_post in pre_post_all_epoch_names:
+                decoded_seconds_by_session[session_name][pre_post] = {}
+                measured_seconds_by_session[session_name][pre_post] = {}
+                period_df = sess_df[sess_df['pre_post_delta'] == pre_post]
+                for epoch_type in ['laps', 'PBEs']:
+                    epoch_df = period_df[period_df['epoch_type'] == epoch_type]
+                    decoder_dict: Dict[str, NDArray] = {}
+                    for decoder_name in decoder_names:
+                        src_df = epoch_df[epoch_df['source'] == decoder_name]
+                        if len(src_df) == 0:
+                            decoder_dict[decoder_name] = np.zeros((n_pos,), dtype=float)
+                        else:
+                            decoder_dict[decoder_name] = src_df.set_index('pos_bin_idx')['occupancy_seconds'].reindex(xbin_bin_ids, fill_value=0.0).to_numpy(dtype=float)
+                    ## END for decoder_name in decoder_names...
+                    decoded_seconds_by_session[session_name][pre_post][epoch_type] = decoder_dict
+
+                    meas_df = epoch_df[epoch_df['source'] == 'measured']
+                    if len(meas_df) == 0:
+                        measured_seconds_by_session[session_name][pre_post][epoch_type] = np.zeros((n_pos,), dtype=float)
+                    else:
+                        measured_seconds_by_session[session_name][pre_post][epoch_type] = meas_df.set_index('pos_bin_idx')['occupancy_seconds'].reindex(xbin_bin_ids, fill_value=0.0).to_numpy(dtype=float)
+                ## END for epoch_type in ['laps', 'PBEs']...
+            ## END for pre_post in pre_post_all_epoch_names...
+        ## END for session_name, sess_df in occ_df.groupby('session_name', sort=False)...
+
+        return decoded_seconds_by_session, measured_seconds_by_session
+
+
 # ==================================================================================================================== #
 # 2023-06-29 - Build Properly sorted ratemaps with potentially missing entries                                         #
 # ==================================================================================================================== #
