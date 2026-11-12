@@ -7586,19 +7586,35 @@ class Figure5:
                 continue
 
             ## Local-only alignment: independently matched a_result/a_decoder can disagree with the posterior DF row count.
-            ## Prefer exact keys under best_matching_context (usually the longest / posterior key); do not change shared get_results_matching_contexts.
-            def _subfn_align_result_decoder_to_best_context(align_ctx, a_result, a_decoder, a_decoded_marginal_posterior_df):
-                if align_ctx is None or a_decoded_marginal_posterior_df is None:
-                    return a_result, a_decoder
+            ## Resolve the posterior-dict key that owns this DF (identity), then take result/decoder under that same key.
+            ## Do not change shared get_results_matching_contexts.
+            def _subfn_align_result_decoder_to_posterior_df(a_result, a_decoder, a_decoded_marginal_posterior_df, fallback_ctx):
+                if a_decoded_marginal_posterior_df is None:
+                    return a_result, a_decoder, fallback_ctx
                 try:
                     n_t_probe, _flat_probe, _p_probe = a_result.flatten()
                     lengths_agree = (int(n_t_probe) == len(a_decoded_marginal_posterior_df))
                 except Exception:
                     lengths_agree = False
                 if lengths_agree:
-                    return a_result, a_decoder
+                    return a_result, a_decoder, fallback_ctx
+
                 result_dict = a_new_fully_generic_result.filter_epochs_specific_decoded_result
                 decoder_dict = a_new_fully_generic_result.decoders
+                posterior_dict = a_new_fully_generic_result.filter_epochs_decoded_track_marginal_posterior_df_dict
+
+                align_ctx = None
+                for _ctx, _df in posterior_dict.items():
+                    if _df is a_decoded_marginal_posterior_df:
+                        align_ctx = _ctx
+                        break
+                ## END for _ctx, _df in posterior_dict.items()...
+                if align_ctx is None:
+                    align_ctx = fallback_ctx
+
+                if align_ctx is None:
+                    return a_result, a_decoder, fallback_ctx
+
                 if align_ctx in result_dict:
                     a_result = result_dict[align_ctx]
                 else:
@@ -7611,13 +7627,26 @@ class Figure5:
                     _ctx, _dec = GenericDecoderDictDecodedEpochsDictResult._subfn_get_value_with_context_matching(decoder_dict, align_ctx, "a_decoder", return_multiple_matches=False, debug_print=False)
                     if _dec is not None:
                         a_decoder = _dec
-                print(f'WARN: Figure5.compute_session_occupancy_long_df_from_pipeline: aligned a_result/a_decoder to best_matching_context={align_ctx} for {epoch_query_name}')
-                return a_result, a_decoder
-            ## END def _subfn_align_result_decoder_to_best_context...
 
-            a_result, a_decoder = _subfn_align_result_decoder_to_best_context(best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df)
+                try:
+                    n_t_after, _f2, _p2 = a_result.flatten()
+                    if int(n_t_after) != len(a_decoded_marginal_posterior_df):
+                        print(f'WARN: Figure5.compute_session_occupancy_long_df_from_pipeline: after align flatten n_t={n_t_after} still != len(df)={len(a_decoded_marginal_posterior_df)} for {epoch_query_name} align_ctx={align_ctx}')
+                    else:
+                        print(f'WARN: Figure5.compute_session_occupancy_long_df_from_pipeline: aligned a_result/a_decoder to posterior key={align_ctx} for {epoch_query_name}')
+                except Exception as e:
+                    print(f'WARN: Figure5.compute_session_occupancy_long_df_from_pipeline: post-align flatten check failed for {epoch_query_name}: {e}')
+                return a_result, a_decoder, align_ctx
+            ## END def _subfn_align_result_decoder_to_posterior_df...
 
-            a_decoded_marginal_posterior_df = _helper_add_interpolated_position_columns_to_decoded_result_df(a_result=a_result, a_decoder=a_decoder, a_decoded_marginal_posterior_df=a_decoded_marginal_posterior_df, global_measured_position_df=global_measured_position_df)
+            a_result, a_decoder, best_matching_context = _subfn_align_result_decoder_to_posterior_df(a_result, a_decoder, a_decoded_marginal_posterior_df, best_matching_context)
+
+            try:
+                a_decoded_marginal_posterior_df = _helper_add_interpolated_position_columns_to_decoded_result_df(a_result=a_result, a_decoder=a_decoder, a_decoded_marginal_posterior_df=a_decoded_marginal_posterior_df, global_measured_position_df=global_measured_position_df)
+            except Exception as e:
+                print(f'WARN: Figure5.compute_session_occupancy_long_df_from_pipeline: measured-position helper failed for {epoch_query_name}: {e}')
+                continue
+
             if 'delta_aligned_start_t' not in a_decoded_marginal_posterior_df.columns:
                 if 't_bin_center' in a_decoded_marginal_posterior_df.columns:
                     a_decoded_marginal_posterior_df['delta_aligned_start_t'] = a_decoded_marginal_posterior_df['t_bin_center'] - float(t_delta)
@@ -7628,14 +7657,18 @@ class Figure5:
             a_decoded_marginal_posterior_df = a_decoded_marginal_posterior_df.copy()
             a_decoded_marginal_posterior_df['pre_post_delta_category'] = np.where(is_post_delta, 'post-delta', 'pre-delta')
 
-            n_timebins, flat_time_bin_containers, timebins_p_x_given_n = a_result.flatten()
-            if timebins_p_x_given_n.ndim == 2:
-                # independent 1D stacked unexpectedly — treat as single decoder
-                timebins_p_x_given_n = timebins_p_x_given_n[:, np.newaxis, :]
-            assert timebins_p_x_given_n.ndim == 3, f"expected (n_pos, n_decoders, n_t), got {np.shape(timebins_p_x_given_n)}"
-            n_pos, n_decoders, n_t = np.shape(timebins_p_x_given_n)
-            assert n_t == len(a_decoded_marginal_posterior_df), f"flatten n_t={n_t} != len(df)={len(a_decoded_marginal_posterior_df)} for {epoch_query_name}"
-            assert n_decoders == len(decoder_names), f"n_decoders={n_decoders} != len(decoder_names)={len(decoder_names)}"
+            try:
+                n_timebins, flat_time_bin_containers, timebins_p_x_given_n = a_result.flatten()
+                if timebins_p_x_given_n.ndim == 2:
+                    # independent 1D stacked unexpectedly — treat as single decoder
+                    timebins_p_x_given_n = timebins_p_x_given_n[:, np.newaxis, :]
+                assert timebins_p_x_given_n.ndim == 3, f"expected (n_pos, n_decoders, n_t), got {np.shape(timebins_p_x_given_n)}"
+                n_pos, n_decoders, n_t = np.shape(timebins_p_x_given_n)
+                assert n_t == len(a_decoded_marginal_posterior_df), f"flatten n_t={n_t} != len(df)={len(a_decoded_marginal_posterior_df)} for {epoch_query_name}"
+                assert n_decoders == len(decoder_names), f"n_decoders={n_decoders} != len(decoder_names)={len(decoder_names)}"
+            except Exception as e:
+                print(f'WARN: Figure5.compute_session_occupancy_long_df_from_pipeline: skipping {epoch_query_name} after flatten/length check: {e}')
+                continue
 
             xbin_centers = np.asarray(getattr(a_decoder, 'xbin_centers', None), dtype=float)
             if (xbin_centers is None) or (len(xbin_centers) != n_pos):
