@@ -14445,6 +14445,14 @@ def determine_decoded_context_uncertainty_as_fn_of_position(curr_active_pipeline
     global_measured_position_df: pd.DataFrame = deepcopy(curr_active_pipeline.sess.position.to_dataframe())
     a_decoded_marginal_posterior_df = _helper_add_interpolated_position_columns_to_decoded_result_df(a_result=a_result, a_decoder=a_decoder, a_decoded_marginal_posterior_df=a_decoded_marginal_posterior_df, global_measured_position_df=global_measured_position_df)
 
+    t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
+    if 'delta_aligned_start_t' not in a_decoded_marginal_posterior_df.columns:
+        if 't_bin_center' in a_decoded_marginal_posterior_df.columns:
+            a_decoded_marginal_posterior_df = a_decoded_marginal_posterior_df.copy()
+            a_decoded_marginal_posterior_df['delta_aligned_start_t'] = a_decoded_marginal_posterior_df['t_bin_center'] - float(t_delta)
+        else:
+            raise KeyError('determine_decoded_context_uncertainty_as_fn_of_position: decoded marginal df missing delta_aligned_start_t and t_bin_center')
+
     is_post_delta = (a_decoded_marginal_posterior_df['delta_aligned_start_t'] > 0.0)
     a_decoded_marginal_posterior_df = a_decoded_marginal_posterior_df.copy()
     a_decoded_marginal_posterior_df['pre_post_delta_category'] = np.where(is_post_delta, 'post-delta', 'pre-delta')

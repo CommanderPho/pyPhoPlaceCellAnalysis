@@ -7585,6 +7585,17 @@ class Figure5:
                 print(f'WARN: Figure5.compute_session_occupancy_long_df_from_pipeline: no match for {epoch_query_name} @ tbin={time_bin_size}: {e}')
                 continue
 
+            ## If flatten length still disagrees with marginal DF, re-fetch result/decoder from the posterior key before helper/occupancy.
+            try:
+                n_timebins_probe, _flat_probe, _p_probe = a_result.flatten()
+                if (best_matching_context is not None) and (int(n_timebins_probe) != len(a_decoded_marginal_posterior_df)):
+                    print(f'WARN: Figure5.compute_session_occupancy_long_df_from_pipeline: flatten n_t={n_timebins_probe} != len(df)={len(a_decoded_marginal_posterior_df)} for {epoch_query_name}; re-fetching result/decoder from best_matching_context={best_matching_context}')
+                    _refetch_ctx, a_result, a_decoder, _refetch_df = a_new_fully_generic_result.get_results_best_matching_context(context_query=best_matching_context, debug_print=debug_print)
+                    if _refetch_df is not None:
+                        a_decoded_marginal_posterior_df = _refetch_df
+            except Exception as e:
+                print(f'WARN: Figure5.compute_session_occupancy_long_df_from_pipeline: length probe/re-fetch failed for {epoch_query_name}: {e}')
+
             a_decoded_marginal_posterior_df = _helper_add_interpolated_position_columns_to_decoded_result_df(a_result=a_result, a_decoder=a_decoder, a_decoded_marginal_posterior_df=a_decoded_marginal_posterior_df, global_measured_position_df=global_measured_position_df)
             if 'delta_aligned_start_t' not in a_decoded_marginal_posterior_df.columns:
                 if 't_bin_center' in a_decoded_marginal_posterior_df.columns:
