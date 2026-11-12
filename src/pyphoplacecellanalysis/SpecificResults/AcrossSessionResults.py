@@ -3522,10 +3522,12 @@ def _new_process_csv_files(parsed_csv_files_df: pd.DataFrame, t_delta_dict: Dict
     final_sessions_loaded_extra_df_dict: Dict[str, Dict] = {'ripple_EpochScoreShuffle_df': {},
                                                             'ripple_WCorrShuffle_df': {},
                                                             'perfmnc_session': {},
+                                                            'fig5_occupancy': {},
                                            }
     final_sessions_loaded_extra_dfs: Dict[str, pd.DataFrame] = {'ripple_EpochScoreShuffle_df': None,
                                                                 'ripple_WCorrShuffle_df': None,
                                                                 'perfmnc_session': None,
+                                                                'fig5_occupancy': None,
                                       }
     
     basic_marginals_file_types = ['laps_marginals_df', 'ripple_marginals_df', 'laps_time_bin_marginals_df', 'ripple_time_bin_marginals_df',]
@@ -3643,10 +3645,11 @@ def _new_process_csv_files(parsed_csv_files_df: pd.DataFrame, t_delta_dict: Dict
                 # #TODO 2025-04-04 10:11: - [ ] FAT is a legit exception and shouldn't belong in `extended_file_types_list`, as it has both time bin and epoch centered items
                 _is_file_valid = _subfn_new_df_process_and_load_exported_file(path, final_sessions_loaded_laps_time_bin_dict, session_name, curr_session_t_delta, time_key='t_bin_center', allow_CONCAT_to_existing=True, **common_additional_columns_dict) ## adds to the time bins 
                 #TODO 2025-04-04 10:12: - [ ] Why does it add to `final_sessions_loaded_laps_time_bin_dict`? this seems wrong
-                
-
-
-
+            elif file_type == 'fig5_occupancy':
+                ## long-form measured/decoded occupancy vectors (no epoch time column); concat across sessions into final_sessions_loaded_extra_dfs['fig5_occupancy']
+                _curr_dict = final_sessions_loaded_extra_df_dict[file_type]
+                _is_file_valid = _subfn_new_df_process_and_load_exported_file(path, _curr_dict, session_name, curr_session_t_delta, time_key=None, **additional_columns_dict)
+                final_sessions_loaded_extra_df_dict[file_type] = _curr_dict
             else:
                 print(f'WARN: File type "{file_type}" for filename "{path.name}" not implemented.')
                 # _is_file_valid = False # shouldn't mark unknown files as invalid

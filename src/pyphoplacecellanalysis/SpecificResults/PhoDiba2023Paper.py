@@ -7253,15 +7253,17 @@ class Figure5:
 
     @classmethod
     def main(cls, full_epoch_occupancy_seconds_dict_dict, 
-                active_measured_positions_dfs_dict,
-                time_bin_size, measured_x_col: str = 'binned_x_meas', 
+                active_measured_positions_dfs_dict: Optional[Dict[str, pd.DataFrame]] = None,
+                time_bin_size=None, measured_x_col: str = 'binned_x_meas', 
                 enable_figure: bool = True, num=f'Figure 5 - measured vs decoded', plot_pos_bin_axes: bool = False, should_max_normalize: bool = True,
                 split_by_session: bool = False, pdf_export_path: Optional[Union[str, Path]] = None,
+                precomputed_measured_occupancy_seconds_dict_dict: Optional[Dict[str, Dict[str, Dict[str, NDArray]]]] = None,
                 **kwargs,
         ):
         """Plots measured vs decoded occupancy.
 
-        When `split_by_session=True`, `full_epoch_occupancy_seconds_dict_dict` must be session-nested (from `compute_decoded_occupancy(..., split_by_session=True)`).
+        When `split_by_session=True`, `full_epoch_occupancy_seconds_dict_dict` must be session-nested (from `compute_decoded_occupancy(..., split_by_session=True)` or CSV load).
+        Pass either `active_measured_positions_dfs_dict` (FAT time-bin frames) or session-nested `precomputed_measured_occupancy_seconds_dict_dict` from `load_occupancy_long_csvs_to_session_nested_dicts`.
         Returns one 2x3 figure per session (keyed dicts), plus session-keyed measured occupancy dicts.
         Also writes per-session PDFs and a single vertically stacked PDF (`pdf_export_path`, default `output/Figure5_measured_vs_decoded_by_session.pdf`).
         """
@@ -7273,6 +7275,7 @@ class Figure5:
         pre_post_all_epoch_names = ['pre-delta', 'post-delta', 'all']
         _PERIOD_KEYS = set(pre_post_all_epoch_names)
         decoder_color_dict: Dict[types.DecoderName, str] = {'long_LR': '#0099ff', 'long_RL': '#1b115a', 'short_LR': '#f51616', 'short_RL': '#891111'}
+        assert (active_measured_positions_dfs_dict is not None) or (precomputed_measured_occupancy_seconds_dict_dict is not None), "provide active_measured_positions_dfs_dict or precomputed_measured_occupancy_seconds_dict_dict"
 
         def _is_session_nested_occupancy(occupancy_dict_dict) -> bool:
             return (len(occupancy_dict_dict) > 0) and set(occupancy_dict_dict.keys()).isdisjoint(_PERIOD_KEYS)
@@ -7337,18 +7340,24 @@ class Figure5:
             return measured_epoch_occupancy_seconds_dict_dict, measured_epoch_occupancy_fractional_dict_dict
 
         def _plot_occupancy_mosaic(fig, decoded_seconds_dict_dict, measured_seconds_dict_dict):
-            """2x3 laps/PBEs × pre/post/all mosaic on `fig`."""
+            """2x3 laps/PBEs × pre/post/all mosaic on `fig`. Decoded on primary (left) y-axis; measured on twin right y-axis (independent autoscale)."""
             # ax_dict = fig.subplot_mosaic([['laps_pre-delta', 'laps_post-delta'], ['PBEs_pre-delta', 'PBEs_post-delta']], sharex=True, sharey=True)
             ax_dict = fig.subplot_mosaic([['laps_pre-delta', 'laps_post-delta', 'laps_all'], ['PBEs_pre-delta', 'PBEs_post-delta', 'PBEs_all']], sharex=True, sharey=True)
             # _plot_kwargs = dict(plot_pos_bin_axes=False, should_max_normalize=False)
             _plot_kwargs = dict(plot_pos_bin_axes=plot_pos_bin_axes, should_max_normalize=should_max_normalize)
 
-            def _color_last_occupancy_stairs(ax, color):
+            _line_alpha: float = 0.65
+
+            def _color_last_occupancy_stairs(ax, color, linestyle: str = '-', linewidth: Optional[float] = None, alpha: float = _line_alpha):
                 """`perform_plot_occupancy` drops `color` via `overriding_dict_with`; color the last stairs patch instead. Also drops the hardcoded `hatch='//'`."""
                 patch = ax.patches[-1]
                 patch.set_hatch('')
                 patch.set_edgecolor(color)
                 patch.set_facecolor('none')
+                patch.set_linestyle(linestyle)
+                patch.set_alpha(alpha)
+                if linewidth is not None:
+                    patch.set_linewidth(linewidth)
 
             legend_handles = None
             legend_labels = None
@@ -7372,9 +7381,6 @@ class Figure5:
                     measured_active = np.zeros((n_pos,), dtype=float)
 
                 measured_total_s: float = np.nansum(measured_active)
-                perform_plot_occupancy(measured_active, xbin_centers=xbin_centers, xbin_edges=xbin_edges, fig=fig, ax=ax,
-                                    label='measured', **_plot_kwargs)
-                _color_last_occupancy_stairs(ax, 'black')
                 if decoded_active is None:
                     decoded_total_s: float = 0.0
                     _decoded_legend_labels = ['decoded']
@@ -7383,7 +7389,7 @@ class Figure5:
                     _decoded_legend_labels = [f'decoded[{decoder_name}]' for decoder_name in decoded_active.keys()]
                     for decoder_name, decoder_occ in decoded_active.items():
                         perform_plot_occupancy(decoder_occ, xbin_centers=xbin_centers, xbin_edges=xbin_edges, fig=fig, ax=ax,
-                                            label=f'decoded[{decoder_name}]', **_plot_kwargs, alpha=0.9)
+                                            label=f'decoded[{decoder_name}]', **_plot_kwargs, alpha=_line_alpha)
                         _color_last_occupancy_stairs(ax, decoder_color_dict[decoder_name])
                     ## END for decoder_name, decoder_occ in decoded_active.items()....
 
@@ -7391,11 +7397,29 @@ class Figure5:
                     decoded_total_s: float = np.nansum(decoded_active)
                     _decoded_legend_labels = ['decoded']
                     perform_plot_occupancy(decoded_active, xbin_centers=xbin_centers, xbin_edges=xbin_edges, fig=fig, ax=ax,
-                                        label='decoded', **_plot_kwargs, alpha=0.9)
+                                        label='decoded', **_plot_kwargs, alpha=_line_alpha)
                     _color_last_occupancy_stairs(ax, 'C0')
+                if pre_post == 'pre-delta':
+                    ax.set_ylabel('decoded (s)')
+                else:
+                    ax.set_ylabel('')
+
+                ## measured on twin (secondary) y-axis so its autoscale is independent of decoded magnitude
+                ax_measured = ax.twinx()
+                perform_plot_occupancy(measured_active, xbin_centers=xbin_centers, xbin_edges=xbin_edges, fig=fig, ax=ax_measured,
+                                    label='measured', **_plot_kwargs, alpha=_line_alpha)
+                _color_last_occupancy_stairs(ax_measured, '0.25', linestyle=(0, (1.0, 0.8)), linewidth=0.75)  # denser dotted path than default ':' (~2x closer dots)
+                ax_measured.tick_params(axis='y', labelcolor='0.45')
+                if pre_post == 'all':
+                    ax_measured.set_ylabel('measured (s)')
+                else:
+                    ax_measured.set_ylabel('')
+                ax_measured.set_title('')  # perform_plot_occupancy sets a per-call title on the twin
                 ax.set_title(f"{pre_post} | {a_lap_pbe_epoch_name}  (decoded={decoded_total_s:0.1f}s, measured={measured_total_s:0.1f}s)")
                 if legend_handles is None:
-                    legend_handles, _ignored_labels = ax.get_legend_handles_labels()
+                    decoded_handles, _ = ax.get_legend_handles_labels()
+                    measured_handles, _ = ax_measured.get_legend_handles_labels()
+                    legend_handles = list(measured_handles) + list(decoded_handles)
                     legend_labels = ['measured'] + _decoded_legend_labels  # perform_plot_occupancy hardcodes stairs label='1D Placefield Occupancy'
             ## END for lap_PBEs_plus_pre_post, ax in ax_dict.items()....
 
@@ -7409,11 +7433,16 @@ class Figure5:
             session_names = list(full_epoch_occupancy_seconds_dict_dict.keys())
             assert len(session_names) > 0, "split_by_session=True but occupancy dict is empty"
 
-            measured_session_names = set()
-            for a_lap_pbe_epoch_name, measured_df in active_measured_positions_dfs_dict.items():
-                assert 'session_name' in measured_df.columns, f"measured df '{a_lap_pbe_epoch_name}' is missing 'session_name' needed for split_by_session"
-                measured_session_names.update(measured_df['session_name'].dropna().unique().tolist())
-            ## END for a_lap_pbe_epoch_name, measured_df in active_measured_positions_dfs_dict.items()....
+            use_precomputed_measured: bool = (precomputed_measured_occupancy_seconds_dict_dict is not None)
+            if use_precomputed_measured:
+                measured_session_names = set(precomputed_measured_occupancy_seconds_dict_dict.keys())
+            else:
+                assert active_measured_positions_dfs_dict is not None, "split_by_session without precomputed measured requires active_measured_positions_dfs_dict"
+                measured_session_names = set()
+                for a_lap_pbe_epoch_name, measured_df in active_measured_positions_dfs_dict.items():
+                    assert 'session_name' in measured_df.columns, f"measured df '{a_lap_pbe_epoch_name}' is missing 'session_name' needed for split_by_session"
+                    measured_session_names.update(measured_df['session_name'].dropna().unique().tolist())
+                ## END for a_lap_pbe_epoch_name, measured_df in active_measured_positions_dfs_dict.items()....
 
             decoded_session_names = set(session_names)
             _missing_measured = decoded_session_names.difference(measured_session_names)
@@ -7441,12 +7470,23 @@ class Figure5:
                     n_pos = _n_pos_from_occupancy(_laps_pre_occupancy)  # 59; matches decoded
                 xbin_bin_ids = np.arange(n_pos) + 1  # binned_x_meas is 1-indexed
 
-                sess_measured_dfs_dict = {}
-                for a_lap_pbe_epoch_name, measured_df in active_measured_positions_dfs_dict.items():
-                    sess_measured_dfs_dict[a_lap_pbe_epoch_name] = measured_df[measured_df['session_name'] == session_name]
-                ## END for a_lap_pbe_epoch_name, measured_df in active_measured_positions_dfs_dict.items()....
+                if use_precomputed_measured:
+                    sess_measured_seconds = precomputed_measured_occupancy_seconds_dict_dict.get(session_name, {})
+                    sess_measured_frac = {}
+                    for pre_post, epoch_dict in sess_measured_seconds.items():
+                        sess_measured_frac[pre_post] = {}
+                        for epoch_name, occ_s in epoch_dict.items():
+                            occ_sum = float(np.nansum(occ_s))
+                            sess_measured_frac[pre_post][epoch_name] = (occ_s / occ_sum) if (occ_sum > 0) else occ_s
+                        ## END for epoch_name, occ_s in epoch_dict.items()...
+                    ## END for pre_post, epoch_dict in sess_measured_seconds.items()...
+                else:
+                    sess_measured_dfs_dict = {}
+                    for a_lap_pbe_epoch_name, measured_df in active_measured_positions_dfs_dict.items():
+                        sess_measured_dfs_dict[a_lap_pbe_epoch_name] = measured_df[measured_df['session_name'] == session_name]
+                    ## END for a_lap_pbe_epoch_name, measured_df in active_measured_positions_dfs_dict.items()....
+                    sess_measured_seconds, sess_measured_frac = _build_measured_occupancy_dicts(sess_decoded_seconds, sess_measured_dfs_dict, xbin_bin_ids)
 
-                sess_measured_seconds, sess_measured_frac = _build_measured_occupancy_dicts(sess_decoded_seconds, sess_measured_dfs_dict, xbin_bin_ids)
                 measured_epoch_occupancy_seconds_dict_dict[session_name] = sess_measured_seconds
                 measured_epoch_occupancy_fractional_dict_dict[session_name] = sess_measured_frac
 
@@ -7465,21 +7505,22 @@ class Figure5:
             merged_pdf_path = None
             if enable_figure and (session_figs is not None) and (len(session_figs) > 0):
                 from pyphocorehelpers.plotting.media_output_helpers import PDFHelpers
-                if pdf_export_path is None:
-                    pdf_export_path = Path('output') / 'Figure5_measured_vs_decoded_by_session.pdf'
-                merged_pdf_path = Path(pdf_export_path).resolve()
-                merged_pdf_path.parent.mkdir(parents=True, exist_ok=True)
-                per_session_pdf_dir = merged_pdf_path.parent.joinpath(merged_pdf_path.stem)
-                per_session_pdf_dir.mkdir(parents=True, exist_ok=True)
-                per_session_pdf_paths = []
-                with mpl.rc_context({'savefig.transparent': True, 'ps.fonttype': 42, 'pdf.fonttype': 42}):
-                    for session_name, sess_fig in session_figs.items():
-                        sess_stem: str = str(session_name).replace('/', '_').replace('\\', '_').replace('|', '_').replace(':', '_')
-                        sess_pdf_path = per_session_pdf_dir.joinpath(f'{sess_stem}.pdf')
-                        sess_fig.savefig(sess_pdf_path, format='pdf', bbox_inches='tight', dpi=220)
-                        per_session_pdf_paths.append(sess_pdf_path)
-                    ## END for session_name, sess_fig in session_figs.items()....
-                merged_pdf_path = PDFHelpers.concatenate_pdfs_vertically(per_session_pdf_paths, merged_pdf_path)
+                # if pdf_export_path is None:
+                #     pdf_export_path = Path('output') / 'Figure5_measured_vs_decoded_by_session.pdf'
+                if pdf_export_path is not None:
+                    merged_pdf_path = Path(pdf_export_path).resolve()
+                    merged_pdf_path.parent.mkdir(parents=True, exist_ok=True)
+                    per_session_pdf_dir = merged_pdf_path.parent.joinpath(merged_pdf_path.stem)
+                    per_session_pdf_dir.mkdir(parents=True, exist_ok=True)
+                    per_session_pdf_paths = []
+                    with mpl.rc_context({'savefig.transparent': True, 'ps.fonttype': 42, 'pdf.fonttype': 42}):
+                        for session_name, sess_fig in session_figs.items():
+                            sess_stem: str = str(session_name).replace('/', '_').replace('\\', '_').replace('|', '_').replace(':', '_')
+                            sess_pdf_path = per_session_pdf_dir.joinpath(f'{sess_stem}.pdf')
+                            sess_fig.savefig(sess_pdf_path, format='pdf', bbox_inches='tight', dpi=220)
+                            per_session_pdf_paths.append(sess_pdf_path)
+                        ## END for session_name, sess_fig in session_figs.items()....
+                    merged_pdf_path = PDFHelpers.concatenate_pdfs_vertically(per_session_pdf_paths, merged_pdf_path)
 
             return (session_figs, session_ax_dicts), (measured_epoch_occupancy_seconds_dict_dict, measured_epoch_occupancy_fractional_dict_dict), merged_pdf_path
 
@@ -7723,8 +7764,8 @@ class Figure5:
 
 
     @classmethod
-    def load_occupancy_long_csvs_to_session_nested_dicts(cls, csv_paths: Sequence[Union[str, Path]], decoder_names: Optional[Sequence[str]] = None) -> Tuple[Dict[str, Dict[str, Dict[str, Any]]], Dict[str, Dict[str, Dict[str, NDArray]]]]:
-        """Load one-or-more ``(fig5_occupancy)`` long CSVs into session-nested dicts for ``Figure5.main(..., split_by_session=True)``.
+    def occupancy_long_df_to_session_nested_dicts(cls, occ_df: pd.DataFrame, decoder_names: Optional[Sequence[str]] = None, time_bin_size: Optional[float] = None) -> Tuple[Dict[str, Dict[str, Dict[str, Any]]], Dict[str, Dict[str, Dict[str, NDArray]]]]:
+        """Pivot a concatenated ``fig5_occupancy`` long DataFrame (from ``final_sessions_loaded_extra_dfs_dict['fig5_occupancy']`` or CSV concat) into session-nested dicts for ``Figure5.main(..., split_by_session=True)``.
 
         Returns
         -------
@@ -7738,16 +7779,15 @@ class Figure5:
         else:
             decoder_names = list(decoder_names)
 
-        frames: List[pd.DataFrame] = []
-        for csv_path in csv_paths:
-            frames.append(pd.read_csv(Path(csv_path)))
-        ## END for csv_path in csv_paths...
+        assert occ_df is not None and len(occ_df) > 0, "occ_df is empty"
+        occ_df = deepcopy(occ_df)
+        if (time_bin_size is not None) and ('time_bin_size' in occ_df.columns):
+            occ_df = occ_df[np.isclose(occ_df['time_bin_size'].astype(float), float(time_bin_size))]
+            assert len(occ_df) > 0, f"no fig5_occupancy rows for time_bin_size={time_bin_size}"
 
-        assert len(frames) > 0, "no csv_paths provided"
-        occ_df: pd.DataFrame = pd.concat(frames, ignore_index=True)
         required_cols = {'session_name', 'epoch_type', 'pre_post_delta', 'source', 'pos_bin_idx', 'occupancy_seconds', 'n_pos'}
         missing = required_cols.difference(occ_df.columns)
-        assert len(missing) == 0, f"fig5_occupancy CSV missing columns: {missing}"
+        assert len(missing) == 0, f"fig5_occupancy df missing columns: {missing}"
 
         decoded_seconds_by_session: Dict[str, Dict[str, Dict[str, Any]]] = {}
         measured_seconds_by_session: Dict[str, Dict[str, Dict[str, NDArray]]] = {}
@@ -7784,6 +7824,93 @@ class Figure5:
         ## END for session_name, sess_df in occ_df.groupby('session_name', sort=False)...
 
         return decoded_seconds_by_session, measured_seconds_by_session
+
+
+    @classmethod
+    def load_occupancy_long_csvs_to_session_nested_dicts(cls, csv_paths: Sequence[Union[str, Path]], decoder_names: Optional[Sequence[str]] = None, time_bin_size: Optional[float] = None) -> Tuple[Dict[str, Dict[str, Dict[str, Any]]], Dict[str, Dict[str, Dict[str, NDArray]]]]:
+        """Load one-or-more ``(fig5_occupancy)`` long CSVs into session-nested dicts for ``Figure5.main(..., split_by_session=True)``."""
+        frames: List[pd.DataFrame] = []
+        for csv_path in csv_paths:
+            frames.append(pd.read_csv(Path(csv_path)))
+        ## END for csv_path in csv_paths...
+
+        assert len(frames) > 0, "no csv_paths provided"
+        return cls.occupancy_long_df_to_session_nested_dicts(pd.concat(frames, ignore_index=True), decoder_names=decoder_names, time_bin_size=time_bin_size)
+
+
+    @classmethod
+    def animal_from_session_name(cls, session_name: str, separator: str = '_') -> str:
+        """``kdiba_gor01_one_2006-6-08_14-26-15`` → ``gor01`` (same split as ``AcrossSessionIdentityDataframeAccessor.split_session_key_col_to_fmt_animal_exper_cols``)."""
+        parts = str(session_name).split(separator, maxsplit=3)
+        assert len(parts) >= 2, f"cannot parse animal from session_name={session_name!r}"
+        return parts[1]
+
+
+    @classmethod
+    def _sum_occupancy_leaf(cls, a: Any, b: Any) -> Any:
+        """Elementwise-sum two occupancy leaves: ``(n_pos,)`` arrays or ``{decoder_name: (n_pos,)}`` dicts."""
+        if isinstance(a, dict) and isinstance(b, dict):
+            out: Dict[str, NDArray] = {}
+            for k in list(dict.fromkeys([*a.keys(), *b.keys()])):
+                av, bv = a.get(k), b.get(k)
+                if av is None:
+                    out[k] = np.asarray(bv, dtype=float).copy()
+                elif bv is None:
+                    out[k] = np.asarray(av, dtype=float).copy()
+                else:
+                    av_arr, bv_arr = np.asarray(av, dtype=float), np.asarray(bv, dtype=float)
+                    assert av_arr.shape == bv_arr.shape, f"n_pos mismatch for key={k!r}: {av_arr.shape} vs {bv_arr.shape}"
+                    out[k] = av_arr + bv_arr
+            ## END for k in list(dict.fromkeys([*a.keys(), *b.keys()]))...
+            return out
+        assert (not isinstance(a, dict)) and (not isinstance(b, dict)), "cannot sum dict leaf with non-dict leaf"
+        a_arr, b_arr = np.asarray(a, dtype=float), np.asarray(b, dtype=float)
+        assert a_arr.shape == b_arr.shape, f"n_pos mismatch: {a_arr.shape} vs {b_arr.shape}"
+        return a_arr + b_arr
+
+
+    @classmethod
+    def _merge_period_epoch_occupancy_dicts(cls, dst: Dict[str, Dict[str, Any]], src: Dict[str, Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
+        """In-place sum ``src`` into ``dst`` for ``{pre-post: {laps|PBEs: leaf}}`` nesting."""
+        for pre_post, epoch_dict in src.items():
+            if pre_post not in dst:
+                dst[pre_post] = deepcopy(epoch_dict)
+                continue
+            for epoch_type, leaf in epoch_dict.items():
+                if epoch_type not in dst[pre_post]:
+                    dst[pre_post][epoch_type] = deepcopy(leaf)
+                else:
+                    dst[pre_post][epoch_type] = cls._sum_occupancy_leaf(dst[pre_post][epoch_type], leaf)
+            ## END for epoch_type, leaf in epoch_dict.items()...
+        ## END for pre_post, epoch_dict in src.items()...
+        return dst
+
+
+    @classmethod
+    def aggregate_session_nested_occupancy_by_animal(cls, decoded_seconds_by_session: Dict[str, Dict[str, Dict[str, Any]]], measured_seconds_by_session: Optional[Dict[str, Dict[str, Dict[str, NDArray]]]] = None, separator: str = '_') -> Tuple[Dict[str, Dict[str, Dict[str, Any]]], Optional[Dict[str, Dict[str, Dict[str, NDArray]]]]]:
+        """Sum session-nested occupancy into animal-nested dicts (same nesting under each animal key). Pass result to ``Figure5.main(..., split_by_session=True)``."""
+        decoded_by_animal: Dict[str, Dict[str, Dict[str, Any]]] = {}
+        for session_name, sess_decoded in decoded_seconds_by_session.items():
+            animal = cls.animal_from_session_name(session_name, separator=separator)
+            if animal not in decoded_by_animal:
+                decoded_by_animal[animal] = deepcopy(sess_decoded)
+            else:
+                cls._merge_period_epoch_occupancy_dicts(decoded_by_animal[animal], sess_decoded)
+        ## END for session_name, sess_decoded in decoded_seconds_by_session.items()...
+
+        if measured_seconds_by_session is None:
+            return decoded_by_animal, None
+
+        measured_by_animal: Dict[str, Dict[str, Dict[str, NDArray]]] = {}
+        for session_name, sess_measured in measured_seconds_by_session.items():
+            animal = cls.animal_from_session_name(session_name, separator=separator)
+            if animal not in measured_by_animal:
+                measured_by_animal[animal] = deepcopy(sess_measured)
+            else:
+                cls._merge_period_epoch_occupancy_dicts(measured_by_animal[animal], sess_measured)
+        ## END for session_name, sess_measured in measured_seconds_by_session.items()...
+
+        return decoded_by_animal, measured_by_animal
 
 
 # ==================================================================================================================== #
