@@ -7272,6 +7272,8 @@ class Figure5:
             from neuropy.plotting.placemaps import perform_plot_occupancy
 
         ## INPUTS: full_epoch_occupancy_seconds_dict_dict, full_epoch_occupancy_fractional_dict_dict, time_bin_size, measured_x_col: str = 'binned_x_meas'
+        ## When split_by_session=True, optional prefix builds a spanning left label per figure, e.g. outer_group_label_prefix='Animal' → "Animal: gor01"
+        outer_group_label_prefix: Optional[str] = kwargs.pop('outer_group_label_prefix', None)
         pre_post_all_epoch_names = ['pre-delta', 'post-delta', 'all']
         _PERIOD_KEYS = set(pre_post_all_epoch_names)
         decoder_color_dict: Dict[types.DecoderName, str] = {'long_LR': '#0099ff', 'long_RL': '#1b115a', 'short_LR': '#f51616', 'short_RL': '#891111'}
@@ -7339,17 +7341,27 @@ class Figure5:
             ## END for a_lap_pbe_epoch_name in laps_pbe_epoch_names....
             return measured_epoch_occupancy_seconds_dict_dict, measured_epoch_occupancy_fractional_dict_dict
 
-        def _plot_occupancy_mosaic(fig, decoded_seconds_dict_dict, measured_seconds_dict_dict):
+        def _plot_occupancy_mosaic(fig, decoded_seconds_dict_dict, measured_seconds_dict_dict, outer_row_group_label: Optional[str] = None):
             """2x3 laps/PBEs × pre/post/all mosaic on `fig`. Decoded on primary (left) y-axis; measured on twin right y-axis (independent autoscale).
 
-            Leftmost mosaic column holds whole-row epoch labels (``Laps`` / ``PBEs``).
+            Left mosaic columns: optional outer group label (e.g. ``Animal: gor01``, spanning both rows), then whole-row epoch labels (``Laps`` / ``PBEs``).
             """
-            # Narrow first column for row labels so they sit left of the "decoded (s)" ylabel without colliding.
-            ax_dict = fig.subplot_mosaic(
-                [['row_laps', 'laps_pre-delta', 'laps_post-delta', 'laps_all'],
-                 ['row_PBEs', 'PBEs_pre-delta', 'PBEs_post-delta', 'PBEs_all']],
-                width_ratios=[0.08, 1, 1, 1],
-            )
+            # Narrow label column(s) sit left of the "decoded (s)" ylabel without colliding.
+            if outer_row_group_label is not None:
+                ax_dict = fig.subplot_mosaic(
+                    [['row_group', 'row_laps', 'laps_pre-delta', 'laps_post-delta', 'laps_all'],
+                     ['row_group', 'row_PBEs', 'PBEs_pre-delta', 'PBEs_post-delta', 'PBEs_all']],
+                    width_ratios=[0.12, 0.08, 1, 1, 1],
+                )
+                _group_ax = ax_dict['row_group']
+                _group_ax.set_axis_off()
+                _group_ax.text(0.5, 0.5, outer_row_group_label, transform=_group_ax.transAxes, rotation=90, va='center', ha='center', fontsize=14, fontweight='bold')
+            else:
+                ax_dict = fig.subplot_mosaic(
+                    [['row_laps', 'laps_pre-delta', 'laps_post-delta', 'laps_all'],
+                     ['row_PBEs', 'PBEs_pre-delta', 'PBEs_post-delta', 'PBEs_all']],
+                    width_ratios=[0.08, 1, 1, 1],
+                )
             _data_ax_keys = ['laps_pre-delta', 'laps_post-delta', 'laps_all', 'PBEs_pre-delta', 'PBEs_post-delta', 'PBEs_all']
             _share_ref_ax = ax_dict[_data_ax_keys[0]]
             for _ax_key in _data_ax_keys[1:]:
@@ -7517,7 +7529,8 @@ class Figure5:
 
                 if enable_figure:
                     sess_fig = plt.figure(layout='constrained', figsize=[18, 4], dpi=220, clear=True, num=f'{num} | {session_name}')
-                    ax_dict = _plot_occupancy_mosaic(sess_fig, sess_decoded_seconds, sess_measured_seconds)
+                    _outer_label: Optional[str] = (f'{outer_group_label_prefix}: {session_name}' if (outer_group_label_prefix is not None) else None)
+                    ax_dict = _plot_occupancy_mosaic(sess_fig, sess_decoded_seconds, sess_measured_seconds, outer_row_group_label=_outer_label)
                     sess_fig.suptitle(f'Figure 5 — measured vs decoded occupancy | {session_name}')
                     session_figs[session_name] = sess_fig
                     session_ax_dicts[session_name] = ax_dict
