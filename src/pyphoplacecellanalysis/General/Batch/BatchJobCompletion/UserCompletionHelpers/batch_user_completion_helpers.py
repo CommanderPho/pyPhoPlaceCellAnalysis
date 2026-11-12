@@ -3148,8 +3148,8 @@ def generalized_decode_epochs_dict_and_export_results_completion_function(self, 
 
 @function_attributes(short_name=None, tags=['decoding', 'context', 'position', 'batch', 'export', 'fig5', 'occupancy', 'shuffles-indep', 'pure'], input_requires=['EpochComputations'], output_provides=['export_decoded_variables_evaluation_completion_function'], uses=['determine_decoded_context_uncertainty_as_fn_of_position', 'Figure5.export_session_occupancy_csv'], used_by=[], creation_date='2026-04-08 14:30', related_items=['generalized_decode_epochs_dict_and_export_results_completion_function'])
 def export_decoded_variables_evaluation_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, time_bin_size: float = 0.025,
-         export_sess_meas_decoded_occupancy: bool = True, export_decoded_ctxt_by_pos_uncertainty: bool = False,
-        show_pos_by_ctxt_joint_figure: bool = False, export_filename_extra_suffix_parts: Optional[List[str]]=None) -> dict:
+         export_sess_meas_decoded_occupancy: bool = True, export_decoded_ctxt_by_pos_uncertainty: bool = False, show_pos_by_ctxt_joint_figure: bool = False,
+         export_filename_extra_suffix_parts: Optional[List[str]]=None) -> dict:
     """Batch hook for ``determine_decoded_context_uncertainty_as_fn_of_position`` plus ``Figure5.export_session_occupancy_csv``.
 
     Run after ``generalized_decode_epochs_dict_and_export_results_completion_function`` so ``EpochComputations`` is populated.
@@ -3198,6 +3198,7 @@ def export_decoded_variables_evaluation_completion_function(self, global_data_ro
         callback_outputs['partition_keys'] = None
         callback_outputs['error'] = None
 
+    assert (not show_pos_by_ctxt_joint_figure), f'\t ERROR: export_decoded_variables_evaluation_completion_function: `show_pos_by_ctxt_joint_figure` must be False when `export_decoded_ctxt_by_pos_uncertainty` is False so the request for figure does not go unnoticed. \n\tNOTE: in batch/headless runs (got {show_pos_by_ctxt_joint_figure}); PNG export still works with show_pos_by_ctxt_joint_figure=False'
 
     if export_sess_meas_decoded_occupancy:
         try:
