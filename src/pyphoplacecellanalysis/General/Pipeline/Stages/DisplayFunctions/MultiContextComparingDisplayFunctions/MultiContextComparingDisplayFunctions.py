@@ -214,14 +214,14 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
             return graphics_output_dict
 
 
-        with mpl.rc_context(PhoPublicationFigureHelper.rc_context_kwargs({'figure.dpi': str(dpi), 'figure.constrained_layout.use': (constrained_layout or False), 'figure.frameon': False, 'figure.figsize': size, })): # 'figure.figsize': (12.4, 4.8), 
+        with mpl.rc_context(PhoPublicationFigureHelper.rc_context_kwargs() | {'figure.dpi': str(dpi), 'figure.constrained_layout.use': (constrained_layout or False), 'figure.frameon': False, 'figure.figsize': size, }): # 'figure.figsize': (12.4, 4.8), 
             # Create a FigureCollector instance
             with FigureCollector(name=display_fn_name, base_context=active_display_context) as collector:
 
                 did_create_new_figure: bool = False
                 # Plot all 1D position variables:
                 if ax is None:
-                    fig, ax = plt.subplots()
+                    fig, ax = plt.subplots(figsize=size)
                     did_create_new_figure = True
                 else:
                     fig = ax.figure
