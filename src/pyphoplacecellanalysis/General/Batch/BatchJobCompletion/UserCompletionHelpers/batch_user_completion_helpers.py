@@ -76,7 +76,7 @@ and can be extracted from batch output by:
 # collected_outputs_path = Path(r'C:\Users\pho\repos\Spike3DWorkEnv\Spike3D\output\collected_outputs').resolve() # Apogee
 
 
-@function_attributes(short_name=None, tags=['export', 'filename', 'suffix', 'variant'], input_requires=[], output_provides=[], uses=[], used_by=['generalized_decode_epochs_dict_and_export_results_completion_function', 'save_custom_session_files_completion_function', 'figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function', 'export_decoded_context_uncertainty_by_position_completion_function'], creation_date='2026-08-27 17:00', related_items=['get_custom_pipeline_filenames_from_parameters'])
+@function_attributes(short_name=None, tags=['export', 'filename', 'suffix', 'variant'], input_requires=[], output_provides=[], uses=[], used_by=['generalized_decode_epochs_dict_and_export_results_completion_function', 'save_custom_session_files_completion_function', 'figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function', 'export_decoded_variables_evaluation_completion_function'], creation_date='2026-08-27 17:00', related_items=['get_custom_pipeline_filenames_from_parameters'])
 def apply_export_filename_extra_suffix_parts_to_pipeline(curr_active_pipeline, export_filename_extra_suffix_parts: Optional[List[str]]=None) -> None:
     """ Sets a transient attribute on the pipeline so that `get_custom_pipeline_filenames_from_parameters()`/`custom_save_pipeline_as()` append extra parser-safe suffix parts (e.g. ['variant_trackBodyPeakOnly']) to export filenames.
     Each part must contain an underscore separating key and value (e.g. 'variant_trackBodyPeakOnly') to stay compatible with `ExportValueNameCleaner.parse_comparable_custom_replay_name_to_separate_columns`.
@@ -3137,8 +3137,8 @@ def generalized_decode_epochs_dict_and_export_results_completion_function(self, 
 
 
 
-@function_attributes(short_name=None, tags=['decoding', 'context', 'position', 'batch', 'export', 'fig5', 'occupancy'], input_requires=['EpochComputations'], output_provides=['export_decoded_context_uncertainty_by_position_completion_function'], uses=['determine_decoded_context_uncertainty_as_fn_of_position', 'Figure5.export_session_occupancy_csv'], used_by=[], creation_date='2026-04-08 14:30', related_items=['generalized_decode_epochs_dict_and_export_results_completion_function'])
-def export_decoded_context_uncertainty_by_position_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, time_bin_size: float = 0.060, show_pos_by_ctxt_joint_figure: bool = True, export_filename_extra_suffix_parts: Optional[List[str]]=None) -> dict:
+@function_attributes(short_name=None, tags=['decoding', 'context', 'position', 'batch', 'export', 'fig5', 'occupancy', 'shuffles-indep', 'pure'], input_requires=['EpochComputations'], output_provides=['export_decoded_variables_evaluation_completion_function'], uses=['determine_decoded_context_uncertainty_as_fn_of_position', 'Figure5.export_session_occupancy_csv'], used_by=[], creation_date='2026-04-08 14:30', related_items=['generalized_decode_epochs_dict_and_export_results_completion_function'])
+def export_decoded_variables_evaluation_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, time_bin_size: float = 0.060, show_pos_by_ctxt_joint_figure: bool = True, export_filename_extra_suffix_parts: Optional[List[str]]=None) -> dict:
     """Batch hook for ``determine_decoded_context_uncertainty_as_fn_of_position`` (CSV/PNG under ``collected_outputs/output/``) plus Figure 5 occupancy CSV under ``collected_outputs/``.
 
     Run after ``generalized_decode_epochs_dict_and_export_results_completion_function`` so ``EpochComputations`` is populated.
@@ -3148,11 +3148,11 @@ def export_decoded_context_uncertainty_by_position_completion_function(self, glo
     from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import determine_decoded_context_uncertainty_as_fn_of_position
     from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import Figure5
 
-    _callback_key = 'export_decoded_context_uncertainty_by_position_completion_function'
+    _callback_key = 'export_decoded_variables_evaluation_completion_function'
     if across_session_results_extended_dict is None:
         across_session_results_extended_dict = {}
     print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
-    print(f'export_decoded_context_uncertainty_by_position_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...)')
+    print(f'export_decoded_variables_evaluation_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...)')
     assert self.collected_outputs_path.exists()
     apply_export_filename_extra_suffix_parts_to_pipeline(curr_active_pipeline, export_filename_extra_suffix_parts=export_filename_extra_suffix_parts) ## disambiguates variant export filenames (e.g. appending '-variant_trackBodyPeakOnly')
 
@@ -3163,7 +3163,7 @@ def export_decoded_context_uncertainty_by_position_completion_function(self, glo
         callback_outputs['partition_keys'] = list(_out.keys()) if _out is not None else []
         callback_outputs['error'] = None
     except Exception as e:
-        print(f'WARN: export_decoded_context_uncertainty_by_position_completion_function (uncertainty) failed for {curr_session_context}: {e}')
+        print(f'WARN: export_decoded_variables_evaluation_completion_function (uncertainty) failed for {curr_session_context}: {e}')
         callback_outputs['partition_keys'] = None
         callback_outputs['error'] = repr(e)
         if self.fail_on_exception:
@@ -3175,7 +3175,7 @@ def export_decoded_context_uncertainty_by_position_completion_function(self, glo
         callback_outputs['fig5_occupancy_csv_path'] = str(fig5_csv_path)
         callback_outputs['fig5_occupancy_error'] = None
     except Exception as e:
-        print(f'WARN: export_decoded_context_uncertainty_by_position_completion_function (fig5_occupancy) failed for {curr_session_context}: {e}')
+        print(f'WARN: export_decoded_variables_evaluation_completion_function (fig5_occupancy) failed for {curr_session_context}: {e}')
         callback_outputs['fig5_occupancy_csv_path'] = None
         callback_outputs['fig5_occupancy_error'] = repr(e)
         if self.fail_on_exception:
@@ -5119,7 +5119,7 @@ def MAIN_get_template_string(BATCH_DATE_TO_USE: str, collected_outputs_path:Path
                                     'compute_and_export_cell_first_spikes_characteristics_completion_function': compute_and_export_cell_first_spikes_characteristics_completion_function,
                                     'figures_plot_cell_first_spikes_characteristics_completion_function': figures_plot_cell_first_spikes_characteristics_completion_function,
                                     'generalized_decode_epochs_dict_and_export_results_completion_function': generalized_decode_epochs_dict_and_export_results_completion_function,
-                                    'export_decoded_context_uncertainty_by_position_completion_function': export_decoded_context_uncertainty_by_position_completion_function,
+                                    'export_decoded_variables_evaluation_completion_function': export_decoded_variables_evaluation_completion_function,
                                     'figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function': figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function,
                                     # 'generalized_export_figures_customizazble_completion_function': generalized_export_figures_customizazble_completion_function,
                                     'compute_and_export_bapun_train_test_decoder_error_distance_completion_function': compute_and_export_bapun_train_test_decoder_error_distance_completion_function,
