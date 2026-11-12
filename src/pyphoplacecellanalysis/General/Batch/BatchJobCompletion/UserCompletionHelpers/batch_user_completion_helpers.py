@@ -3147,7 +3147,7 @@ def generalized_decode_epochs_dict_and_export_results_completion_function(self, 
 
 
 @function_attributes(short_name=None, tags=['decoding', 'context', 'position', 'batch', 'export', 'fig5', 'occupancy', 'shuffles-indep', 'pure'], input_requires=['EpochComputations'], output_provides=['export_decoded_variables_evaluation_completion_function'], uses=['determine_decoded_context_uncertainty_as_fn_of_position', 'Figure5.export_session_occupancy_csv'], used_by=[], creation_date='2026-04-08 14:30', related_items=['generalized_decode_epochs_dict_and_export_results_completion_function'])
-def export_decoded_variables_evaluation_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, time_bin_size: float = 0.060, show_pos_by_ctxt_joint_figure: bool = True, export_filename_extra_suffix_parts: Optional[List[str]]=None) -> dict:
+def export_decoded_variables_evaluation_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, time_bin_size: float = 0.025, show_pos_by_ctxt_joint_figure: bool = True, export_filename_extra_suffix_parts: Optional[List[str]]=None) -> dict:
     """Batch hook for ``determine_decoded_context_uncertainty_as_fn_of_position`` (CSV/PNG under ``collected_outputs/output/``) plus Figure 5 occupancy CSV under ``collected_outputs/``.
 
     Run after ``generalized_decode_epochs_dict_and_export_results_completion_function`` so ``EpochComputations`` is populated.
