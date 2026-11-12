@@ -609,7 +609,10 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
             # long_epoch_context, short_epoch_context, global_epoch_context = [owning_pipeline_reference.filtered_contexts[a_name] for a_name in (long_epoch_name, short_epoch_name, global_epoch_name)]
             long_session, short_session, global_session = [owning_pipeline_reference.filtered_sessions[an_epoch_name] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
             from pyphoplacecellanalysis.PhoPositionalData.plotting.laps import plot_laps_2d
-            fig, out_axes_list = plot_laps_2d(global_session, legacy_plotting_mode=False, **kwargs)
+            # Hide interval edge lines by default; callers can override via even_lap_kwargs/odd_lap_kwargs.
+            even_lap_kwargs = dict(include_edge_lines=False) | kwargs.pop('even_lap_kwargs', {})
+            odd_lap_kwargs = dict(include_edge_lines=False) | kwargs.pop('odd_lap_kwargs', {})
+            fig, out_axes_list = plot_laps_2d(global_session, legacy_plotting_mode=False, even_lap_kwargs=even_lap_kwargs, odd_lap_kwargs=odd_lap_kwargs, **kwargs)
             out_axes_list[0].set_title('Estimated Laps')
             fig.canvas.manager.set_window_title('Estimated Laps')
 

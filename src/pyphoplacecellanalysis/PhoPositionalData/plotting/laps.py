@@ -173,7 +173,7 @@ def _build_included_mask(mask_shape, crossing_beginings, crossing_endings):
         included_mask[aRange] = True
     return included_mask, included_index_ranges
 
-def _plot_helper_render_laps(pos_t_rel_seconds, pos_value, crossing_beginings, crossing_midpoints, crossing_endings, color='y', include_highlight=False, ax=None, zorder:int=-5):
+def _plot_helper_render_laps(pos_t_rel_seconds, pos_value, crossing_beginings, crossing_midpoints, crossing_endings, color='y', include_highlight=False, include_edge_lines: bool=True, ax=None, zorder:int=-5):
     """ renders a set of estimated laps with the provided settings
     Usage:
         fig, out_axes_list = plot_position_curves_figure(position_obj, include_velocity=False, include_accel=False)
@@ -196,11 +196,12 @@ def _plot_helper_render_laps(pos_t_rel_seconds, pos_value, crossing_beginings, c
         ax.scatter(pos_t_rel_seconds[crossing_midpoints], pos_value[crossing_midpoints], s=15, c=color, label='lap_crossing_midpoints', zorder=(zorder+1))
     
     # Plots the concrete vertical lines denoting the start/end of each lap
-    ax.vlines(pos_t_rel_seconds[crossing_beginings], 0, 1, transform=ax.get_xaxis_transform(), colors=color, label='lap_crossing_beginings', zorder=(zorder)) # index 57100 is out of bounds for axis 0 with size 51455 -> pos_t_rel_seconds has size 51455, and crossing_beginings is too long!
-    ax.vlines(pos_t_rel_seconds[crossing_endings], 0, 1, transform=ax.get_xaxis_transform(), colors=color, label='lap_crossing_endings', zorder=(zorder))
+    if include_edge_lines:
+        ax.vlines(pos_t_rel_seconds[crossing_beginings], 0, 1, transform=ax.get_xaxis_transform(), colors=color, label='lap_crossing_beginings', zorder=(zorder)) # index 57100 is out of bounds for axis 0 with size 51455 -> pos_t_rel_seconds has size 51455, and crossing_beginings is too long!
+        ax.vlines(pos_t_rel_seconds[crossing_endings], 0, 1, transform=ax.get_xaxis_transform(), colors=color, label='lap_crossing_endings', zorder=(zorder))
     # Plot the ranges for the ascending and descending laps:
     curr_included_mask, curr_included_index_ranges = _build_included_mask(np.shape(pos_value), crossing_beginings, crossing_endings)
-    collection = BrokenBarHCollection.span_where(pos_t_rel_seconds, ymin=0, ymax=1, transform=ax.get_xaxis_transform(), where=curr_included_mask, facecolor=color, alpha=0.35, label='lap_span_where', zorder=(zorder-1))
+    collection = BrokenBarHCollection.span_where(pos_t_rel_seconds, ymin=0, ymax=1, transform=ax.get_xaxis_transform(), where=curr_included_mask, facecolor=color, edgecolor='none', alpha=0.35, label='lap_span_where', zorder=(zorder-1))
     ax.add_collection(collection)
     
      # Add highlight/overlay
