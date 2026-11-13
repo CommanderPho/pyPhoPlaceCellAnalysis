@@ -4182,6 +4182,8 @@ class PrePostDeltaDistributionComparison:
                                          animal_marker_mapping: Optional[Dict[str, str]] = None, animal_legend_labels: Optional[Dict[str, str]] = None,
                                          laps_p_value: Optional[float] = None, pbe_p_value: Optional[float] = None,
                                          pbe_heuristic_passing_results=None, pbe_heuristic_p_value: Optional[float] = None,
+                                         pbe_additional_filter_results=None, pbe_additional_filter_p_value: Optional[float] = None,
+                                         pbe_additional_filter_label: Optional[str] = None, pbe_additional_filter_color: Optional[str] = None,
                                          ylabel: str = 'Session-mean $P_{Short}$', title: str = 'Decoded $P_{Short}$',
                                          group_labels: Tuple[str, str] = ('Laps', 'PBEs'), prepare_for_publication: bool = True,
                                          defer_show: bool = False, save_figure: bool = False, export_folder: Optional[Path] = None,
@@ -4200,8 +4202,12 @@ class PrePostDeltaDistributionComparison:
         Points are dodged into animal columns with a shared pre/post x-offset so paired lines do not cross.
 
         When `enable_heuristic_filtered_outputs=True`, pass `pbe_heuristic_passing_results` (the `*_PBEs_heuristic_passing` `run()` dict,
-        or a parent results dict with a single such key). Heuristic-passing session means are drawn as a second adjacent bar series:
-        each PBE column is split into two half-width bars (all PBEs | heuristic-passing). Laps bars stay full width.
+        or a parent results dict with a single such key). Heuristic-passing session means are drawn as an adjacent bar series:
+        each PBE column is split into half-width bars (all PBEs | heuristic-passing). Laps bars stay full width.
+
+        Pass `pbe_additional_filter_results` (e.g. `*_sig_spearman_z`) for a third PBE series. With both additional + heuristic,
+        each PBE column splits into three bars: all | additional | heuristic. Order is fixed; colors default to Tab10 blue
+        then green (`FigureS8.ADDITIONAL_FILTER_PASSING_COLOR` / `HEURISTIC_PASSING_COLOR`).
 
         Saving uses `FigureCollector` plus `PhoPublicationFigureHelper.rc_context_kwargs`. When `save_figure=True`, writes PDF/PNG
         via `build_and_write_to_file` (or `AcrossSessionsVisualizations.output_figure` if `export_folder` is omitted) and SVG via `fig.savefig`.
@@ -4213,6 +4219,8 @@ class PrePostDeltaDistributionComparison:
                 pre_post_delta_stats_results_dict['_perTimeBin_Laps'],
                 pre_post_delta_stats_results_dict['_perTimeBin_PBEs'],
                 pbe_heuristic_passing_results=pre_post_delta_stats_results_dict.get('_perTimeBin_PBEs_heuristic_passing'),
+                pbe_additional_filter_results=pre_post_delta_stats_results_dict.get('_perTimeBin_PBEs_sig_spearman_z'),
+                pbe_additional_filter_label='sig_spearman_z',
                 fignum=f'{fig_name}-pre_post_delta_effect-{metric}',
                 separate_laps_pbes_figures=False,
             )
@@ -4286,27 +4294,52 @@ class PrePostDeltaDistributionComparison:
                     return None
             return obj
 
-        laps_session_summary, laps_p_value = _coerce_session_summary(laps_results, laps_p_value, 'laps_results')
-        pbe_session_summary, pbe_p_value = _coerce_session_summary(pbe_results, pbe_p_value, 'pbe_results')
+        laps_session_summary, laps_p_value = _coerce_session_summary(laps_results, laps_p_value, 'laps_results', required=False)
+        pbe_session_summary, pbe_p_value = _coerce_session_summary(pbe_results, pbe_p_value, 'pbe_results', required=False)
+        if (laps_session_summary is None) and (pbe_session_summary is None):
+            raise ValueError('At least one of laps_results or pbe_results is required.')
+        include_laps: bool = laps_session_summary is not None
+        include_pbes: bool = pbe_session_summary is not None
         pbe_heuristic_session_summary, pbe_heuristic_p_value = _coerce_session_summary(
             _unwrap_heuristic_passing_obj(pbe_heuristic_passing_results), pbe_heuristic_p_value,
             'pbe_heuristic_passing_results', required=False,
         )
+        pbe_additional_session_summary, pbe_additional_filter_p_value = _coerce_session_summary(
+            pbe_additional_filter_results, pbe_additional_filter_p_value,
+            'pbe_additional_filter_results', required=False,
+        )
+        if pbe_additional_filter_label is None:
+            pbe_additional_filter_label = 'Additional filter'
+        if pbe_additional_filter_color is None:
+            pbe_additional_filter_color = FigureS8.ADDITIONAL_FILTER_PASSING_COLOR
 
-        y_values = [
-            laps_session_summary[pre_col].to_numpy(dtype=float),
-            laps_session_summary[post_col].to_numpy(dtype=float),
-            pbe_session_summary[pre_col].to_numpy(dtype=float),
-            pbe_session_summary[post_col].to_numpy(dtype=float),
-        ]
-        x_labels = [
-            f'{group_labels[0]} pre-$\\Delta$',
-            f'{group_labels[0]} post-$\\Delta$',
-            f'{group_labels[1]} pre-$\\Delta$',
-            f'{group_labels[1]} post-$\\Delta$',
-        ]
+        # Extra PBE overlay series drawn beside "all PBEs" (order: additional then heuristic when both present)
+        extra_pbe_series: List[Dict[str, Any]] = []
+        if include_pbes and (pbe_additional_session_summary is not None):
+            extra_pbe_series.append(dict(label=str(pbe_additional_filter_label), color=str(pbe_additional_filter_color), summary=pbe_additional_session_summary, p_value=pbe_additional_filter_p_value))
+        if include_pbes and (pbe_heuristic_session_summary is not None):
+            extra_pbe_series.append(dict(label='Heuristic-passing', color=FigureS8.HEURISTIC_PASSING_COLOR, summary=pbe_heuristic_session_summary, p_value=pbe_heuristic_p_value))
+        ## END if include_pbes and (pbe_heuristic_session_summary is not None)...
+        n_extra_pbe: int = len(extra_pbe_series)
+        has_pbe_extras: bool = (n_extra_pbe > 0)
+        has_heuristic: bool = pbe_heuristic_session_summary is not None
 
-        has_animal: bool = (animal_col in laps_session_summary.columns) and (animal_col in pbe_session_summary.columns)
+        y_values = []
+        x_labels = []
+        if include_laps:
+            y_values.extend([laps_session_summary[pre_col].to_numpy(dtype=float), laps_session_summary[post_col].to_numpy(dtype=float)])
+            x_labels.extend([f'{group_labels[0]} pre-$\\Delta$', f'{group_labels[0]} post-$\\Delta$'])
+        if include_pbes:
+            y_values.extend([pbe_session_summary[pre_col].to_numpy(dtype=float), pbe_session_summary[post_col].to_numpy(dtype=float)])
+            x_labels.extend([f'{group_labels[1]} pre-$\\Delta$', f'{group_labels[1]} post-$\\Delta$'])
+
+        has_animal: bool = True
+        if include_laps:
+            has_animal = has_animal and (animal_col in laps_session_summary.columns)
+        if include_pbes:
+            has_animal = has_animal and (animal_col in pbe_session_summary.columns)
+        if (not include_laps) and (not include_pbes):
+            has_animal = False
         filled_markers = ['o', '^', 's', 'p', 'd', 'P', 'X']
         preferred_animals = ('gor01', 'vvp01', 'pin01')
         if animal_marker_mapping is None:
@@ -4328,9 +4361,16 @@ class PrePostDeltaDistributionComparison:
         unique_animals: List[str] = []
         marker_mapping: Dict[str, str] = {}
         if has_animal:
-            animal_frames = [laps_session_summary, pbe_session_summary]
-            if (pbe_heuristic_session_summary is not None) and (animal_col in pbe_heuristic_session_summary.columns):
-                animal_frames.append(pbe_heuristic_session_summary)
+            animal_frames = []
+            if include_laps:
+                animal_frames.append(laps_session_summary)
+            if include_pbes:
+                animal_frames.append(pbe_session_summary)
+            for _series in extra_pbe_series:
+                _sum = _series['summary']
+                if (animal_col in _sum.columns):
+                    animal_frames.append(_sum)
+            ## END for _series in extra_pbe_series...
             unique_animals = [str(a) for a in pd.unique(pd.concat([df[animal_col] for df in animal_frames], ignore_index=True))]
             used_markers = set(animal_marker_mapping.values())
             spare_markers = [m for m in filled_markers if m not in used_markers] or list(filled_markers)
@@ -4384,23 +4424,31 @@ class PrePostDeltaDistributionComparison:
 
             return offsets
 
-        scatter_props = [
-            _bar_scatter_props(laps_session_summary),
-            _bar_scatter_props(laps_session_summary),
-            _bar_scatter_props(pbe_session_summary),
-            _bar_scatter_props(pbe_session_summary),
-        ]
+        scatter_props = []
+        if include_laps:
+            scatter_props.extend([_bar_scatter_props(laps_session_summary), _bar_scatter_props(laps_session_summary)])
+        if include_pbes:
+            scatter_props.extend([_bar_scatter_props(pbe_session_summary), _bar_scatter_props(pbe_session_summary)])
         if active_context is None:
             active_context = IdentifyingContext(format_name='kdiba', fig='4', display_fn_name='pre_post_delta_summary_bars')
 
         heuristic_color = FigureS8.HEURISTIC_PASSING_COLOR
         summary_bar_color = 'k'  # Laps/PBEs are not Long/Short; do not use Fig2 blue/red
-        has_heuristic: bool = pbe_heuristic_session_summary is not None
         heuristic_y_pre = None
         heuristic_y_post = None
         pbe_half_offset = 0.0
         full_width = 0.3
         half_width = full_width / 2.0
+        n_pbe_split: int = 1 + n_extra_pbe  # all + extras
+        split_width = full_width / float(n_pbe_split)
+        pair_gap = 0.02
+        def _pbe_split_offsets(n_split: int = n_pbe_split) -> np.ndarray:
+            if n_split <= 1:
+                return np.array([0.0], dtype=float)
+            step = split_width + pair_gap
+            return (np.arange(n_split, dtype=float) - (n_split - 1) / 2.0) * step
+        ## END def _pbe_split_offsets...
+        pbe_split_offsets = _pbe_split_offsets()
         dpi = kwargs.pop('dpi', 220)
         laps_fig_file_name: Optional[str] = kwargs.pop('laps_fig_file_name', None)
         pbe_fig_file_name: Optional[str] = kwargs.pop('pbe_fig_file_name', None)
@@ -4414,15 +4462,17 @@ class PrePostDeltaDistributionComparison:
             panel_saved_paths: List[Path] = []
             if not save_figure:
                 return panel_saved_paths, None
+            # Outside-axes legends (and wide 3-split bars) extend past the default figure box; every export format needs tight bbox.
+            _save_bbox_kwargs = dict(bbox_inches='tight', pad_inches=0.25)
             save_context = active_context.overwriting_context(display_fn_name=panel_fig_file_name)
             fig_man = None
             export_folder_path = None if export_folder is None else Path(export_folder)
             if export_folder_path is not None:
                 export_folder_path.mkdir(parents=True, exist_ok=True)
                 fig_man = FileOutputManager(figure_output_location=FigureOutputLocation.CUSTOM, context_to_path_mode=ContextToPathMode.GLOBAL_UNIQUE, override_output_parent_path=export_folder_path)
-                panel_saved_paths = list(build_and_write_to_file(fig, save_context, fig_man=fig_man, write_vector_format=write_vector_format, write_png=write_png) or [])
+                panel_saved_paths = list(build_and_write_to_file(fig, save_context, fig_man=fig_man, write_vector_format=write_vector_format, write_png=write_png, **_save_bbox_kwargs) or [])
             else:
-                panel_saved_paths, _save_context = AcrossSessionsVisualizations.output_figure(save_context, fig, write_vector_format=write_vector_format, write_png=write_png)
+                panel_saved_paths, _save_context = AcrossSessionsVisualizations.output_figure(save_context, fig, write_vector_format=write_vector_format, write_png=write_png, **_save_bbox_kwargs)
                 panel_saved_paths = list(panel_saved_paths or [])
                 fig_man = AcrossSessionsVisualizations._fig_out_man
             if write_svg:
@@ -4432,16 +4482,18 @@ class PrePostDeltaDistributionComparison:
                     if fig_man is None:
                         fig_man = FileOutputManager(figure_output_location=FigureOutputLocation.DAILY_PROGRAMMATIC_OUTPUT_FOLDER, context_to_path_mode=ContextToPathMode.GLOBAL_UNIQUE)
                     svg_path = fig_man.get_figure_save_file_path(save_context, make_folder_if_needed=True).with_suffix('.svg')
-                fig.savefig(svg_path, format='svg', transparent=True)
+                fig.savefig(svg_path, format='svg', transparent=True, **_save_bbox_kwargs)
                 postprocess_matplotlib_svg_for_publication(svg_path)
                 panel_saved_paths.append(svg_path)
             return panel_saved_paths, (panel_saved_paths[0] if panel_saved_paths else None)
 
         def _plot_one_panel(group_label: str, summary_df: pd.DataFrame, p_value: Optional[float],
                             panel_fig_name: str, panel_fignum, panel_fig_file_name: str, collector,
-                            heuristic_summary=None, heuristic_p_value: Optional[float] = None) -> Dict[str, Any]:
-            """One 2-bar (or heuristic-split) pre/post panel for the separate-figures path."""
-            panel_has_heuristic: bool = heuristic_summary is not None
+                            panel_extra_series: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
+            """One 2-bar (or multi-split) pre/post panel for the separate-figures path."""
+            panel_extra_series = list(panel_extra_series or [])
+            n_panel_extra: int = len(panel_extra_series)
+            panel_has_extras: bool = (n_panel_extra > 0)
             panel_kwargs = dict(kwargs)
             panel_kwargs.pop('fignum', None)
             panel_kwargs.pop('num', None)
@@ -4450,40 +4502,39 @@ class PrePostDeltaDistributionComparison:
             panel_kwargs.setdefault('scatter_kwargs', dict(edgecolors='white', linewidths=0.4, zorder=4))
             if 'figsize' not in panel_kwargs:
                 rc_w, rc_h = mpl.rcParams['figure.figsize']
-                panel_kwargs['figsize'] = (float(rc_w) * 0.5, float(rc_h))
+                # Full Fig2 width when filter overlays need a right-edge legend; half-width otherwise
+                width_scale = 1.0 if panel_has_extras else 0.5
+                panel_kwargs['figsize'] = (float(rc_w) * width_scale, float(rc_h))
             panel_kwargs.setdefault('bottom_margin', 0.20)
             y_pre = summary_df[pre_col].to_numpy(dtype=float)
             y_post = summary_df[post_col].to_numpy(dtype=float)
             panel_x_labels = [f'{group_label} pre-$\\Delta$', f'{group_label} post-$\\Delta$']
-            if panel_has_heuristic:
-                pair_gap = 0.03
-                half_off = (half_width + pair_gap) / 2.0
-                h_pre = heuristic_summary[pre_col].to_numpy(dtype=float)
-                h_post = heuristic_summary[post_col].to_numpy(dtype=float)
-                panel_y = [y_pre, h_pre, y_post, h_post]
-                panel_scatter = [
-                    _bar_scatter_props(summary_df),
-                    _bar_scatter_props(heuristic_summary),
-                    _bar_scatter_props(summary_df),
-                    _bar_scatter_props(heuristic_summary),
-                ]
+            panel_sig_brackets: List[Tuple[float, float, Optional[float], str]] = []
+            if panel_has_extras:
+                n_split = 1 + n_panel_extra
+                p_split_w = full_width / float(n_split)
+                p_offs = _pbe_split_offsets(n_split)
+                # [all_pre, e0_pre, ..., all_post, e0_post, ...]
+                panel_y = [y_pre] + [s['summary'][pre_col].to_numpy(dtype=float) for s in panel_extra_series] + [y_post] + [s['summary'][post_col].to_numpy(dtype=float) for s in panel_extra_series]
+                panel_scatter = [_bar_scatter_props(summary_df)] + [_bar_scatter_props(s['summary']) for s in panel_extra_series] + [_bar_scatter_props(summary_df)] + [_bar_scatter_props(s['summary']) for s in panel_extra_series]
+                bar_x = np.array([0.0 + float(o) for o in p_offs] + [1.0 + float(o) for o in p_offs], dtype=float)
+                bar_colors = [summary_bar_color] + [s['color'] for s in panel_extra_series] + [summary_bar_color] + [s['color'] for s in panel_extra_series]
+                err_colors = ['k'] + [s['color'] for s in panel_extra_series] + ['k'] + [s['color'] for s in panel_extra_series]
+                widths = np.full(len(bar_x), p_split_w, dtype=float)
+                offsets = [_animal_dodge_offsets(summary_df, p_split_w)] + [_animal_dodge_offsets(s['summary'], p_split_w) for s in panel_extra_series]
+                offsets = offsets + offsets
                 panel_kwargs.update(dict(
-                    bar_x=np.array([0.0 - half_off, 0.0 + half_off, 1.0 - half_off, 1.0 + half_off], dtype=float),
-                    bar_width=np.array([half_width, half_width, half_width, half_width], dtype=float),
-                    bar_colors=[summary_bar_color, heuristic_color, summary_bar_color, heuristic_color],
-                    errorbar_colors=['k', heuristic_color, 'k', heuristic_color],
-                    xtick_positions=np.arange(2),
-                    xtick_labels=panel_x_labels,
-                    scatter_x_offsets=[
-                        _animal_dodge_offsets(summary_df, half_width),
-                        _animal_dodge_offsets(heuristic_summary, half_width),
-                        _animal_dodge_offsets(summary_df, half_width),
-                        _animal_dodge_offsets(heuristic_summary, half_width),
-                    ],
+                    bar_x=bar_x, bar_width=widths, bar_colors=bar_colors, errorbar_colors=err_colors,
+                    xtick_positions=np.arange(2), xtick_labels=panel_x_labels, scatter_x_offsets=offsets,
                 ))
-                pair_specs = [(0, 2, 'gray', 0.3), (1, 3, heuristic_color, 0.45)]
-                all_sig_x = (0.0 - half_off, 1.0 - half_off)
-                heur_sig_x = (0.0 + half_off, 1.0 + half_off)
+                pair_specs = [(0, n_split, 'gray', 0.3)]
+                for ei, series in enumerate(panel_extra_series):
+                    pair_specs.append((1 + ei, n_split + 1 + ei, series['color'], 0.45))
+                ## END for ei, series in enumerate(panel_extra_series)...
+                panel_sig_brackets.append((float(bar_x[0]), float(bar_x[n_split]), p_value, 'k'))
+                for ei, series in enumerate(panel_extra_series):
+                    panel_sig_brackets.append((float(bar_x[1 + ei]), float(bar_x[n_split + 1 + ei]), series.get('p_value'), series['color']))
+                ## END for ei, series in enumerate(panel_extra_series)...
             else:
                 panel_y = [y_pre, y_post]
                 panel_scatter = [_bar_scatter_props(summary_df), _bar_scatter_props(summary_df)]
@@ -4494,7 +4545,7 @@ class PrePostDeltaDistributionComparison:
                 ))
                 pair_specs = [(0, 1, 'gray', 0.3)]
                 all_sig_x = (0.0, 1.0)
-                heur_sig_x = None
+                panel_sig_brackets.append((0.0, 1.0, p_value, 'k'))
             render = PaperFigureTwo.create_plot(
                 panel_x_labels, panel_y, panel_scatter, ylabel, title, panel_fig_name, active_context, True,
                 prepare_for_publication=prepare_for_publication,
@@ -4517,11 +4568,12 @@ class PrePostDeltaDistributionComparison:
                 ## END for i0, i1, line_color, line_alpha in pair_specs...
 
             y_max = float(np.nanmax(np.concatenate(panel_y)))
-            if p_value is not None:
-                add_significance_bars(ax, p_value, x1=all_sig_x[0], x2=all_sig_x[1], y=y_max)
-            if panel_has_heuristic and (heuristic_p_value is not None) and (heur_sig_x is not None):
-                heuristic_bracket_y = y_max + (0.10 * max(abs(y_max), 1e-12))
-                add_significance_bars(ax, heuristic_p_value, x1=heur_sig_x[0], x2=heur_sig_x[1], y=heuristic_bracket_y, color=heuristic_color)
+            for bi, (x1, x2, bracket_p, bracket_color) in enumerate(panel_sig_brackets):
+                if bracket_p is None:
+                    continue
+                bracket_y = y_max if bi == 0 else (y_max + (0.10 * bi * max(abs(y_max), 1e-12)))
+                add_significance_bars(ax, bracket_p, x1=x1, x2=x2, y=bracket_y, color=bracket_color)
+            ## END for bi, (x1, x2, bracket_p, bracket_color) in enumerate(panel_sig_brackets)...
             animal_legend = None
             if has_animal and marker_mapping:
                 legend_animals = [a for a in preferred_animals if a in marker_mapping]
@@ -4551,21 +4603,69 @@ class PrePostDeltaDistributionComparison:
                     bbox_to_anchor=(legend_x, legend_y - 0.008), bbox_transform=fig.transFigure,
                     ncol=max(len(animal_legend_handles), 1), borderaxespad=0.0, columnspacing=1.0, handletextpad=0.4,
                 )
-            if panel_has_heuristic:
-                ax.legend(
-                    handles=[
-                        Patch(facecolor='none', edgecolor=summary_bar_color, label=f'All {group_label}'),
-                        Patch(facecolor='none', edgecolor=heuristic_color, label='Heuristic-passing'),
+            if panel_has_extras:
+                # Expand x-limits so the outermost of the 3 split bars are not clipped by the axes box
+                x_pad = float(split_width) + float(pair_gap) + 0.15
+                ax.set_xlim(-x_pad, 1.0 + x_pad)
+                series_legend = ax.legend(
+                    handles=[Patch(facecolor='none', edgecolor=summary_bar_color, label=f'All {group_label}')] + [
+                        Patch(facecolor='none', edgecolor=s['color'], label=s['label']) for s in panel_extra_series
                     ],
-                    frameon=False, loc='upper left', ncol=2, borderaxespad=0.3, columnspacing=1.0, handletextpad=0.4,
+                    frameon=False, loc='center left', bbox_to_anchor=(1.02, 0.5), bbox_transform=ax.transAxes,
+                    ncol=1, borderaxespad=0.0, columnspacing=1.0, handletextpad=0.4, labelspacing=0.35,
                 )
+                series_legend.set_clip_on(False)
+                # Leave figure-fraction room for the outside-axes legend (savefig also uses bbox_inches='tight')
+                fig.subplots_adjust(right=0.70)
             panel_saved_paths, panel_saved_path = _save_panel_figure(fig, panel_fig_file_name)
             return dict(fig=fig, ax=ax, render=render, y_values=panel_y, saved_path=panel_saved_path, saved_paths=panel_saved_paths)
+
+        # Single epoch-kind (e.g. enabled_epoch_kinds=('PBEs',)): one panel, no Laps series
+        if (include_pbes != include_laps):
+            single_is_pbe: bool = include_pbes
+            single_label: str = group_labels[1] if single_is_pbe else group_labels[0]
+            single_summary = pbe_session_summary if single_is_pbe else laps_session_summary
+            single_p = pbe_p_value if single_is_pbe else laps_p_value
+            single_suffix: str = str(single_label).replace(' ', '')
+            single_fig_file_name: str = (pbe_fig_file_name if single_is_pbe else laps_fig_file_name) or f'{fig_file_name}-{single_suffix}'
+            single_fignum = None if fignum is None else single_fig_file_name
+            if debug_print:
+                print(f'single-kind summary ({single_label}): n_sessions={len(single_summary)}, p_value={single_p}, n_extra={n_extra_pbe}')
+            collector = None
+            with fig2_bar_style.rc_context():
+                with FigureCollector(name='fig4_summary_four_bar', base_context=active_context) as collector:
+                    single_panel = _plot_one_panel(single_label, single_summary, single_p, f'fig4_summary_{single_suffix}_bars', single_fignum, single_fig_file_name, collector,
+                                                   panel_extra_series=(extra_pbe_series if (single_is_pbe and has_pbe_extras) else None))
+                    if not defer_show:
+                        plt.show()
+            return dict(
+                fig=single_panel['fig'],
+                ax=single_panel['ax'],
+                render=single_panel['render'],
+                figs=[single_panel['fig']],
+                laps=None if single_is_pbe else single_panel,
+                pbe=single_panel if single_is_pbe else None,
+                collector=collector,
+                laps_session_summary=laps_session_summary,
+                pbe_session_summary=pbe_session_summary,
+                pbe_heuristic_session_summary=pbe_heuristic_session_summary,
+                pbe_additional_session_summary=pbe_additional_session_summary,
+                y_values=single_panel['y_values'],
+                laps_p_value=laps_p_value,
+                pbe_p_value=pbe_p_value,
+                pbe_heuristic_p_value=pbe_heuristic_p_value,
+                pbe_additional_filter_p_value=pbe_additional_filter_p_value,
+                animal_marker_mapping=marker_mapping,
+                animal_legend_labels={a: _animal_legend_label(a) for a in marker_mapping},
+                saved_path=single_panel['saved_path'],
+                saved_paths=single_panel['saved_paths'],
+            )
 
         if separate_laps_pbes_figures:
             if debug_print:
                 n_heuristic = 0 if pbe_heuristic_session_summary is None else len(pbe_heuristic_session_summary)
-                print(f'laps n_sessions={len(laps_session_summary)}, pbe n_sessions={len(pbe_session_summary)}, pbe_heuristic n_sessions={n_heuristic}, laps_p_value={laps_p_value}, pbe_p_value={pbe_p_value}, pbe_heuristic_p_value={pbe_heuristic_p_value}')
+                n_additional = 0 if pbe_additional_session_summary is None else len(pbe_additional_session_summary)
+                print(f'laps n_sessions={len(laps_session_summary)}, pbe n_sessions={len(pbe_session_summary)}, pbe_additional n_sessions={n_additional}, pbe_heuristic n_sessions={n_heuristic}, laps_p_value={laps_p_value}, pbe_p_value={pbe_p_value}, pbe_additional_filter_p_value={pbe_additional_filter_p_value}, pbe_heuristic_p_value={pbe_heuristic_p_value}')
             collector = None
             laps_suffix: str = str(group_labels[0]).replace(' ', '')
             pbe_suffix: str = str(group_labels[1]).replace(' ', '')
@@ -4579,7 +4679,7 @@ class PrePostDeltaDistributionComparison:
                 with FigureCollector(name='fig4_summary_four_bar', base_context=active_context) as collector:
                     laps_panel = _plot_one_panel(group_labels[0], laps_session_summary, laps_p_value, 'fig4_summary_laps_bars', laps_fignum, laps_fig_file_name, collector)
                     pbe_panel = _plot_one_panel(group_labels[1], pbe_session_summary, pbe_p_value, 'fig4_summary_pbe_bars', pbe_fignum, pbe_fig_file_name, collector,
-                                                heuristic_summary=pbe_heuristic_session_summary if has_heuristic else None, heuristic_p_value=pbe_heuristic_p_value)
+                                                panel_extra_series=extra_pbe_series if has_pbe_extras else None)
                     if not defer_show:
                         plt.show()
             combined_saved_paths = list(laps_panel['saved_paths'] or []) + list(pbe_panel['saved_paths'] or [])
@@ -4594,10 +4694,12 @@ class PrePostDeltaDistributionComparison:
                 laps_session_summary=laps_session_summary,
                 pbe_session_summary=pbe_session_summary,
                 pbe_heuristic_session_summary=pbe_heuristic_session_summary,
+                pbe_additional_session_summary=pbe_additional_session_summary,
                 y_values=y_values,
                 laps_p_value=laps_p_value,
                 pbe_p_value=pbe_p_value,
                 pbe_heuristic_p_value=pbe_heuristic_p_value,
+                pbe_additional_filter_p_value=pbe_additional_filter_p_value,
                 animal_marker_mapping=marker_mapping,
                 animal_legend_labels={a: _animal_legend_label(a) for a in marker_mapping},
                 saved_path=laps_panel['saved_path'],
@@ -4609,44 +4711,41 @@ class PrePostDeltaDistributionComparison:
             create_plot_kwargs.setdefault('fignum', fignum)
         create_plot_kwargs.setdefault('bar_colors', [summary_bar_color] * 4)
         create_plot_kwargs.setdefault('scatter_kwargs', dict(edgecolors='white', linewidths=0.4, zorder=4))
-        if has_heuristic:
-            heuristic_y_pre = pbe_heuristic_session_summary[pre_col].to_numpy(dtype=float)
-            heuristic_y_post = pbe_heuristic_session_summary[post_col].to_numpy(dtype=float)
-            pair_gap = 0.03
-            pbe_half_offset = (half_width + pair_gap) / 2.0
+        if has_pbe_extras:
             pbe_color = summary_bar_color
-            # Split each PBE column into adjacent half-width bars: all-PBEs | heuristic-passing, with a tiny x-gap.
-            y_values = [
-                y_values[0], y_values[1],
-                y_values[2], heuristic_y_pre,
-                y_values[3], heuristic_y_post,
-            ]
-            scatter_props = [
-                scatter_props[0], scatter_props[1],
-                scatter_props[2], _bar_scatter_props(pbe_heuristic_session_summary),
-                scatter_props[3], _bar_scatter_props(pbe_heuristic_session_summary),
-            ]
+            # Per PBE column: all | extra0 | extra1... (offsets from _pbe_split_offsets)
+            # y/scatter order: laps_pre, laps_post, then for each PBE column center [all, *extras] at pre then post
+            # Flatten as: [laps_pre, laps_post, pbe_pre_all, *extras_pre, pbe_post_all, *extras_post]
+            y_pre_block = [y_values[2]] + [s['summary'][pre_col].to_numpy(dtype=float) for s in extra_pbe_series]
+            y_post_block = [y_values[3]] + [s['summary'][post_col].to_numpy(dtype=float) for s in extra_pbe_series]
+            y_values = [y_values[0], y_values[1]] + y_pre_block + y_post_block
+            scatter_pre_block = [scatter_props[2]] + [_bar_scatter_props(s['summary']) for s in extra_pbe_series]
+            scatter_post_block = [scatter_props[3]] + [_bar_scatter_props(s['summary']) for s in extra_pbe_series]
+            scatter_props = [scatter_props[0], scatter_props[1]] + scatter_pre_block + scatter_post_block
+            bar_x = np.array([0.0, 1.0] + [2.0 + float(o) for o in pbe_split_offsets] + [3.0 + float(o) for o in pbe_split_offsets], dtype=float)
+            bar_widths = np.array([full_width, full_width] + [split_width] * n_pbe_split + [split_width] * n_pbe_split, dtype=float)
+            bar_colors = [summary_bar_color, summary_bar_color] + [pbe_color] + [s['color'] for s in extra_pbe_series] + [pbe_color] + [s['color'] for s in extra_pbe_series]
+            err_colors = ['k', 'k'] + ['k'] + [s['color'] for s in extra_pbe_series] + ['k'] + [s['color'] for s in extra_pbe_series]
             create_plot_kwargs.update(dict(
-                bar_x=np.array([0.0, 1.0, 2.0 - pbe_half_offset, 2.0 + pbe_half_offset, 3.0 - pbe_half_offset, 3.0 + pbe_half_offset], dtype=float),
-                bar_width=np.array([full_width, full_width, half_width, half_width, half_width, half_width], dtype=float),
-                bar_colors=[summary_bar_color, summary_bar_color, pbe_color, heuristic_color, pbe_color, heuristic_color],
-                errorbar_colors=['k', 'k', 'k', heuristic_color, 'k', heuristic_color],
-                xtick_positions=np.arange(4),
-                xtick_labels=x_labels,
+                bar_x=bar_x, bar_width=bar_widths, bar_colors=bar_colors, errorbar_colors=err_colors,
+                xtick_positions=np.arange(4), xtick_labels=x_labels,
             ))
+            pbe_half_offset = float(abs(pbe_split_offsets[0])) if len(pbe_split_offsets) else 0.0
 
         laps_offsets = _animal_dodge_offsets(laps_session_summary, full_width)
-        if has_heuristic:
-            pbe_offsets = _animal_dodge_offsets(pbe_session_summary, half_width)
-            heur_offsets = _animal_dodge_offsets(pbe_heuristic_session_summary, half_width)
-            create_plot_kwargs['scatter_x_offsets'] = [laps_offsets, laps_offsets, pbe_offsets, heur_offsets, pbe_offsets, heur_offsets]
+        if has_pbe_extras:
+            pbe_offsets = _animal_dodge_offsets(pbe_session_summary, split_width)
+            extra_offsets = [_animal_dodge_offsets(s['summary'], split_width) for s in extra_pbe_series]
+            pre_post_offsets = [pbe_offsets] + extra_offsets
+            create_plot_kwargs['scatter_x_offsets'] = [laps_offsets, laps_offsets] + pre_post_offsets + pre_post_offsets
         else:
             pbe_offsets = _animal_dodge_offsets(pbe_session_summary, full_width)
             create_plot_kwargs['scatter_x_offsets'] = [laps_offsets, laps_offsets, pbe_offsets, pbe_offsets]
 
         if debug_print:
             n_heuristic = 0 if pbe_heuristic_session_summary is None else len(pbe_heuristic_session_summary)
-            print(f'laps n_sessions={len(laps_session_summary)}, pbe n_sessions={len(pbe_session_summary)}, pbe_heuristic n_sessions={n_heuristic}, laps_p_value={laps_p_value}, pbe_p_value={pbe_p_value}, pbe_heuristic_p_value={pbe_heuristic_p_value}')
+            n_additional = 0 if pbe_additional_session_summary is None else len(pbe_additional_session_summary)
+            print(f'laps n_sessions={len(laps_session_summary)}, pbe n_sessions={len(pbe_session_summary)}, pbe_additional n_sessions={n_additional}, pbe_heuristic n_sessions={n_heuristic}, laps_p_value={laps_p_value}, pbe_p_value={pbe_p_value}, pbe_additional_filter_p_value={pbe_additional_filter_p_value}, pbe_heuristic_p_value={pbe_heuristic_p_value}')
 
         collector = None
         saved_paths: List[Path] = []
@@ -4668,8 +4767,15 @@ class PrePostDeltaDistributionComparison:
                 x_values_list, plotted_y_values = render.plot_data
 
                 if enable_paired_lines:
-                    if has_heuristic:
-                        pair_specs = [(0, 1, 'gray', 0.3), (2, 4, 'gray', 0.3), (3, 5, heuristic_color, 0.45)]
+                    if has_pbe_extras:
+                        # indices: 0=laps_pre, 1=laps_post, then pre-block [all,*extras] starting at 2, post-block at 2+n_pbe_split
+                        pair_specs = [(0, 1, 'gray', 0.3)]
+                        pre_base = 2
+                        post_base = 2 + n_pbe_split
+                        pair_specs.append((pre_base, post_base, 'gray', 0.3))
+                        for ei, series in enumerate(extra_pbe_series):
+                            pair_specs.append((pre_base + 1 + ei, post_base + 1 + ei, series['color'], 0.45))
+                        ## END for ei, series in enumerate(extra_pbe_series)...
                     else:
                         pair_specs = [(0, 1, 'gray', 0.3), (2, 3, 'gray', 0.3)]
                     for i0, i1, line_color, line_alpha in pair_specs:
@@ -4682,11 +4788,18 @@ class PrePostDeltaDistributionComparison:
                 y_max = float(np.nanmax(np.concatenate(y_values)))
                 if laps_p_value is not None:
                     add_significance_bars(ax, laps_p_value, x1=0, x2=1, y=y_max)
-                if pbe_p_value is not None:
-                    add_significance_bars(ax, pbe_p_value, x1=(2.0 - pbe_half_offset), x2=(3.0 - pbe_half_offset), y=y_max)
-                if has_heuristic and (pbe_heuristic_p_value is not None):
-                    heuristic_bracket_y = y_max + (0.10 * max(abs(y_max), 1e-12))
-                    add_significance_bars(ax, pbe_heuristic_p_value, x1=(2.0 + pbe_half_offset), x2=(3.0 + pbe_half_offset), y=heuristic_bracket_y, color=heuristic_color)
+                if has_pbe_extras:
+                    if pbe_p_value is not None:
+                        add_significance_bars(ax, pbe_p_value, x1=(2.0 + float(pbe_split_offsets[0])), x2=(3.0 + float(pbe_split_offsets[0])), y=y_max)
+                    for ei, series in enumerate(extra_pbe_series):
+                        if series.get('p_value') is None:
+                            continue
+                        off = float(pbe_split_offsets[ei + 1])
+                        bracket_y = y_max + (0.10 * (ei + 1) * max(abs(y_max), 1e-12))
+                        add_significance_bars(ax, series['p_value'], x1=(2.0 + off), x2=(3.0 + off), y=bracket_y, color=series['color'])
+                    ## END for ei, series in enumerate(extra_pbe_series)...
+                elif pbe_p_value is not None:
+                    add_significance_bars(ax, pbe_p_value, x1=2.0, x2=3.0, y=y_max)
 
                 animal_legend = None
                 if has_animal and marker_mapping:
@@ -4704,28 +4817,32 @@ class PrePostDeltaDistributionComparison:
                     )
                     animal_legend.set_clip_on(False)
 
-                if has_heuristic:
-                    pbe_legend_color = summary_bar_color
-                    ax.legend(
-                        handles=[
-                            Patch(facecolor='none', edgecolor=pbe_legend_color, label=f'All {group_labels[1]}'),
-                            Patch(facecolor='none', edgecolor=heuristic_color, label='Heuristic-passing'),
+                if has_pbe_extras:
+                    x_pad = float(split_width) + float(pair_gap) + 0.15
+                    ax.set_xlim(-x_pad, 3.0 + x_pad)
+                    series_legend = ax.legend(
+                        handles=[Patch(facecolor='none', edgecolor=summary_bar_color, label=f'All {group_labels[1]}')] + [
+                            Patch(facecolor='none', edgecolor=s['color'], label=s['label']) for s in extra_pbe_series
                         ],
-                        frameon=False, loc='upper left', ncol=2, borderaxespad=0.3, columnspacing=1.0, handletextpad=0.4,
+                        frameon=False, loc='center left', bbox_to_anchor=(1.02, 0.5), bbox_transform=ax.transAxes,
+                        ncol=1, borderaxespad=0.0, columnspacing=1.0, handletextpad=0.4, labelspacing=0.35,
                     )
+                    series_legend.set_clip_on(False)
+                    fig.subplots_adjust(right=0.70)
                     if animal_legend is not None:
                         ax.add_artist(animal_legend)
 
                 if save_figure:
+                    _save_bbox_kwargs = dict(bbox_inches='tight', pad_inches=0.25)
                     save_context = active_context.overwriting_context(display_fn_name=fig_file_name)
                     fig_man = None
                     if export_folder is not None:
                         export_folder = Path(export_folder)
                         export_folder.mkdir(parents=True, exist_ok=True)
                         fig_man = FileOutputManager(figure_output_location=FigureOutputLocation.CUSTOM, context_to_path_mode=ContextToPathMode.GLOBAL_UNIQUE, override_output_parent_path=export_folder)
-                        saved_paths = list(build_and_write_to_file(fig, save_context, fig_man=fig_man, write_vector_format=write_vector_format, write_png=write_png) or [])
+                        saved_paths = list(build_and_write_to_file(fig, save_context, fig_man=fig_man, write_vector_format=write_vector_format, write_png=write_png, **_save_bbox_kwargs) or [])
                     else:
-                        saved_paths, _save_context = AcrossSessionsVisualizations.output_figure(save_context, fig, write_vector_format=write_vector_format, write_png=write_png)
+                        saved_paths, _save_context = AcrossSessionsVisualizations.output_figure(save_context, fig, write_vector_format=write_vector_format, write_png=write_png, **_save_bbox_kwargs)
                         saved_paths = list(saved_paths or [])
                         fig_man = AcrossSessionsVisualizations._fig_out_man
                     if write_svg:
@@ -4735,7 +4852,7 @@ class PrePostDeltaDistributionComparison:
                             if fig_man is None:
                                 fig_man = FileOutputManager(figure_output_location=FigureOutputLocation.DAILY_PROGRAMMATIC_OUTPUT_FOLDER, context_to_path_mode=ContextToPathMode.GLOBAL_UNIQUE)
                             svg_path = fig_man.get_figure_save_file_path(save_context, make_folder_if_needed=True).with_suffix('.svg')
-                        fig.savefig(svg_path, format='svg', transparent=True)
+                        fig.savefig(svg_path, format='svg', transparent=True, **_save_bbox_kwargs)
                         postprocess_matplotlib_svg_for_publication(svg_path)
                         saved_paths.append(svg_path)
                     saved_path = saved_paths[0] if saved_paths else None
@@ -4751,10 +4868,12 @@ class PrePostDeltaDistributionComparison:
             laps_session_summary=laps_session_summary,
             pbe_session_summary=pbe_session_summary,
             pbe_heuristic_session_summary=pbe_heuristic_session_summary,
+            pbe_additional_session_summary=pbe_additional_session_summary,
             y_values=y_values,
             laps_p_value=laps_p_value,
             pbe_p_value=pbe_p_value,
             pbe_heuristic_p_value=pbe_heuristic_p_value,
+            pbe_additional_filter_p_value=pbe_additional_filter_p_value,
             animal_marker_mapping=marker_mapping,
             animal_legend_labels={a: _animal_legend_label(a) for a in marker_mapping},
             saved_path=saved_path,
@@ -5393,6 +5512,7 @@ class FigureS8:
     _transparent_bgcolor: str = "rgba(0,0,0,0)"  # Kaleido PDF ignores this (always white); SVG+cairosvg preserves it.
 
     HEURISTIC_PASSING_COLOR: str = '#2ca02c'  # Matplotlib Tab10 green; match Fig S8c summary "Heuristic-passing"
+    ADDITIONAL_FILTER_PASSING_COLOR: str = '#1f77b4'  # Matplotlib Tab10 blue; non-heuristic overlay filter (e.g. sig_spearman_z)
     HEURISTIC_EXCLUDED_COLOR: str = 'rgb(100,100,100)'  # darker secondary grey for filter-excluded / background overlay
     HEURISTIC_EXCLUDED_COLOR_HEX: str = '#646464'
     _heuristic_filter_color_map: Dict[str, str] = {
@@ -5757,7 +5877,11 @@ class FigureS8:
                 effective_show_scatter_legend: bool = (not color_by_time_bin_size) if (show_scatter_legend is None) else bool(show_scatter_legend)
                 showlegend: bool = bool(effective_show_scatter_legend) and bool(color_by_time_bin_size and (n_unique_tbins > 1))
                 legend_title_text: str = 'Time bin size (s)'
-                new_fig, new_fig_context = cls._plot_formatted_pre_post_scatter(plot_df=plot_df, data_context=data_context, plot_kwargs=active_plot_kwargs, showlegend=showlegend, legend_title_text=legend_title_text)
+                # Skip Plotly build/export when should_save=False and no on-figure stats annotations (summary-only iteration)
+                should_build_figure: bool = bool(should_save or enable_add_stats_to_figures)
+                new_fig, new_fig_context = (None, None)
+                if should_build_figure:
+                    new_fig, new_fig_context = cls._plot_formatted_pre_post_scatter(plot_df=plot_df, data_context=data_context, plot_kwargs=active_plot_kwargs, showlegend=showlegend, legend_title_text=legend_title_text)
                 if should_compute_or_annotate_stats and (k == 'Final'):
                     stats_by_label = {}
                     n_unique_tbins_stats: int = int(group_df['time_bin_size'].nunique(dropna=True)) if ('time_bin_size' in group_df.columns) else 0
@@ -5785,11 +5909,11 @@ class FigureS8:
                             if results_pass is not None:
                                 stats_by_label['True'] = results_pass
                         _out_stats_dict.setdefault(k, {})[group_key] = group_stats
-                        if enable_add_stats_to_figures and stats_by_label:
+                        if enable_add_stats_to_figures and stats_by_label and (new_fig is not None):
                             new_fig = cls._add_pre_post_delta_stats_annotation(new_fig, stats_by_label)
                 fig_key = group_key if group_key is not None else k
                 group_figs[fig_key] = new_fig
-                if should_save:
+                if should_save and (new_fig is not None):
                     if basename is None:
                         save_basename = None
                     elif group_key is not None:
@@ -5888,6 +6012,7 @@ class FigureS8:
     def main(cls, df_filter, plotly_helpers: PlotlyHelpers, additional_filter_predicates: Dict, figures_parent_folder: Path, active_filter_constraints: Optional[Dict]=None, should_concatenate_figures: bool=False, enable_heuristic_filtered_outputs: bool = False, split_by_column: Optional[str] = None,
             should_compute_stats: bool = True, enable_add_stats_to_figures: bool = False, debug_print: bool = False, store_debug_values: bool = False,
             color_by_time_bin_size: bool = False, enabled_granularities: Optional[Sequence[str]] = None, enabled_epoch_kinds: Optional[Sequence[str]] = None, overlay_filter_panels: Optional[Sequence[Tuple[str, str]]] = None, legend_groups_to_hide: Optional[List] = None, show_scatter_legend: Optional[bool] = None,
+            enable_main_figures: bool = True,
         ):
         """ Performs the main plotting and adds optional stats
 
@@ -5899,6 +6024,7 @@ class FigureS8:
             `overlay_filter_panels`: sequence of `(panel_id, predicate_key)` for PBE overlay scatters (Figure S8 F8a/F8b).
             Each panel uses grey-background overlay style with the named `additional_filter_predicates` key.
             When unset, `enable_heuristic_filtered_outputs=True` still does a single `is_heuristic_passing` overlay.
+            `enable_main_figures=False`: skip Plotly scatter build/SVG export (stats still run for summary figs).
 
 
             from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import FigureS8
@@ -6123,6 +6249,7 @@ class FigureS8:
                     _out_figs_dict_dict[export_epoch_name], _out_paths[export_epoch_name], a_stage_stats_dict, a_stage_debug_dict = cls._perform_plot_iteratively_constrained(base_df=base_df, additional_filter_predicates=additional_filter_predicates, figures_parent_folder=figures_parent_folder,
                                                                                                                     should_export_initially_filtered = False,
                                                                                                                     should_export_iteratively_constrainted = False,
+                                                                                                                    should_save=bool(enable_main_figures),
                                                                                                                     export_suffix=export_epoch_name,
                                                                                                                     constraint_keys=a_constraint_keys,
                                                                                                                     title_suffix=title_suffix,
@@ -6163,6 +6290,20 @@ class FigureS8:
                                 if (pass_suffix == 'is_heuristic_passing') and (f'{result_key}_heuristic_passing' not in pre_post_delta_stats_results_dict):
                                     pre_post_delta_stats_distribution_comparison_dict[f'{result_key}_heuristic_passing'] = comparison_pass
                                     pre_post_delta_stats_results_dict[f'{result_key}_heuristic_passing'] = results_pass
+                            # Panel-agnostic aliases for summary four-bar (e.g. _perTimeBin_PBEs / _perTimeBin_PBEs_sig_spearman_z)
+                            if panel_id is not None:
+                                alias_base: str = '_'.join([a_grainularity, epoch_kind])  # e.g. '_perTimeBin_PBEs'
+                                if results_all is not None and (alias_base not in pre_post_delta_stats_results_dict):
+                                    pre_post_delta_stats_distribution_comparison_dict[alias_base] = comparison_all
+                                    pre_post_delta_stats_results_dict[alias_base] = results_all
+                                if (results_pass is not None) and (pass_suffix is not None):
+                                    alias_pass: str = f'{alias_base}_{pass_suffix}'
+                                    if alias_pass not in pre_post_delta_stats_results_dict:
+                                        pre_post_delta_stats_distribution_comparison_dict[alias_pass] = comparison_pass
+                                        pre_post_delta_stats_results_dict[alias_pass] = results_pass
+                                    if (pass_suffix == 'is_heuristic_passing') and (f'{alias_base}_heuristic_passing' not in pre_post_delta_stats_results_dict):
+                                        pre_post_delta_stats_distribution_comparison_dict[f'{alias_base}_heuristic_passing'] = comparison_pass
+                                        pre_post_delta_stats_results_dict[f'{alias_base}_heuristic_passing'] = results_pass
                             if debug_print:
                                 keys_to_print = []
                                 if results_all is not None:
@@ -6224,7 +6365,8 @@ class FigureS8:
     def main_all_figs(cls, df_filter, plotly_helpers: PlotlyHelpers, additional_filter_predicates: Dict,
                       earliest_delta_aligned_t_start: Optional[float] = None, latest_delta_aligned_t_end: Optional[float] = None,
                       enabled_figure_names: Optional[Sequence[str]] = None, figures_config_dict: Optional[Dict] = None, figures_root: Optional[Path] = None, figures_date: Optional[str] = None,
-                      should_compute_stats: bool = True, enable_add_stats_to_figures: bool = False, separate_laps_pbes_figures: bool = False, should_concatenate_figures: bool = False, store_debug_values: bool = False, **kwargs):
+                      should_compute_stats: bool = True, enable_add_stats_to_figures: bool = False, separate_laps_pbes_figures: bool = False, should_concatenate_figures: bool = False, store_debug_values: bool = False,
+                      enable_main_figures: bool = True, **kwargs):
         """Produce Figure 4, Figure S3, Figure S8, and Figure S9 from a single notebook call.
 
             from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import FigureS8
@@ -6235,9 +6377,11 @@ class FigureS8:
             # subset: figures_out_dict = FigureS8.main_all_figs(..., enabled_figure_names=['Figure S9'])
             # Figure S3 only: figures_out_dict = FigureS8.main_all_figs(..., enabled_figure_names=['Figure S3'])
             # Override S3 time bins via figures_config_dict['Figure S3']['active_filter_constraints']['time_bin_size'].
+            # Summary-only (skip scatter Plotly/SVG export): enable_main_figures=False
 
         Defaults write all configured figures. Pass `enabled_figure_names` to restrict, or `figures_config_dict` to replace the built-in output folders / per-figure flags.
         Figure S3 uses `color_by_time_bin_size=True` with multi-value `time_bin_size` constraints (overridable). S3 scatter panels hide the time-bin legend by default; pass `show_scatter_legend=True` in the Figure S3 config to show it.
+        `enable_main_figures=False` skips main scatter build/export but still computes stats and summary bars (faster iteration).
         """
         if earliest_delta_aligned_t_start is not None:
             plotly_helpers.earliest_delta_aligned_t_start = earliest_delta_aligned_t_start
@@ -6305,6 +6449,11 @@ class FigureS8:
                 fig_separate_laps_pbes_figures = fig_config_dict.pop('separate_laps_pbes_figures', separate_laps_pbes_figures)
                 fig_should_compute_stats = fig_config_dict.pop('should_compute_stats', should_compute_stats)
                 fig_legend_groups_to_hide = fig_config_dict.pop('legend_groups_to_hide', None)
+                fig_overlay_filter_panels = fig_config_dict.get('overlay_filter_panels', None)
+                fig_enabled_epoch_kinds = fig_config_dict.get('enabled_epoch_kinds', None)
+                fig_enable_main_figures: bool = bool(fig_config_dict.pop('enable_main_figures', enable_main_figures))
+                fig_include_laps: bool = (fig_enabled_epoch_kinds is None) or ('Laps' in fig_enabled_epoch_kinds)
+                fig_include_pbes: bool = (fig_enabled_epoch_kinds is None) or ('PBEs' in fig_enabled_epoch_kinds)
                 fig_color_by_time_bin_size: bool = bool(fig_config_dict.get('color_by_time_bin_size', False))
                 summary_split_column: str = 'time_bin_size' if fig_color_by_time_bin_size else (split_by_column or 'animal')
                 prev_legend_groups_to_hide = getattr(plotly_helpers, 'legend_groups_to_hide', None)
@@ -6314,7 +6463,7 @@ class FigureS8:
                     _out = cls.main(df_filter=df_filter, plotly_helpers=plotly_helpers, additional_filter_predicates=additional_filter_predicates, figures_parent_folder=figures_parent_folder,
                                     should_concatenate_figures=should_concatenate_figures, split_by_column=split_by_column,
                                     should_compute_stats=fig_should_compute_stats, enable_add_stats_to_figures=fig_enable_add_stats_to_figures, store_debug_values=store_debug_values,
-                                    legend_groups_to_hide=fig_legend_groups_to_hide,
+                                    legend_groups_to_hide=fig_legend_groups_to_hide, enable_main_figures=fig_enable_main_figures,
                                     **{**kwargs, **fig_config_dict},
                     )
                 finally:
@@ -6350,29 +6499,92 @@ class FigureS8:
                         ## END for suffix in ('_heuristic_passing', '_is_heuristic_passing')...
                         return None
 
+                    def _subfn_resolve_additional_filter_sibling_key(results_dict: Dict, pbes_key: str, overlay_panels) -> Tuple[Optional[str], Optional[str]]:
+                        """Return `(results_key, label)` for the first non-heuristic overlay predicate sibling of `pbes_key`."""
+                        candidate_suffixes: List[str] = []
+                        if overlay_panels is not None:
+                            for _panel_id, pred_key in overlay_panels:
+                                if pred_key in (None, 'is_heuristic_passing'):
+                                    continue
+                                candidate_suffixes.append(str(pred_key))
+                            ## END for _panel_id, pred_key in overlay_panels...
+                        if not candidate_suffixes:
+                            # Fallback: any sibling that is not heuristic
+                            prefix = f'{pbes_key}_'
+                            for k in results_dict.keys():
+                                if (not str(k).startswith(prefix)) or str(k).endswith(('_heuristic_passing', '_is_heuristic_passing')):
+                                    continue
+                                candidate_suffixes.append(str(k)[len(prefix):])
+                            ## END for k in results_dict.keys()...
+                        for suffix in candidate_suffixes:
+                            candidate: str = f'{pbes_key}_{suffix}'
+                            if candidate in results_dict:
+                                return candidate, suffix
+                        ## END for suffix in candidate_suffixes...
+                        return None, None
+
                     def _subfn_iter_summary_four_bar_specs(results_dict: Dict, grainularity: str = '_perTimeBin'):
-                        """Yield `(group_key, laps_key, pbes_key, heuristic_key)` for pooled or split-by-group stats."""
+                        """Yield `(group_key, laps_key, pbes_key, heuristic_key, additional_key, additional_label)` for pooled or split-by-group stats.
+
+                        Respects `fig_include_laps` / `fig_include_pbes` from `enabled_epoch_kinds` (missing kind → key is None).
+                        """
                         heuristic_suffixes = ('_heuristic_passing', '_is_heuristic_passing')
                         laps_base: str = f'{grainularity}_Laps'
                         pbes_base: str = f'{grainularity}_PBEs'
-                        if (laps_base in results_dict) and (pbes_base in results_dict):
-                            yield None, laps_base, pbes_base, _subfn_resolve_heuristic_sibling_key(results_dict, pbes_base)
+                        have_laps: bool = fig_include_laps and (laps_base in results_dict)
+                        have_pbes: bool = fig_include_pbes and (pbes_base in results_dict)
+                        if have_laps and have_pbes:
+                            add_key, add_label = _subfn_resolve_additional_filter_sibling_key(results_dict, pbes_base, fig_overlay_filter_panels)
+                            yield None, laps_base, pbes_base, _subfn_resolve_heuristic_sibling_key(results_dict, pbes_base), add_key, add_label
+                            return
+                        if have_pbes and (not fig_include_laps):
+                            add_key, add_label = _subfn_resolve_additional_filter_sibling_key(results_dict, pbes_base, fig_overlay_filter_panels)
+                            yield None, None, pbes_base, _subfn_resolve_heuristic_sibling_key(results_dict, pbes_base), add_key, add_label
+                            return
+                        if have_laps and (not fig_include_pbes):
+                            yield None, laps_base, None, None, None, None
                             return
 
-                        laps_prefix: str = f'{laps_base}_'
+                        # Split-by-group: prefer Laps-keyed groups when Laps included; else PBEs-keyed groups
+                        if fig_include_laps:
+                            split_prefix: str = f'{laps_base}_'
+                            peer_base: str = pbes_base
+                        else:
+                            split_prefix = f'{pbes_base}_'
+                            peer_base = laps_base
                         group_names = []
                         for k in results_dict.keys():
-                            if k.startswith(laps_prefix) and (not any(str(k).endswith(sfx) for sfx in heuristic_suffixes)):
-                                group_name = k[len(laps_prefix):]
-                                if f'{pbes_base}_{group_name}' in results_dict:
+                            if k.startswith(split_prefix) and (not any(str(k).endswith(sfx) for sfx in heuristic_suffixes)):
+                                group_name = k[len(split_prefix):]
+                                # skip panel ids / filter suffixes mistaken as groups when only PBEs
+                                if fig_include_laps:
+                                    if (not fig_include_pbes) or (f'{peer_base}_{group_name}' in results_dict):
+                                        group_names.append(group_name)
+                                else:
+                                    # PBEs-only: pooled aliases preferred; skip animal/panel split keys that look like filter names
+                                    if group_name in ('F8a', 'F8b'):
+                                        continue
                                     group_names.append(group_name)
                         ## END for k in results_dict.keys()...
 
                         ordered_groups = cls._sorted_split_values(group_names, split_by_column=summary_split_column)
                         for group_name in ordered_groups:
-                            laps_key: str = f'{laps_base}_{group_name}'
-                            pbes_key: str = f'{pbes_base}_{group_name}'
-                            yield group_name, laps_key, pbes_key, _subfn_resolve_heuristic_sibling_key(results_dict, pbes_key)
+                            laps_key: Optional[str] = f'{laps_base}_{group_name}' if fig_include_laps else None
+                            pbes_key: Optional[str] = f'{pbes_base}_{group_name}' if fig_include_pbes else None
+                            if fig_include_laps and (laps_key not in results_dict):
+                                continue
+                            if fig_include_pbes and (pbes_key not in results_dict):
+                                # PBEs-only pooled already handled; split groups need the key
+                                if fig_include_laps:
+                                    pbes_key = None
+                                else:
+                                    continue
+                            add_key, add_label = (None, None)
+                            heur_key = None
+                            if pbes_key is not None:
+                                add_key, add_label = _subfn_resolve_additional_filter_sibling_key(results_dict, pbes_key, fig_overlay_filter_panels)
+                                heur_key = _subfn_resolve_heuristic_sibling_key(results_dict, pbes_key)
+                            yield group_name, laps_key, pbes_key, heur_key, add_key, add_label
                         ## END for group_name in ordered_groups...
 
                     summary_specs = list(_subfn_iter_summary_four_bar_specs(pre_post_delta_stats_results_dict, grainularity=grainularity))
@@ -6380,11 +6592,11 @@ class FigureS8:
                         print(f'WARN: keys missing from pre_post_delta_stats_results_dict. Keys: {list(pre_post_delta_stats_results_dict.keys())} required for summary figure. Skipping for fig_name: "{fig_name}"')
                     elif fig_color_by_time_bin_size and (len(summary_specs) >= 1) and (summary_specs[0][0] is not None):
                         # Figure S3: one panel with side-by-side bars per time_bin_size (colors match scatter)
-                        ordered_tbins = [group_name for group_name, _, _, _ in summary_specs if group_name is not None]
+                        ordered_tbins = [group_name for group_name, _, _, _, _, _ in summary_specs if group_name is not None]
                         results_by_tbin = {
                             group_name: (pre_post_delta_stats_results_dict[laps_key], pre_post_delta_stats_results_dict[pbes_key])
-                            for group_name, laps_key, pbes_key, _heuristic_key in summary_specs
-                            if group_name is not None
+                            for group_name, laps_key, pbes_key, _heuristic_key, _add_key, _add_label in summary_specs
+                            if (group_name is not None) and (laps_key is not None) and (pbes_key is not None)
                         }
                         combined_basename: str = f'{fig_name}_SummaryStats_{grainularity_token}_by_time_bin_size'
                         _out_extra_plot = PrePostDeltaDistributionComparison.plot_fig2_style_summary_multi_tbin_bars(
@@ -6401,8 +6613,8 @@ class FigureS8:
                         fig_summary_dict = {}
                         group_svg_paths = []
                         group_pdf_paths = []
-                        for group_name, laps_key, pbes_key, heuristic_key in summary_specs:
-                            combined_basename: str = _subfn_summary_fig_file_name('all', group_name)
+                        for group_name, laps_key, pbes_key, heuristic_key, additional_key, additional_label in summary_specs:
+                            combined_basename: str = _subfn_summary_fig_file_name('all' if (laps_key is not None and pbes_key is not None) else ('PBEs' if pbes_key is not None else 'Laps'), group_name)
                             save_folder = figures_parent_folder
                             if group_name is not None:
                                 intermediates_folder = cls.figures_intermediates_parent_folder()
@@ -6413,13 +6625,15 @@ class FigureS8:
                             if fig_separate_laps_pbes_figures:
                                 plot_kwargs['laps_fig_file_name'] = _subfn_summary_fig_file_name('Laps', group_name)
                                 plot_kwargs['pbe_fig_file_name'] = _subfn_summary_fig_file_name('PBEs', group_name)
-                                plot_kwargs['fignum'] = plot_kwargs['laps_fig_file_name']
+                                plot_kwargs['fignum'] = plot_kwargs['laps_fig_file_name'] if laps_key is not None else plot_kwargs['pbe_fig_file_name']
                             if group_name is not None:
                                 plot_kwargs['title'] = f'Decoded $P_{{Short}}$ | {group_name}'
                             _out_extra_plot = PrePostDeltaDistributionComparison.plot_fig2_style_summary_four_bar(
-                                pre_post_delta_stats_results_dict[laps_key],
-                                pre_post_delta_stats_results_dict[pbes_key],
+                                None if laps_key is None else pre_post_delta_stats_results_dict[laps_key],
+                                None if pbes_key is None else pre_post_delta_stats_results_dict[pbes_key],
                                 pbe_heuristic_passing_results=None if heuristic_key is None else pre_post_delta_stats_results_dict.get(heuristic_key, None),
+                                pbe_additional_filter_results=None if additional_key is None else pre_post_delta_stats_results_dict.get(additional_key, None),
+                                pbe_additional_filter_label=additional_label,
                                 **plot_kwargs,
                             )
                             fig_summary_dict[group_name if group_name is not None else 'all'] = _out_extra_plot
@@ -6431,7 +6645,7 @@ class FigureS8:
                                     group_pdf_paths.append(a_path)
                             ## END for a_path in (_out_extra_plot.get('saved_paths') or [])...
 
-                        ## END for group_name, laps_key, pbes_key, heuristic_key in summary_specs...
+                        ## END for group_name, laps_key, pbes_key, heuristic_key, additional_key, additional_label in summary_specs...
 
                         if (len(summary_specs) == 1) and (summary_specs[0][0] is None):
                             _out_figs_dict_dict_dict['fig_summary'] = fig_summary_dict['all']
