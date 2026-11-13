@@ -5651,7 +5651,7 @@ class FigureS8:
     @function_attributes(short_name=None, tags=['private', 'secondary', 'figure', 'stats'], input_requires=[], output_provides=[], uses=['cls._compute_pre_post_delta_stats'], used_by=[], creation_date='2026-10-28 07:47', related_items=[])
     @classmethod
     def _perform_plot_iteratively_constrained(cls, base_df: pd.DataFrame, additional_filter_predicates, figures_parent_folder: Path, export_suffix: str, title_suffix: str='', constraint_keys=("is_long_duration", "is_track_body"), should_save: bool = True,
-                                                    should_export_initially_filtered: bool = False, should_export_iteratively_constrainted: bool = True, should_overlay_heuristic_filter: bool = False, split_by_column: Optional[str] = None,
+                                                    should_export_initially_filtered: bool = False, should_export_iteratively_constrainted: bool = True, should_overlay_heuristic_filter: bool = False, overlay_filter_predicate_key: Optional[str] = None, split_by_column: Optional[str] = None,
                                                     should_compute_stats: bool = False, enable_add_stats_to_figures: bool = False, stats_class_kwargs: Optional[Dict] = None, stats_run_kwargs: Optional[Dict] = None,
                                                     store_debug_values: bool = False, color_by_time_bin_size: bool = False, legend_groups_to_hide: Optional[List] = None, show_scatter_legend: Optional[bool] = None,
         ):
@@ -5663,10 +5663,20 @@ class FigureS8:
         When `color_by_time_bin_size` is True, scatter/hist traces are colored by `time_bin_size` (Figure S3).
         Scatter legend is hidden by default for Figure S3 (`show_scatter_legend=None` → off when `color_by_time_bin_size`).
         When `store_debug_values` is True, the 4th return is a dict of the processed DFs actually plotted (`final_df`, `plot_df`, optional `groups`) plus row counts.
+
+        Overlay: grey background = full constrained df; green foreground = rows passing `overlay_filter_predicate_key`
+        (looked up in `additional_filter_predicates`). `should_overlay_heuristic_filter=True` is a compat shim for
+        `overlay_filter_predicate_key='is_heuristic_passing'`.
         """
+        if (overlay_filter_predicate_key is None) and should_overlay_heuristic_filter:
+            overlay_filter_predicate_key = 'is_heuristic_passing'
+        should_overlay_filter: bool = (overlay_filter_predicate_key is not None)
+        if should_overlay_filter and (overlay_filter_predicate_key not in additional_filter_predicates):
+            raise KeyError(f'overlay_filter_predicate_key={overlay_filter_predicate_key!r} not in additional_filter_predicates keys: {list(additional_filter_predicates.keys())}')
+
         predicates = {k: additional_filter_predicates[k] for k in constraint_keys}
         plot_kind: str = 'PBEs' if ('PBEs' in export_suffix) else 'Laps'
-        main_title: str = f"Short-track Decoded Likelihood during {plot_kind}" # keep the center subplot title short so it does not collide with Pre-Δ / Post-Δ
+        main_title: str = f"Short-track Decoded Likelihood during {plot_kind}{title_suffix}" # keep the center subplot title short so it does not collide with Pre-Δ / Post-Δ
         should_compute_or_annotate_stats: bool = bool(should_compute_stats or enable_add_stats_to_figures)
         if stats_class_kwargs is None:
             stats_class_kwargs = {}
@@ -5689,7 +5699,7 @@ class FigureS8:
             _plot_kwargs['px_scatter_kwargs'] = {"size_max": 2.0, **_tbin_color_kwargs}
             _plot_kwargs['hist_kwargs'] = deepcopy(_tbin_hist_kwargs)
             _plot_kwargs['common_plot_kwargs'] = deepcopy(_tbin_color_kwargs)
-        # should_overlay_heuristic_filter: grey background = full constrained df; foreground = heuristic-passing (via background_data_results_df)
+        # overlay_filter_predicate_key: grey background = full constrained df; foreground = predicate-passing (via background_data_results_df)
 
         _out_figs_dict = {}
         _out_paths_dict = {}
@@ -5700,10 +5710,11 @@ class FigureS8:
                 'base_df': base_df,
                 'final_df': None,
                 'plot_df': None,
-                'heuristic_passing_df': None,
+                'filter_passing_df': None,
                 'n_rows': {'Initial': len(base_df)},
                 'constraint_keys': constraint_keys,
-                'should_overlay_heuristic_filter': should_overlay_heuristic_filter,
+                'overlay_filter_predicate_key': overlay_filter_predicate_key,
+                'should_overlay_heuristic_filter': should_overlay_filter and (overlay_filter_predicate_key == 'is_heuristic_passing'),
                 'color_by_time_bin_size': color_by_time_bin_size,
                 'split_by_column': split_by_column,
                 'export_suffix': export_suffix,
@@ -5721,8 +5732,8 @@ class FigureS8:
 
             for group_key, group_df in cls._iter_split_plot_groups(source_df, split_by_column):
                 active_plot_kwargs = deepcopy(_plot_kwargs)
-                if should_overlay_heuristic_filter:
-                    passing_mask = additional_filter_predicates['is_heuristic_passing'](group_df).astype(bool)
+                if should_overlay_filter:
+                    passing_mask = additional_filter_predicates[overlay_filter_predicate_key](group_df).astype(bool)
                     plot_df = cls._copy_df_preserving_context(group_df[passing_mask])
                     active_plot_kwargs['background_data_results_df'] = group_df
                     _fg = dict(color_discrete_sequence=[cls.HEURISTIC_PASSING_COLOR])
@@ -5763,11 +5774,14 @@ class FigureS8:
                         comparison_all, results_all = cls._compute_pre_post_delta_stats(group_df, stats_class_kwargs, stats_run_kwargs)
                         group_stats = {'all': (comparison_all, results_all)}
                         if results_all is not None:
-                            stats_by_label['False' if should_overlay_heuristic_filter else ''] = results_all
-                        if should_overlay_heuristic_filter:
-                            passing_mask = additional_filter_predicates['is_heuristic_passing'](group_df).astype(bool)
+                            stats_by_label['False' if should_overlay_filter else ''] = results_all
+                        if should_overlay_filter:
+                            passing_mask = additional_filter_predicates[overlay_filter_predicate_key](group_df).astype(bool)
                             comparison_pass, results_pass = cls._compute_pre_post_delta_stats(group_df[passing_mask], stats_class_kwargs, stats_run_kwargs)
-                            group_stats['heuristic_passing'] = (comparison_pass, results_pass)
+                            group_stats[overlay_filter_predicate_key] = (comparison_pass, results_pass)
+                            # legacy alias for summary four-bar sibling lookup
+                            if overlay_filter_predicate_key == 'is_heuristic_passing':
+                                group_stats['heuristic_passing'] = (comparison_pass, results_pass)
                             if results_pass is not None:
                                 stats_by_label['True'] = results_pass
                         _out_stats_dict.setdefault(k, {})[group_key] = group_stats
@@ -5838,13 +5852,15 @@ class FigureS8:
                 _export_stage(k, active, title_prefix=f"FILTERED | {k}", basename=None)
         ## END for k in constraint_keys...
 
-        if should_overlay_heuristic_filter:
-            passing_mask = additional_filter_predicates['is_heuristic_passing'](active).astype(bool)
-            n_heuristic_pass: int = int(passing_mask.sum())
-            print(f"heuristic passing: {n_heuristic_pass}/{len(active)} rows")
+        if should_overlay_filter:
+            passing_mask = additional_filter_predicates[overlay_filter_predicate_key](active).astype(bool)
+            n_filter_pass: int = int(passing_mask.sum())
+            print(f"{overlay_filter_predicate_key} passing: {n_filter_pass}/{len(active)} rows")
             if store_debug_values:
-                _out_debug_dict['n_rows']['heuristic_passing'] = n_heuristic_pass
-                _out_debug_dict['heuristic_passing_df'] = active[passing_mask]
+                _out_debug_dict['n_rows'][overlay_filter_predicate_key] = n_filter_pass
+                _out_debug_dict['filter_passing_df'] = active[passing_mask]
+                if overlay_filter_predicate_key == 'is_heuristic_passing':
+                    _out_debug_dict['heuristic_passing_df'] = active[passing_mask]
 
         ## Get the FINAL Figure
         # FINAL ______________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
@@ -5857,8 +5873,8 @@ class FigureS8:
             _out_debug_dict['final_df'] = active
             _out_debug_dict['n_rows']['Final'] = len(active)
             if _out_debug_dict.get('plot_df') is None:
-                if should_overlay_heuristic_filter:
-                    passing_mask = additional_filter_predicates['is_heuristic_passing'](active).astype(bool)
+                if should_overlay_filter:
+                    passing_mask = additional_filter_predicates[overlay_filter_predicate_key](active).astype(bool)
                     _out_debug_dict['plot_df'] = cls._copy_df_preserving_context(active[passing_mask])
                 else:
                     _out_debug_dict['plot_df'] = active
@@ -5871,7 +5887,7 @@ class FigureS8:
     @classmethod
     def main(cls, df_filter, plotly_helpers: PlotlyHelpers, additional_filter_predicates: Dict, figures_parent_folder: Path, active_filter_constraints: Optional[Dict]=None, should_concatenate_figures: bool=False, enable_heuristic_filtered_outputs: bool = False, split_by_column: Optional[str] = None,
             should_compute_stats: bool = True, enable_add_stats_to_figures: bool = False, debug_print: bool = False, store_debug_values: bool = False,
-            color_by_time_bin_size: bool = False, enabled_granularities: Optional[Sequence[str]] = None, enabled_epoch_kinds: Optional[Sequence[str]] = None, legend_groups_to_hide: Optional[List] = None, show_scatter_legend: Optional[bool] = None,
+            color_by_time_bin_size: bool = False, enabled_granularities: Optional[Sequence[str]] = None, enabled_epoch_kinds: Optional[Sequence[str]] = None, overlay_filter_panels: Optional[Sequence[Tuple[str, str]]] = None, legend_groups_to_hide: Optional[List] = None, show_scatter_legend: Optional[bool] = None,
         ):
         """ Performs the main plotting and adds optional stats
 
@@ -5880,6 +5896,9 @@ class FigureS8:
             `color_by_time_bin_size=True` (Figure S3): color scatter/hist by `time_bin_size` as separate series; scatter legend off by default (`show_scatter_legend=True` to restore).
             `enabled_granularities` defaults to both `('_perTimeBin', '_perEpochs')`; pass e.g. `('_perTimeBin',)` for S3/S8/S9.
             `enabled_epoch_kinds` defaults to both `('Laps', 'PBEs')`; pass e.g. `('PBEs',)` for S8/S9 (skip Laps scatter).
+            `overlay_filter_panels`: sequence of `(panel_id, predicate_key)` for PBE overlay scatters (Figure S8 F8a/F8b).
+            Each panel uses grey-background overlay style with the named `additional_filter_predicates` key.
+            When unset, `enable_heuristic_filtered_outputs=True` still does a single `is_heuristic_passing` overlay.
 
 
             from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import FigureS8
@@ -6080,70 +6099,88 @@ class FigureS8:
                 else:
                     a_constraint_keys = deepcopy(constraint_keys)
 
-
-                
-                should_overlay_heuristic_filter: bool = (enable_heuristic_filtered_outputs and an_epoch_name.startswith('PBEs'))
-
-                title_suffix: str = ' (heuristic filtered)' if should_overlay_heuristic_filter else ''
-
                 epoch_kind: str = an_epoch_name  # 'Laps' or 'PBEs' — keep un-suffixed for stats keys
-                active_key: str = '_'.join([a_grainularity, epoch_kind])  # e.g. '_perTimeBin_Laps'
-                if not should_concatenate_figures:
-                    an_epoch_name = f"{an_epoch_name}{a_grainularity}"
+                # Resolve overlay panel specs for this epoch kind: (panel_id|None, predicate_key|None)
+                if (overlay_filter_panels is not None) and epoch_kind.startswith('PBEs'):
+                    panel_specs = list(overlay_filter_panels)
+                elif enable_heuristic_filtered_outputs and epoch_kind.startswith('PBEs'):
+                    panel_specs = [(None, 'is_heuristic_passing')]
+                else:
+                    panel_specs = [(None, None)]
 
-                _out_figs_dict_dict[an_epoch_name], _out_paths[an_epoch_name], a_stage_stats_dict, a_stage_debug_dict = cls._perform_plot_iteratively_constrained(base_df=base_df, additional_filter_predicates=additional_filter_predicates, figures_parent_folder=figures_parent_folder,
-                                                                                                                should_export_initially_filtered = False,
-                                                                                                                should_export_iteratively_constrainted = False,
-                                                                                                                export_suffix=an_epoch_name,
-                                                                                                                constraint_keys=a_constraint_keys,
-                                                                                                                title_suffix=title_suffix,
-                                                                                                                should_overlay_heuristic_filter=should_overlay_heuristic_filter,
-                                                                                                                split_by_column=split_by_column,
-                                                                                                                should_compute_stats=should_compute_stats, enable_add_stats_to_figures=enable_add_stats_to_figures,
-                                                                                                                stats_class_kwargs=_stats_class_kwargs, stats_run_kwargs=_stats_run_kwargs,
-                                                                                                                store_debug_values=store_debug_values,
-                                                                                                                color_by_time_bin_size=color_by_time_bin_size,
-                                                                                                                legend_groups_to_hide=legend_groups_to_hide,
-                                                                                                                show_scatter_legend=show_scatter_legend,
-                                                                                                            )
-                if store_debug_values:
-                    _out_debug_values['plot_data'][active_key] = a_stage_debug_dict
+                for panel_id, overlay_filter_predicate_key in panel_specs:
+                    title_suffix: str = f' ({overlay_filter_predicate_key})' if (overlay_filter_predicate_key is not None) else ''
+                    active_key_parts = [a_grainularity, epoch_kind]
+                    if panel_id is not None:
+                        active_key_parts.append(str(panel_id))
+                    active_key: str = '_'.join(active_key_parts)  # e.g. '_perTimeBin_PBEs_F8a'
+                    export_epoch_name: str = epoch_kind
+                    if not should_concatenate_figures:
+                        export_epoch_name = f"{epoch_kind}{a_grainularity}"
+                    if panel_id is not None:
+                        export_epoch_name = f"{export_epoch_name}_{panel_id}"
 
-                # Flatten Final stats (computed on the plotted Final-constrained group_df, not unconstrained base_df)
-                # g = filtered_all_sessions_ripple_time_bin_df.groupby(['animal', 'session_name', 'parent_epoch_id'], dropna=False)['pre_post_delta_category']
-                # bad = g.nunique()
-                # bad = bad[bad > 1]
-                # print(bad.head())
-                # print('n mixed groups', len(bad), 'n nan parent_epoch_id', filtered_all_sessions_ripple_time_bin_df['parent_epoch_id'].isna().sum())
-                if should_compute_stats or enable_add_stats_to_figures:
-                    for group_key, group_stats in a_stage_stats_dict.get('Final', {}).items():
-                        result_key: str = active_key if group_key is None else f'{active_key}_{group_key}'
-                        comparison_all, results_all = group_stats.get('all', (None, None))
-                        if results_all is not None:
-                            pre_post_delta_stats_distribution_comparison_dict[result_key] = comparison_all
-                            pre_post_delta_stats_results_dict[result_key] = results_all
-                        comparison_pass, results_pass = group_stats.get('heuristic_passing', (None, None))
-                        if results_pass is not None:
-                            pass_key: str = f'{result_key}_heuristic_passing'
-                            pre_post_delta_stats_distribution_comparison_dict[pass_key] = comparison_pass
-                            pre_post_delta_stats_results_dict[pass_key] = results_pass
-                        if debug_print:
-                            keys_to_print = []
+                    _out_figs_dict_dict[export_epoch_name], _out_paths[export_epoch_name], a_stage_stats_dict, a_stage_debug_dict = cls._perform_plot_iteratively_constrained(base_df=base_df, additional_filter_predicates=additional_filter_predicates, figures_parent_folder=figures_parent_folder,
+                                                                                                                    should_export_initially_filtered = False,
+                                                                                                                    should_export_iteratively_constrainted = False,
+                                                                                                                    export_suffix=export_epoch_name,
+                                                                                                                    constraint_keys=a_constraint_keys,
+                                                                                                                    title_suffix=title_suffix,
+                                                                                                                    overlay_filter_predicate_key=overlay_filter_predicate_key,
+                                                                                                                    split_by_column=split_by_column,
+                                                                                                                    should_compute_stats=should_compute_stats, enable_add_stats_to_figures=enable_add_stats_to_figures,
+                                                                                                                    stats_class_kwargs=_stats_class_kwargs, stats_run_kwargs=_stats_run_kwargs,
+                                                                                                                    store_debug_values=store_debug_values,
+                                                                                                                    color_by_time_bin_size=color_by_time_bin_size,
+                                                                                                                    legend_groups_to_hide=legend_groups_to_hide,
+                                                                                                                    show_scatter_legend=show_scatter_legend,
+                                                                                                                )
+                    if store_debug_values:
+                        _out_debug_values['plot_data'][active_key] = a_stage_debug_dict
+
+                    # Flatten Final stats (computed on the plotted Final-constrained group_df, not unconstrained base_df)
+                    if should_compute_stats or enable_add_stats_to_figures:
+                        for group_key, group_stats in a_stage_stats_dict.get('Final', {}).items():
+                            result_key: str = active_key if group_key is None else f'{active_key}_{group_key}'
+                            comparison_all, results_all = group_stats.get('all', (None, None))
                             if results_all is not None:
-                                keys_to_print.append(result_key)
+                                pre_post_delta_stats_distribution_comparison_dict[result_key] = comparison_all
+                                pre_post_delta_stats_results_dict[result_key] = results_all
+                            # Prefer named predicate stage key; fall back to legacy 'heuristic_passing'
+                            comparison_pass, results_pass = (None, None)
+                            pass_suffix: Optional[str] = None
+                            if overlay_filter_predicate_key is not None:
+                                comparison_pass, results_pass = group_stats.get(overlay_filter_predicate_key, (None, None))
+                                pass_suffix = overlay_filter_predicate_key
+                            if (results_pass is None) and ('heuristic_passing' in group_stats):
+                                comparison_pass, results_pass = group_stats.get('heuristic_passing', (None, None))
+                                pass_suffix = 'heuristic_passing'
                             if results_pass is not None:
-                                keys_to_print.append(f'{result_key}_heuristic_passing')
-                            for printed_key in keys_to_print:
-                                print(f'for "{printed_key}":')
-                                print({
-                                    k: v for k, v in pre_post_delta_stats_results_dict[printed_key].items()
-                                    if k not in ('animal_summary', 'permutation_results', 'session_summary')
-                                })
-                            ## END for printed_key in keys_to_print...
+                                pass_key: str = f'{result_key}_{pass_suffix}'
+                                pre_post_delta_stats_distribution_comparison_dict[pass_key] = comparison_pass
+                                pre_post_delta_stats_results_dict[pass_key] = results_pass
+                                # Also emit legacy *_heuristic_passing when predicate is is_heuristic_passing (summary four-bar)
+                                if (pass_suffix == 'is_heuristic_passing') and (f'{result_key}_heuristic_passing' not in pre_post_delta_stats_results_dict):
+                                    pre_post_delta_stats_distribution_comparison_dict[f'{result_key}_heuristic_passing'] = comparison_pass
+                                    pre_post_delta_stats_results_dict[f'{result_key}_heuristic_passing'] = results_pass
+                            if debug_print:
+                                keys_to_print = []
+                                if results_all is not None:
+                                    keys_to_print.append(result_key)
+                                if results_pass is not None:
+                                    keys_to_print.append(f'{result_key}_{pass_suffix}')
+                                for printed_key in keys_to_print:
+                                    print(f'for "{printed_key}":')
+                                    print({
+                                        k: v for k, v in pre_post_delta_stats_results_dict[printed_key].items()
+                                        if k not in ('animal_summary', 'permutation_results', 'session_summary')
+                                    })
+                                ## END for printed_key in keys_to_print...
 
-                    ## END for group_key, group_stats in a_stage_stats_dict.get('Final', {}).items()...
+                        ## END for group_key, group_stats in a_stage_stats_dict.get('Final', {}).items()...
+                ## END for panel_id, overlay_filter_predicate_key in panel_specs...
 
-            ## END for export_suffix, base_df in base_df_dict.items()...
+            ## END for an_epoch_name, base_df in base_df_dict.items()...
 
             # _out_paths
             # _out_figs_dict_dict['Laps']['Final']
@@ -6242,6 +6279,10 @@ class FigureS8:
                     'enable_heuristic_filtered_outputs': True,
                     'enabled_granularities': ('_perTimeBin',),
                     'enabled_epoch_kinds': ('PBEs',),
+                    'overlay_filter_panels': (
+                        ('F8a', 'sig_spearman_z'),
+                        ('F8b', 'is_heuristic_passing'),
+                    ),
                 },
                 'Figure S9': {
                     'figures_parent_folder': figures_root.joinpath(f'Figure S9 - Effect of Heuristic-filtering P_Short Scatter over Time - PerEpoch/Inputs/{figures_date}').resolve(),
@@ -6300,20 +6341,28 @@ class FigureS8:
                             basename = f'{basename}_{group_name}'
                         return basename
 
+                    def _subfn_resolve_heuristic_sibling_key(results_dict: Dict, pbes_key: str) -> Optional[str]:
+                        """Prefer legacy `*_heuristic_passing`, then `*_is_heuristic_passing`."""
+                        for suffix in ('_heuristic_passing', '_is_heuristic_passing'):
+                            candidate: str = f'{pbes_key}{suffix}'
+                            if candidate in results_dict:
+                                return candidate
+                        ## END for suffix in ('_heuristic_passing', '_is_heuristic_passing')...
+                        return None
+
                     def _subfn_iter_summary_four_bar_specs(results_dict: Dict, grainularity: str = '_perTimeBin'):
                         """Yield `(group_key, laps_key, pbes_key, heuristic_key)` for pooled or split-by-group stats."""
-                        heuristic_suffix: str = '_heuristic_passing'
+                        heuristic_suffixes = ('_heuristic_passing', '_is_heuristic_passing')
                         laps_base: str = f'{grainularity}_Laps'
                         pbes_base: str = f'{grainularity}_PBEs'
                         if (laps_base in results_dict) and (pbes_base in results_dict):
-                            heuristic_key: str = f'{pbes_base}{heuristic_suffix}'
-                            yield None, laps_base, pbes_base, heuristic_key if heuristic_key in results_dict else None
+                            yield None, laps_base, pbes_base, _subfn_resolve_heuristic_sibling_key(results_dict, pbes_base)
                             return
 
                         laps_prefix: str = f'{laps_base}_'
                         group_names = []
                         for k in results_dict.keys():
-                            if k.startswith(laps_prefix) and (not str(k).endswith(heuristic_suffix)):
+                            if k.startswith(laps_prefix) and (not any(str(k).endswith(sfx) for sfx in heuristic_suffixes)):
                                 group_name = k[len(laps_prefix):]
                                 if f'{pbes_base}_{group_name}' in results_dict:
                                     group_names.append(group_name)
@@ -6323,8 +6372,7 @@ class FigureS8:
                         for group_name in ordered_groups:
                             laps_key: str = f'{laps_base}_{group_name}'
                             pbes_key: str = f'{pbes_base}_{group_name}'
-                            heuristic_key: str = f'{pbes_key}{heuristic_suffix}'
-                            yield group_name, laps_key, pbes_key, heuristic_key if heuristic_key in results_dict else None
+                            yield group_name, laps_key, pbes_key, _subfn_resolve_heuristic_sibling_key(results_dict, pbes_key)
                         ## END for group_name in ordered_groups...
 
                     summary_specs = list(_subfn_iter_summary_four_bar_specs(pre_post_delta_stats_results_dict, grainularity=grainularity))
