@@ -1763,6 +1763,10 @@ from collections import defaultdict
 class LoadedScoreShufflesDataframeAccessor:
     """ Adds shuffle z-score and p-value columns (`z_{score}`, `p_{score}`) columns on per-epoch DFs such as `ripple_EpochScoreShuffle_df`.
 
+    `process_loaded_shuffles` builds `sig_*` predicates from a source shuffle config (default 25ms) and evaluates them
+    on any plot df via session/replay/start identity join (cross-tbin safe). Overlap diagnostics land on
+    `discovered_shuffle_metrics_df.attrs['cross_tbin_epoch_overlap_df']` when a target plot df is available.
+
     Usage:
         from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import LoadedScoreShufflesDataframeAccessor
 
@@ -1779,10 +1783,11 @@ class LoadedScoreShufflesDataframeAccessor:
             additional_filter_predicates = {}
         _out = LoadedScoreShufflesDataframeAccessor.process_loaded_shuffles(ripple_EpochScoreShuffle_df=ripple_EpochScoreShuffle_df, df_filter=df_filter, additional_filter_predicates=additional_filter_predicates,
                     shuffle_p_alpha=shuffle_p_alpha, shuffle_z_threshold=shuffle_z_threshold, high_shuffle_quantile_threshold=high_shuffle_quantile_threshold,
-                    time_bin_size=time_bin_size, custom_replay_name=custom_replay_name)
+                    time_bin_size=time_bin_size, custom_replay_name=custom_replay_name, target_time_bin_size=0.075)
         shuffle_significance_predicates, discovered_shuffle_metrics_df, ripple_EpochScoreShuffle_df = _out
 
         discovered_shuffle_metrics_df
+        discovered_shuffle_metrics_df.attrs.get('cross_tbin_epoch_overlap_df')
         ripple_EpochScoreShuffle_df
         LoadedScoreShufflesDataframeAccessor.count_available_shuffles_per_session(ripple_EpochScoreShuffle_df)
 
@@ -1926,11 +1931,138 @@ class LoadedScoreShufflesDataframeAccessor:
 
 
     @classmethod
+    def _resolve_epoch_start_col(cls, df: pd.DataFrame) -> Optional[str]:
+        """First present among parent_epoch_start_t / epoch_start_t / ripple_start_t / start (FAT-merge order)."""
+        for a_candidate_col in ('parent_epoch_start_t', 'epoch_start_t', 'ripple_start_t', 'start'):
+            if a_candidate_col in df.columns:
+                return a_candidate_col
+        ## END for a_candidate_col in ('parent_epoch_start_t', 'epoch_start_t', 'ripple_start_t', 'start')...
+        return None
+
+
+    @classmethod
+    def _normalize_epoch_identity_columns(cls, df: pd.DataFrame, start_col: Optional[str] = None) -> pd.DataFrame:
+        """Add `_join_session`, `_join_replay`, `_join_start` for cross-tbin epoch identity joins (no time_bin_size)."""
+        out_df: pd.DataFrame = df.copy()
+        if start_col is None:
+            start_col = cls._resolve_epoch_start_col(out_df)
+        if start_col is None:
+            raise ValueError(f'_normalize_epoch_identity_columns: no epoch-start column among parent_epoch_start_t/epoch_start_t/ripple_start_t/start; columns={list(out_df.columns)}')
+        if 'session_name' in out_df.columns:
+            out_df['_join_session'] = out_df['session_name'].astype(str).str.replace('_', '-')
+        else:
+            out_df['_join_session'] = ''
+        if 'custom_replay_name' in out_df.columns:
+            out_df['_join_replay'] = out_df['custom_replay_name'].map(cls._comparable_custom_replay_name)
+        else:
+            out_df['_join_replay'] = ''
+        out_df['_join_start'] = pd.to_numeric(out_df[start_col], errors='coerce').round(4)
+        return out_df
+
+
+    @classmethod
+    def _build_shuffle_significance_lookup(cls, shuffle_df: pd.DataFrame, transfer_cols: List[str]) -> pd.DataFrame:
+        """Deduped right table keyed by session/replay/start for predicate lookup (shuffle side uses `start`)."""
+        join_keys: List[str] = ['_join_session', '_join_replay', '_join_start']
+        present_transfer_cols: List[str] = [c for c in transfer_cols if c in shuffle_df.columns]
+        right_df: pd.DataFrame = cls._normalize_epoch_identity_columns(shuffle_df, start_col='start')
+        return right_df[join_keys + present_transfer_cols].drop_duplicates(subset=join_keys, keep='first').reset_index(drop=True)
+
+
+    @classmethod
+    def diagnose_cross_time_bin_epoch_overlap(cls, source_df: pd.DataFrame, target_df: pd.DataFrame,
+        source_time_bin_size: float = DEFAULT_TIME_BIN_SIZE, target_time_bin_size: float = 0.075,
+        session_col: str = 'session_name', time_bin_col: str = 'time_bin_size', debug_print: bool = True,
+        ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+        """Compare epoch identity sets between a source shuffle tbs and a target plot tbs.
+
+        Returns (summary_df, source_only_epochs_df, target_only_epochs_df). Summary is per session_name with
+        n_source, n_target, n_matched, n_source_only, n_target_only, frac_target_matched.
+        """
+        empty_summary_cols = [session_col, 'n_source', 'n_target', 'n_matched', 'n_source_only', 'n_target_only', 'frac_target_matched']
+        empty_detail_cols = ['_join_session', '_join_replay', '_join_start']
+        if (source_df is None) or (len(source_df) == 0) or (target_df is None) or (len(target_df) == 0):
+            return (pd.DataFrame(columns=empty_summary_cols), pd.DataFrame(columns=empty_detail_cols), pd.DataFrame(columns=empty_detail_cols))
+
+        src_df: pd.DataFrame = deepcopy(source_df)
+        tgt_df: pd.DataFrame = deepcopy(target_df)
+        if time_bin_col in src_df.columns:
+            src_tbin_vals = pd.to_numeric(src_df[time_bin_col], errors='coerce')
+            src_df = src_df.loc[np.isclose(src_tbin_vals.to_numpy(dtype=float), float(source_time_bin_size), rtol=0.0, atol=1e-9)].copy()
+        if time_bin_col in tgt_df.columns:
+            tgt_tbin_vals = pd.to_numeric(tgt_df[time_bin_col], errors='coerce')
+            tgt_df = tgt_df.loc[np.isclose(tgt_tbin_vals.to_numpy(dtype=float), float(target_time_bin_size), rtol=0.0, atol=1e-9)].copy()
+
+        src_start_col: Optional[str] = 'start' if ('start' in src_df.columns) else cls._resolve_epoch_start_col(src_df)
+        tgt_start_col: Optional[str] = cls._resolve_epoch_start_col(tgt_df)
+        if (src_start_col is None) or (tgt_start_col is None):
+            if debug_print:
+                print(f'WARN: diagnose_cross_time_bin_epoch_overlap: missing start cols (source={src_start_col!r}, target={tgt_start_col!r})')
+            return (pd.DataFrame(columns=empty_summary_cols), pd.DataFrame(columns=empty_detail_cols), pd.DataFrame(columns=empty_detail_cols))
+
+        src_norm: pd.DataFrame = cls._normalize_epoch_identity_columns(src_df, start_col=src_start_col)
+        tgt_norm: pd.DataFrame = cls._normalize_epoch_identity_columns(tgt_df, start_col=tgt_start_col)
+        join_keys: List[str] = ['_join_session', '_join_replay', '_join_start']
+        src_keys: pd.DataFrame = src_norm[join_keys].drop_duplicates(subset=join_keys, keep='first')
+        tgt_keys: pd.DataFrame = tgt_norm[join_keys].drop_duplicates(subset=join_keys, keep='first')
+        src_keys['_in_source'] = True
+        tgt_keys['_in_target'] = True
+        merged_keys: pd.DataFrame = src_keys.merge(tgt_keys, how='outer', on=join_keys)
+        merged_keys['_in_source'] = merged_keys['_in_source'].fillna(False).astype(bool)
+        merged_keys['_in_target'] = merged_keys['_in_target'].fillna(False).astype(bool)
+
+        summary_rows: list[dict] = []
+        for a_session, a_session_df in merged_keys.groupby('_join_session', dropna=False, sort=False):
+            n_source: int = int(a_session_df['_in_source'].sum())
+            n_target: int = int(a_session_df['_in_target'].sum())
+            n_matched: int = int((a_session_df['_in_source'] & a_session_df['_in_target']).sum())
+            n_source_only: int = int((a_session_df['_in_source'] & ~a_session_df['_in_target']).sum())
+            n_target_only: int = int((~a_session_df['_in_source'] & a_session_df['_in_target']).sum())
+            frac_target_matched: float = (float(n_matched) / float(n_target)) if (n_target > 0) else np.nan
+            summary_rows.append({session_col: a_session, 'n_source': n_source, 'n_target': n_target, 'n_matched': n_matched, 'n_source_only': n_source_only, 'n_target_only': n_target_only, 'frac_target_matched': frac_target_matched})
+        ## END for a_session, a_session_df in merged_keys.groupby('_join_session', dropna=False, sort=False)...
+
+        summary_df: pd.DataFrame = pd.DataFrame(summary_rows)
+        if len(summary_df) > 0:
+            summary_df = summary_df.sort_values(session_col).reset_index(drop=True)
+
+        def _subfn_attach_optional_cols(keys_df: pd.DataFrame, norm_df: pd.DataFrame) -> pd.DataFrame:
+            out_keys: pd.DataFrame = keys_df[join_keys].copy()
+            optional_cols: List[str] = [c for c in ('stop', 'duration', 'label', 'ripple_idx') if c in norm_df.columns]
+            if len(optional_cols) == 0:
+                return out_keys.reset_index(drop=True)
+            extras: pd.DataFrame = norm_df[join_keys + optional_cols].drop_duplicates(subset=join_keys, keep='first')
+            return out_keys.merge(extras, how='left', on=join_keys).reset_index(drop=True)
+
+        source_only_mask = merged_keys['_in_source'] & ~merged_keys['_in_target']
+        target_only_mask = ~merged_keys['_in_source'] & merged_keys['_in_target']
+        source_only_epochs_df: pd.DataFrame = _subfn_attach_optional_cols(merged_keys.loc[source_only_mask], src_norm)
+        target_only_epochs_df: pd.DataFrame = _subfn_attach_optional_cols(merged_keys.loc[target_only_mask], tgt_norm)
+
+        if debug_print:
+            n_source_total: int = int(len(src_keys))
+            n_target_total: int = int(len(tgt_keys))
+            n_matched_total: int = int((merged_keys['_in_source'] & merged_keys['_in_target']).sum())
+            n_source_only_total: int = int(source_only_mask.sum())
+            n_target_only_total: int = int(target_only_mask.sum())
+            print(f'diagnose_cross_time_bin_epoch_overlap: source_tbin={source_time_bin_size}, target_tbin={target_time_bin_size}; n_source={n_source_total}, n_target={n_target_total}, n_matched={n_matched_total}, n_source_only={n_source_only_total}, n_target_only={n_target_only_total}')
+
+        return (summary_df, source_only_epochs_df, target_only_epochs_df)
+
+
+    @classmethod
     def process_loaded_shuffles(cls, ripple_EpochScoreShuffle_df: pd.DataFrame, additional_filter_predicates=None,
         shuffle_p_alpha: float = 0.05, shuffle_z_threshold: float = 1.96, high_shuffle_quantile_threshold: float = 0.9,
         time_bin_size: float = DEFAULT_TIME_BIN_SIZE, custom_replay_name: Optional[str] = DEFAULT_PREFERRED_CUSTOM_REPLAY_NAME,
-        drop_sessions_missing_preferred: bool = True, **kwargs):
-        """ Load the Shuffles
+        drop_sessions_missing_preferred: bool = True, target_plot_df: Optional[pd.DataFrame] = None, target_time_bin_size: Optional[float] = 0.075, **kwargs):
+        """Load EpochScoreShuffle significance predicates with cross-tbin identity lookup.
+
+        Predicates close over the filtered source shuffle table (`time_bin_size`, default 25ms) and evaluate
+        significance by joining plot rows on (session_name, custom_replay_name, start) — not time_bin_size —
+        so 75ms plot dfs can be filtered by 25ms shuffle z/p/n_extreme. Unmatched rows are not significant.
+
+        Optional `target_plot_df` (or `df_filter.active_plot_df` via kwargs) runs cross-tbin overlap diagnostics;
+        summary/detail frames are stored on `discovered_shuffle_metrics_df.attrs`.
 
         Usage:
             from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import LoadedScoreShufflesDataframeAccessor
@@ -1948,10 +2080,11 @@ class LoadedScoreShufflesDataframeAccessor:
                 additional_filter_predicates = {}
             _out = LoadedScoreShufflesDataframeAccessor.process_loaded_shuffles(ripple_EpochScoreShuffle_df=ripple_EpochScoreShuffle_df, df_filter=df_filter, additional_filter_predicates=additional_filter_predicates,
                         shuffle_p_alpha=shuffle_p_alpha, shuffle_z_threshold=shuffle_z_threshold, high_shuffle_quantile_threshold=high_shuffle_quantile_threshold,
-                        time_bin_size=time_bin_size, custom_replay_name=custom_replay_name)
+                        time_bin_size=time_bin_size, custom_replay_name=custom_replay_name, target_time_bin_size=0.075)
             shuffle_significance_predicates, discovered_shuffle_metrics_df, ripple_EpochScoreShuffle_df = _out
 
             discovered_shuffle_metrics_df
+            discovered_shuffle_metrics_df.attrs.get('cross_tbin_epoch_overlap_df')
             ripple_EpochScoreShuffle_df
             LoadedScoreShufflesDataframeAccessor.count_available_shuffles_per_session(ripple_EpochScoreShuffle_df)
 
@@ -1969,9 +2102,14 @@ class LoadedScoreShufflesDataframeAccessor:
         from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionHelpers
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.SequenceBasedComputations import DEFAULT_SHUFFLE_DECODER_NAMES, SCORE_EXTREME_MODE
 
+        if additional_filter_predicates is None:
+            additional_filter_predicates = {}
+
         ripple_EpochScoreShuffle_df = cls.filter_to_single_session_config(ripple_EpochScoreShuffle_df, time_bin_size=time_bin_size, custom_replay_name=custom_replay_name, drop_sessions_missing_preferred=drop_sessions_missing_preferred, debug_print=True)
         ripple_EpochScoreShuffle_df, epoch_score_shuffle_transfer_col_names = AcrossSessionHelpers.prepare_epoch_score_shuffle_transfer_columns(ripple_EpochScoreShuffle_df)
         decoder_names: list[str] = list(DEFAULT_SHUFFLE_DECODER_NAMES)
+        join_keys: List[str] = ['_join_session', '_join_replay', '_join_start']
+        shuffle_lookup_df: pd.DataFrame = cls._build_shuffle_significance_lookup(ripple_EpochScoreShuffle_df, epoch_score_shuffle_transfer_col_names)
 
 
         def _subfn_parse_shuffle_col(col: str):
@@ -1993,16 +2131,8 @@ class LoadedScoreShufflesDataframeAccessor:
             return None
 
 
-        def _subfn_present_cols(df: pd.DataFrame, cols) -> list[str]:
-            return [c for c in cols if c in df.columns]
-
-
-        def _subfn_any_significant(df: pd.DataFrame, cols, mode: str, thresh: float) -> pd.Series:
-            """1D bool Series; missing columns or NaNs are not significant (False)."""
-            present_cols: list[str] = _subfn_present_cols(df, cols)
-            if len(present_cols) == 0:
-                return pd.Series(False, index=df.index)
-            values = np.asarray(df[present_cols].to_numpy(), dtype=float)
+        def _subfn_apply_significance_values(values: np.ndarray, mode: str, thresh: float, index) -> pd.Series:
+            """Apply lt/eq/abs_ge; NaNs are not significant (False)."""
             if mode == 'lt':
                 is_sig = values < float(thresh)
             elif mode == 'eq':
@@ -2012,7 +2142,36 @@ class LoadedScoreShufflesDataframeAccessor:
             else:
                 raise ValueError(f'unknown significance mode: {mode}')
             is_sig = np.where(np.isnan(values), False, is_sig)
-            return pd.Series(np.any(is_sig, axis=1), index=df.index).fillna(False).astype(bool)
+            return pd.Series(np.any(is_sig, axis=1), index=index).fillna(False).astype(bool)
+
+
+        def _subfn_any_significant_on_df(df: pd.DataFrame, cols, mode: str, thresh: float) -> pd.Series:
+            """1D bool Series from columns already on `df` (legacy quantile path)."""
+            present_cols: list[str] = [c for c in cols if c in df.columns]
+            if len(present_cols) == 0:
+                return pd.Series(False, index=df.index)
+            values = np.asarray(df[present_cols].to_numpy(), dtype=float)
+            return _subfn_apply_significance_values(values, mode=mode, thresh=thresh, index=df.index)
+
+
+        def _subfn_any_significant(df: pd.DataFrame, cols, mode: str, thresh: float) -> pd.Series:
+            """1D bool Series via identity join onto closed-over source shuffle lookup; unmatched/NaN → False."""
+            present_lookup_cols: list[str] = [c for c in cols if c in shuffle_lookup_df.columns]
+            if (len(present_lookup_cols) == 0) or (len(shuffle_lookup_df) == 0):
+                return pd.Series(False, index=df.index)
+            try:
+                left_norm: pd.DataFrame = cls._normalize_epoch_identity_columns(df)
+            except ValueError:
+                return pd.Series(False, index=df.index)
+            left_keys: pd.DataFrame = left_norm[join_keys].copy()
+            left_keys['_row_i'] = np.arange(len(left_keys), dtype=int)
+            right_subset: pd.DataFrame = shuffle_lookup_df[join_keys + present_lookup_cols]
+            merged: pd.DataFrame = left_keys.merge(right_subset, how='left', on=join_keys)
+            if len(merged) != len(left_keys):
+                raise ValueError(f'_subfn_any_significant: identity left-merge changed row count ({len(left_keys)} -> {len(merged)}); refusing ambiguous join')
+            merged = merged.sort_values('_row_i', kind='mergesort')
+            values = np.asarray(merged[present_lookup_cols].to_numpy(), dtype=float)
+            return _subfn_apply_significance_values(values, mode=mode, thresh=thresh, index=df.index)
 
 
         metric_kind_cols: dict[str, dict[str, list[str]]] = defaultdict(lambda: defaultdict(list))
@@ -2051,26 +2210,44 @@ class LoadedScoreShufflesDataframeAccessor:
             shuffle_significance_predicates['sig_any_shuffle_z'] = (lambda df, _cols=tuple(all_z_cols), _z=shuffle_z_threshold: _subfn_any_significant(df, _cols, mode='abs_ge', thresh=_z))
 
         ## Legacy rank-order quantile (merged_complete_epoch_stats), if present on the plot df
-        shuffle_significance_predicates['high_shuffle_percentile_score'] = (lambda df, _thresh=high_shuffle_quantile_threshold: _subfn_any_significant(df, ['best_overall_quantile'], mode='abs_ge', thresh=_thresh))
+        shuffle_significance_predicates['high_shuffle_percentile_score'] = (lambda df, _thresh=high_shuffle_quantile_threshold: _subfn_any_significant_on_df(df, ['best_overall_quantile'], mode='abs_ge', thresh=_thresh))
 
-        # if 'additional_filter_predicates' not in locals() or additional_filter_predicates is None:
-        #     additional_filter_predicates = {}
         additional_filter_predicates.update(shuffle_significance_predicates)
 
         discovered_shuffle_metrics_df: pd.DataFrame = pd.DataFrame(discovered_rows)
-        print(f'shuffle_p_alpha={shuffle_p_alpha}, shuffle_z_threshold={shuffle_z_threshold}')
+        print(f'shuffle_p_alpha={shuffle_p_alpha}, shuffle_z_threshold={shuffle_z_threshold}; source_time_bin_size={time_bin_size}; cross-tbin identity lookup enabled')
         print(f'added {len(shuffle_significance_predicates)} shuffle-significance predicates: {list(shuffle_significance_predicates.keys())}')
-        # display(discovered_shuffle_metrics_df[['metric', 'extreme_mode', 'n_p', 'n_z', 'n_n_extreme']])
 
-        ## Preview pass counts on the best available already-merged df (NaNs count as not significant)
-        _preview_df = None
-        for a_candidate in ('all_sessions_all_scores_ripple_df', 'all_sessions_MultiMeasure_ripple_df', 'all_sessions_ripple_df', 'all_sessions_ripple_time_bin_df', 'all_sessions_laps_time_bin_df', 'FAT_df'):
-            if (a_candidate in locals()) and (locals()[a_candidate] is not None):
-                _preview_df = locals()[a_candidate]
-                _preview_name: str = a_candidate
-                break
-            ## END if (a_candidate in locals())...
-        ## END for a_candidate in (...)...
+        ## Resolve optional target plot df for overlap diagnostics / preview
+        if target_plot_df is None:
+            df_filter = kwargs.get('df_filter', None)
+            if df_filter is not None:
+                try:
+                    target_plot_df = df_filter.active_plot_df
+                except Exception:
+                    target_plot_df = None
+
+        if (target_plot_df is not None) and (len(target_plot_df) > 0) and (target_time_bin_size is not None):
+            overlap_summary_df, source_only_epochs_df, target_only_epochs_df = cls.diagnose_cross_time_bin_epoch_overlap(
+                source_df=ripple_EpochScoreShuffle_df, target_df=target_plot_df,
+                source_time_bin_size=float(time_bin_size), target_time_bin_size=float(target_time_bin_size), debug_print=True)
+            discovered_shuffle_metrics_df.attrs['cross_tbin_epoch_overlap_df'] = overlap_summary_df
+            discovered_shuffle_metrics_df.attrs['cross_tbin_source_only_epochs_df'] = source_only_epochs_df
+            discovered_shuffle_metrics_df.attrs['cross_tbin_target_only_epochs_df'] = target_only_epochs_df
+            print(f'cross-tbin epoch overlap summary (source_tbin={time_bin_size}, target_tbin={target_time_bin_size}):')
+            display(overlap_summary_df)
+
+        ## Preview pass counts (NaNs / unmatched count as not significant)
+        _preview_df = target_plot_df
+        _preview_name: str = 'target_plot_df'
+        if _preview_df is None:
+            for a_candidate in ('all_sessions_all_scores_ripple_df', 'all_sessions_MultiMeasure_ripple_df', 'all_sessions_ripple_df', 'all_sessions_ripple_time_bin_df', 'all_sessions_laps_time_bin_df', 'FAT_df'):
+                if (a_candidate in locals()) and (locals()[a_candidate] is not None):
+                    _preview_df = locals()[a_candidate]
+                    _preview_name = a_candidate
+                    break
+                ## END if (a_candidate in locals())...
+            ## END for a_candidate in (...)...
         if _preview_df is not None:
             _preview_counts = {k: int(np.nansum(np.asarray(fn(_preview_df), dtype=bool))) for k, fn in shuffle_significance_predicates.items()}
             print(f'preview pass counts on {_preview_name} (n={len(_preview_df)}):')
@@ -5694,14 +5871,15 @@ class FigureS8:
     @classmethod
     def main(cls, df_filter, plotly_helpers: PlotlyHelpers, additional_filter_predicates: Dict, figures_parent_folder: Path, active_filter_constraints: Optional[Dict]=None, should_concatenate_figures: bool=False, enable_heuristic_filtered_outputs: bool = False, split_by_column: Optional[str] = None,
             should_compute_stats: bool = True, enable_add_stats_to_figures: bool = False, debug_print: bool = False, store_debug_values: bool = False,
-            color_by_time_bin_size: bool = False, enabled_granularities: Optional[Sequence[str]] = None, legend_groups_to_hide: Optional[List] = None, show_scatter_legend: Optional[bool] = None,
+            color_by_time_bin_size: bool = False, enabled_granularities: Optional[Sequence[str]] = None, enabled_epoch_kinds: Optional[Sequence[str]] = None, legend_groups_to_hide: Optional[List] = None, show_scatter_legend: Optional[bool] = None,
         ):
         """ Performs the main plotting and adds optional stats
 
             When `store_debug_values=True`, a 4th return item holds the processed plot DFs (`base_df_dict_dict`, per-key `plot_data` with `final_df`/`plot_df`) and filter params. Also stored on `FigureS8.last_debug_values`.
 
             `color_by_time_bin_size=True` (Figure S3): color scatter/hist by `time_bin_size` as separate series; scatter legend off by default (`show_scatter_legend=True` to restore).
-            `enabled_granularities` defaults to both `('_perTimeBin', '_perEpochs')`; pass e.g. `('_perTimeBin',)` for S3.
+            `enabled_granularities` defaults to both `('_perTimeBin', '_perEpochs')`; pass e.g. `('_perTimeBin',)` for S3/S8/S9.
+            `enabled_epoch_kinds` defaults to both `('Laps', 'PBEs')`; pass e.g. `('PBEs',)` for S8/S9 (skip Laps scatter).
 
 
             from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import FigureS8
@@ -5874,6 +6052,8 @@ class FigureS8:
         ## INPUTS: base_df_dict_dict, base_constraint_keys_dict
         if enabled_granularities is None:
             enabled_granularities = ('_perTimeBin', '_perEpochs')
+        if enabled_epoch_kinds is None:
+            enabled_epoch_kinds = ('Laps', 'PBEs')
         for a_grainularity, base_df_dict in base_df_dict_dict.items(): # a_grainularity: grainularity_options = ['_perTimeBin', '_perEpochs']
             if a_grainularity not in enabled_granularities:
                 continue
@@ -5890,6 +6070,8 @@ class FigureS8:
             _out_paths = {}
 
             for an_epoch_name, base_df in base_df_dict.items(): # an_epoch_name: ['Laps', 'PBEs']
+                if an_epoch_name not in enabled_epoch_kinds:
+                    continue
                 ## export_suffix: ['_perTimeBin', '_perEpochs']
                 if isinstance(constraint_keys, dict):
                     ## separate for laps/PBEs
@@ -6058,10 +6240,14 @@ class FigureS8:
                 'Figure S8': {
                     'figures_parent_folder': figures_root.joinpath(f'Figure S8 - Effect of Heuristic-filtering P_Short Scatter over Time - perEpoch/Inputs/{figures_date}').resolve(),
                     'enable_heuristic_filtered_outputs': True,
+                    'enabled_granularities': ('_perTimeBin',),
+                    'enabled_epoch_kinds': ('PBEs',),
                 },
                 'Figure S9': {
                     'figures_parent_folder': figures_root.joinpath(f'Figure S9 - Effect of Heuristic-filtering P_Short Scatter over Time - PerEpoch/Inputs/{figures_date}').resolve(),
                     'enable_heuristic_filtered_outputs': True, 'split_by_column': 'animal',
+                    'enabled_granularities': ('_perTimeBin',),
+                    'enabled_epoch_kinds': ('PBEs',),
                 },
             }
         _figures_config_dict = deepcopy(figures_config_dict)
