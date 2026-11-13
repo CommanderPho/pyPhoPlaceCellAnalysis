@@ -7542,9 +7542,20 @@ class Figure5:
 
             merged_pdf_path = None
             if enable_figure and (session_figs is not None) and (len(session_figs) > 0):
+                from matplotlib.lines import Line2D
                 from pyphocorehelpers.plotting.media_output_helpers import PDFHelpers
                 # if pdf_export_path is None:
                 #     pdf_export_path = Path('output') / 'Figure5_measured_vs_decoded_by_session.pdf'
+                ## Thin black separators between stacked animals/sessions (all but last figure)
+                _session_fig_items = list(session_figs.items())
+                _n_sess_figs: int = len(_session_fig_items)
+                if _n_sess_figs > 1:
+                    for _i, (_session_name, _sess_fig) in enumerate(_session_fig_items):
+                        if _i < (_n_sess_figs - 1):
+                            _sess_fig.add_artist(Line2D([0.0, 1.0], [0.0, 0.0], transform=_sess_fig.transFigure, color='black', linewidth=0.9, clip_on=False))
+                        ## END if _i < (_n_sess_figs - 1)...
+                    ## END for _i, (_session_name, _sess_fig) in enumerate(_session_fig_items)...
+
                 if pdf_export_path is not None:
                     merged_pdf_path = Path(pdf_export_path).resolve()
                     merged_pdf_path.parent.mkdir(parents=True, exist_ok=True)
@@ -7558,7 +7569,7 @@ class Figure5:
                             sess_fig.savefig(sess_pdf_path, format='pdf', bbox_inches='tight', dpi=220)
                             per_session_pdf_paths.append(sess_pdf_path)
                         ## END for session_name, sess_fig in session_figs.items()....
-                    merged_pdf_path = PDFHelpers.concatenate_pdfs_vertically(per_session_pdf_paths, merged_pdf_path)
+                    merged_pdf_path = PDFHelpers.concatenate_pdfs_vertically(per_session_pdf_paths, merged_pdf_path, padding=8)
 
             return (session_figs, session_ax_dicts), (measured_epoch_occupancy_seconds_dict_dict, measured_epoch_occupancy_fractional_dict_dict), merged_pdf_path
 
