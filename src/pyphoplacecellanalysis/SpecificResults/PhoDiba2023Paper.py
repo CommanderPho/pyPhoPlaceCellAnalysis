@@ -4216,7 +4216,7 @@ class PrePostDeltaDistributionComparison:
         if active_context is None:
             active_context = IdentifyingContext(format_name='kdiba', fig='4', display_fn_name='pre_post_delta_summary_bars')
 
-        heuristic_color = '#2ca02c'
+        heuristic_color = FigureS8.HEURISTIC_PASSING_COLOR
         summary_bar_color = 'k'  # Laps/PBEs are not Long/Short; do not use Fig2 blue/red
         has_heuristic: bool = pbe_heuristic_session_summary is not None
         heuristic_y_pre = None
@@ -5020,7 +5020,7 @@ class PrePostDeltaDistributionComparison:
             f'{group_labels[1]} post-$\\Delta$',
         ]
         bar_colors = PaperFigureTwo.get_bar_colors()
-        heuristic_color = '#2ca02c'
+        heuristic_color = FigureS8.HEURISTIC_PASSING_COLOR
         heuristic_pre = None
         heuristic_post = None
         heuristic_obj = _subfn_unwrap_heuristic_distribution_obj(pbe_heuristic_passing)
@@ -5215,9 +5215,12 @@ class FigureS8:
     last_debug_values: Optional[Dict] = None
     _transparent_bgcolor: str = "rgba(0,0,0,0)"  # Kaleido PDF ignores this (always white); SVG+cairosvg preserves it.
 
+    HEURISTIC_PASSING_COLOR: str = '#2ca02c'  # Matplotlib Tab10 green; match Fig S8c summary "Heuristic-passing"
+    HEURISTIC_EXCLUDED_COLOR: str = 'rgb(100,100,100)'  # darker secondary grey for filter-excluded / background overlay
+    HEURISTIC_EXCLUDED_COLOR_HEX: str = '#646464'
     _heuristic_filter_color_map: Dict[str, str] = {
-        'False': 'rgba(170,170,170,0.45)',
-        'True': 'black',
+        'False': 'rgba(100,100,100,0.45)',
+        'True': HEURISTIC_PASSING_COLOR,
     }
     _PREFERRED_ANIMAL_ORDER = ('gor01', 'vvp01', 'pin01')
 
@@ -5396,8 +5399,8 @@ class FigureS8:
     # Pre/post-delta stats insets                                                                                                                                                                                                                                                          #
     # ==================================================================================================================================================================================================================================================================================== #
     _STATS_ANNOTATION_LABEL_COLOR: Dict[str, str] = {
-        'False': '#aaaaaa',  # solid gray; overlay map alpha is too faint for text
-        'True': 'black',
+        'False': HEURISTIC_EXCLUDED_COLOR_HEX,  # solid darker grey; overlay map alpha is too faint for text
+        'True': HEURISTIC_PASSING_COLOR,
     }
 
 
@@ -5545,6 +5548,9 @@ class FigureS8:
                     passing_mask = additional_filter_predicates['is_heuristic_passing'](group_df).astype(bool)
                     plot_df = cls._copy_df_preserving_context(group_df[passing_mask])
                     active_plot_kwargs['background_data_results_df'] = group_df
+                    _fg = dict(color_discrete_sequence=[cls.HEURISTIC_PASSING_COLOR])
+                    active_plot_kwargs['px_scatter_kwargs'] = {**(active_plot_kwargs.get('px_scatter_kwargs') or {}), **_fg}
+                    active_plot_kwargs['hist_kwargs'] = {**(active_plot_kwargs.get('hist_kwargs') or {}), **_fg}
                 else:
                     plot_df = group_df
                 if store_debug_values and (k == 'Final'):

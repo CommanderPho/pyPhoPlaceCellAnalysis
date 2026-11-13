@@ -2533,7 +2533,11 @@ def find_most_recent_files(found_session_export_paths: List[Path], cuttoff_date:
 
     # Original behavior: filter out files where parse_filename returns None for the first element
     if not should_fallback_to_filesystem_modification_datetime:
-        parsed_paths = [(*parse_filename(p, **parse_filename_kwargs), p) for p in found_session_export_paths if (parse_filename(p, should_print_unparsable_filenames=False, debug_print=False)[0] is not None)]
+        for p in found_session_export_paths:
+            parsed_info = parse_filename(p, **parse_filename_kwargs)
+            if parsed_info[0] is not None:
+                parsed_paths.append((*parsed_info, p))
+        ## END for p in found_session_export_paths...
     else:
         # Extended behavior with fallback to file modification time
         for p in found_session_export_paths:
@@ -2558,6 +2562,7 @@ def find_most_recent_files(found_session_export_paths: List[Path], cuttoff_date:
                     if debug_print:
                         print(f"WARN (SKIP): Skipping file {p.name} due to error: {e}")
                     continue
+        ## END for p in found_session_export_paths...
 
     # Function that helps sort tuples by handling None values.
     def sort_key(tup):
@@ -2589,32 +2594,26 @@ def find_most_recent_files(found_session_export_paths: List[Path], cuttoff_date:
     # Sort by columns: 'session' (ascending), 'custom_replay_name' (ascending) and 3 other columns
     all_parsed_paths_df = all_parsed_paths_df.sort_values(['session', 'file_type', compare_custom_replay_name_col_name, 'decoding_time_bin_size_str', 'export_datetime']).reset_index(drop=True)
 
-    # get_only_most_recent_session_files _________________________________________________________________________________ #
-    ## This is where we drop all but the most recent:
-    filtered_parsed_paths_df = get_only_most_recent_session_files(parsed_paths_df=deepcopy(all_parsed_paths_df), group_column_names=['session', compare_custom_replay_name_col_name, 'file_type', 'decoding_time_bin_size_str']) ## `filtered_parsed_paths_df` still has it
-
-    # Drop rows with export_datetime less than or equal to cutoff_date
+    # Cutoff first, then most-recent among remaining (so pre-cutoff files never win or compete)
+    cutoff_eligible_parsed_paths_df = all_parsed_paths_df
     if cuttoff_date is not None:
-        filtered_parsed_paths_df = filtered_parsed_paths_df[filtered_parsed_paths_df['export_datetime'] >= cuttoff_date]
+        cutoff_eligible_parsed_paths_df = all_parsed_paths_df[all_parsed_paths_df['export_datetime'] >= cuttoff_date]
 
-    ## filtered_parsed_paths_df is new 2024-07-11 output, NOTE we don't use `filtered_parsed_paths_df` below, instead `parsed_paths`.
+    # get_only_most_recent_session_files _________________________________________________________________________________ #
+    ## This is where we drop all but the most recent among cutoff-eligible rows:
+    filtered_parsed_paths_df = get_only_most_recent_session_files(parsed_paths_df=deepcopy(cutoff_eligible_parsed_paths_df), group_column_names=['session', compare_custom_replay_name_col_name, 'file_type', 'decoding_time_bin_size_str']) ## `filtered_parsed_paths_df` still has it
 
+    ## Build sessions dict from the same cutoff + most-recent set used for loading
     sessions = {}
-    for export_datetime, session_str, custom_replay_name, file_type, decoding_time_bin_size_str, path in parsed_paths:
+    for row in filtered_parsed_paths_df.itertuples(index=False):
+        session_str = row.session
+        file_type = row.file_type
+        export_datetime = row.export_datetime
         if session_str not in sessions:
             sessions[session_str] = {}
-
-        should_add: bool = False
         if (file_type not in sessions[session_str]) or (sessions[session_str][file_type][-1] < export_datetime):
-            if cuttoff_date is not None:
-                if (cuttoff_date <= export_datetime):
-                    should_add = True
-            else:
-                # if there is no cutoff date, add
-                should_add = True
-
-            if should_add:
-                sessions[session_str][file_type] = (path, decoding_time_bin_size_str, export_datetime)
+            sessions[session_str][file_type] = (row.path, row.decoding_time_bin_size_str, export_datetime)
+    ## END for row in filtered_parsed_paths_df.itertuples(index=False)...
 
     return sessions, filtered_parsed_paths_df, all_parsed_paths_df
 
@@ -3102,10 +3101,12 @@ def is_file_most_recent(all_parsed_df: pd.DataFrame, most_recent_parsed_df: pd.D
 
 
 @function_attributes(short_name=None, tags=['MAIN', 'across_sessions'], input_requires=[], output_provides=[], uses=['find_csv_files', 'find_HDF5_files', 'find_most_recent_files', '_new_process_csv_files', '_common_cleanup_operations'], used_by=[], creation_date='2024-04-15 08:47', related_items=[])
-def load_across_sessions_exported_files(cuttoff_date: Optional[datetime] = None, collected_outputs_directory: Optional[Path]=None, debug_print: bool = False):
+def load_across_sessions_exported_files(cuttoff_date: Optional[datetime] = None, collected_outputs_directory: Optional[Path]=None, debug_print: bool = False, include_h5: bool = False):
     """ Discovers all exported CSV files in collected_outputs, parses their filenames to determine the most recent one for each session, and builds joined dataframes from these values.
     
     #TODO 2024-10-23 05:12: - [ ] updated to use the modern `_new_process_csv_files`-based approach
+
+    include_h5 (bool): If True, also discover/parse H5 export metadata (contents are still not loaded here). Default False to avoid scanning large H5 directories when only CSVs are needed.
     
     from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import load_across_sessions_exported_files
     final_sessions, sessions_t_delta_tuple, df_results, (most_recent_parsed_csv_files_df, all_parsed_csv_files_df, csv_files, csv_sessions), (most_recent_parsed_h5_files_df, all_parsed_h5_files_df, h5_files, h5_sessions), excluded_or_outdated_files_list = load_across_sessions_exported_files(collected_outputs_directory=collected_outputs_directory, cuttoff_date=cuttoff_date, debug_print=True)
@@ -3156,10 +3157,18 @@ def load_across_sessions_exported_files(cuttoff_date: Optional[datetime] = None,
 
     ## Find the files:
     csv_files = find_csv_files(collected_outputs_directory)
-    h5_files = find_HDF5_files(collected_outputs_directory)
-
     csv_sessions, most_recent_parsed_csv_files_df, all_parsed_csv_files_df  = find_most_recent_files(found_session_export_paths=csv_files, cuttoff_date=cuttoff_date) # #TODO 2024-09-27 02:01: - [ ] Note `csv_sessions` is unused, replaced by `parsed_csv_files_df`
-    h5_sessions, most_recent_parsed_h5_files_df, all_parsed_h5_files_df = find_most_recent_files(found_session_export_paths=h5_files, cuttoff_date=cuttoff_date)
+
+    if include_h5:
+        h5_files = find_HDF5_files(collected_outputs_directory)
+        h5_sessions, most_recent_parsed_h5_files_df, all_parsed_h5_files_df = find_most_recent_files(found_session_export_paths=h5_files, cuttoff_date=cuttoff_date)
+    else:
+        ## Keep return-tuple shape stable without scanning/parsing H5 paths
+        h5_files = []
+        h5_sessions = {}
+        _empty_parsed_h5_cols = ['export_datetime', 'session', 'custom_replay_name', 'file_type', 'decoding_time_bin_size_str', 'path', '_comparable_custom_replay_name']
+        most_recent_parsed_h5_files_df = pd.DataFrame(columns=_empty_parsed_h5_cols)
+        all_parsed_h5_files_df = pd.DataFrame(columns=_empty_parsed_h5_cols)
 
     ## OUTPUTS: (csv_files, csv_sessions), (h5_files, h5_sessions)
 
@@ -3197,7 +3206,8 @@ def load_across_sessions_exported_files(cuttoff_date: Optional[datetime] = None,
     ## NEW `parsed_csv_files_df1-based approach 2024-07-11 - 
     ## INPUTS: parsed_csv_files_df
     dict_results, df_results, excluded_or_outdated_files_list = _new_process_csv_files(parsed_csv_files_df=most_recent_parsed_csv_files_df, t_delta_dict=t_delta_dict, cuttoff_date=cuttoff_date, known_bad_session_strs=known_bad_session_strs, all_session_experiment_experience_csv_path=all_session_experiment_experience_csv_path, debug_print=False) # , known_bad_session_strs=known_bad_session_strs
-    (final_sessions_loaded_laps_dict, final_sessions_loaded_ripple_dict, final_sessions_loaded_laps_time_bin_dict, final_sessions_loaded_ripple_time_bin_dict, final_sessions_loaded_simple_pearson_laps_dict, final_sessions_loaded_simple_pearson_ripple_dict, final_sessions_loaded_laps_wcorr_dict, final_sessions_loaded_ripple_wcorr_dict, final_sessions_loaded_laps_all_scores_dict, final_sessions_loaded_ripple_all_scores_dict, final_sessions_loaded_merged_complete_epoch_stats_df_dict, *final_sessions_loaded_extra_df_dicts_list) = dict_results
+    ## Drop per-session dict copies immediately — only concatenated dfs are needed here
+    del dict_results
     (all_sessions_laps_df, all_sessions_ripple_df, all_sessions_laps_time_bin_df, all_sessions_ripple_time_bin_df, all_sessions_simple_pearson_laps_df, all_sessions_simple_pearson_ripple_df, all_sessions_wcorr_laps_df, all_sessions_wcorr_ripple_df, all_sessions_all_scores_ripple_df, all_sessions_merged_complete_epoch_stats_df, *final_sessions_loaded_extra_dfs_list) = df_results
 
     # Old (pre 2024-10-22) method ________________________________________________________________________________________ #
@@ -3539,6 +3549,9 @@ def _new_process_csv_files(parsed_csv_files_df: pd.DataFrame, t_delta_dict: Dict
     # Sort by columns: 'session' (ascending), 'custom_replay_name' (ascending) and 3 other columns
     parsed_csv_files_df = parsed_csv_files_df.sort_values(['session', 'file_type', 'custom_replay_name', 'decoding_time_bin_size_str', 'export_datetime'], ascending=[True, True, True, True, False]).reset_index(drop=True) # ensures all are sorted ascending except for export_datetime, which are sorted decending so the first value is the most recent.
 
+    ## Prefer FAT over classic laps_time_bin_marginals_df for the same (session, custom_replay_name) key
+    fat_session_replay_keys = set((str(a_row.session), a_row.custom_replay_name) for a_row in parsed_csv_files_df.itertuples(index=False) if a_row.file_type == 'FAT')
+
     excluded_or_outdated_files_list = []
     for index, row in parsed_csv_files_df.iterrows():
         session_str = str(row['session'])
@@ -3605,6 +3618,11 @@ def _new_process_csv_files(parsed_csv_files_df: pd.DataFrame, t_delta_dict: Dict
             elif file_type == 'ripple_marginals_df':
                 _is_file_valid = _subfn_new_df_process_and_load_exported_file(path, final_sessions_loaded_ripple_dict, session_name, curr_session_t_delta, time_key='ripple_start_t', **common_additional_columns_dict)
             elif file_type == 'laps_time_bin_marginals_df':
+                if (session_name, custom_replay_name) in fat_session_replay_keys:
+                    ## FAT covers this sink for the same key — skip classic time-bin marginals to avoid double-loading
+                    if debug_print:
+                        print(f'Skipping classic laps_time_bin_marginals_df for "{session_name}" / "{custom_replay_name}" because FAT is present.')
+                    continue
                 _is_file_valid = _subfn_new_df_process_and_load_exported_file(path, final_sessions_loaded_laps_time_bin_dict, session_name, curr_session_t_delta, time_key='t_bin_center', **common_additional_columns_dict)
             elif file_type == 'ripple_time_bin_marginals_df':
                 _is_file_valid = _subfn_new_df_process_and_load_exported_file(path, final_sessions_loaded_ripple_time_bin_dict, session_name, curr_session_t_delta, time_key='t_bin_center', **common_additional_columns_dict)
@@ -3642,9 +3660,8 @@ def _new_process_csv_files(parsed_csv_files_df: pd.DataFrame, t_delta_dict: Dict
                 final_sessions_loaded_extra_df_dict[file_type] = _curr_dict
             elif file_type == 'FAT':
                 # 2025-03-01 - a bulk export .CSV format where all results are stacked vertically and fields duplicated as needed (no attentioned paid to disk
-                # #TODO 2025-04-04 10:11: - [ ] FAT is a legit exception and shouldn't belong in `extended_file_types_list`, as it has both time bin and epoch centered items
-                _is_file_valid = _subfn_new_df_process_and_load_exported_file(path, final_sessions_loaded_laps_time_bin_dict, session_name, curr_session_t_delta, time_key='t_bin_center', allow_CONCAT_to_existing=True, **common_additional_columns_dict) ## adds to the time bins 
-                #TODO 2025-04-04 10:12: - [ ] Why does it add to `final_sessions_loaded_laps_time_bin_dict`? this seems wrong
+                # Prefer FAT alone for this sink (classic laps_time_bin_marginals_df skipped above when FAT exists for the key)
+                _is_file_valid = _subfn_new_df_process_and_load_exported_file(path, final_sessions_loaded_laps_time_bin_dict, session_name, curr_session_t_delta, time_key='t_bin_center', allow_CONCAT_to_existing=False, **common_additional_columns_dict)
             elif file_type == 'fig5_occupancy':
                 ## long-form measured/decoded occupancy vectors (no epoch time column); concat across sessions into final_sessions_loaded_extra_dfs['fig5_occupancy']
                 _curr_dict = final_sessions_loaded_extra_df_dict[file_type]
@@ -3666,7 +3683,7 @@ def _new_process_csv_files(parsed_csv_files_df: pd.DataFrame, t_delta_dict: Dict
                     print(f'file_type: {file_type} -- "{path.name}" is valid and has been loaded.')
             # np.any([v[0] for k, v in final_sessions_loaded_laps_dict.items()])
             
-        ## END FOR    
+    ## END for index, row in parsed_csv_files_df.iterrows()...
     if debug_print:
         print(f'done with main processing loop')
     ## Prefer ripple_EpochScoreShuffle_df; fill missing session keys from legacy ripple_WCorrShuffle_df
@@ -3716,8 +3733,25 @@ def _new_process_csv_files(parsed_csv_files_df: pd.DataFrame, t_delta_dict: Dict
         # final_sessions_loaded_extra_dfs[file_type].metadata.update(**{'file_type': file_type, })
         
 
-    final_sessions_loaded_extra_df_dicts_list = list(final_sessions_loaded_extra_df_dict.values())        
     final_sessions_loaded_extra_dfs_list = list(final_sessions_loaded_extra_dfs.values())
+
+    ## Drop per-session dict copies after concat so peak RAM falls sooner (return empty shells to keep tuple shape)
+    final_sessions_loaded_laps_dict.clear()
+    final_sessions_loaded_ripple_dict.clear()
+    final_sessions_loaded_laps_time_bin_dict.clear()
+    final_sessions_loaded_ripple_time_bin_dict.clear()
+    final_sessions_loaded_simple_pearson_laps_dict.clear()
+    final_sessions_loaded_simple_pearson_ripple_dict.clear()
+    final_sessions_loaded_laps_wcorr_dict.clear()
+    final_sessions_loaded_ripple_wcorr_dict.clear()
+    final_sessions_loaded_laps_all_scores_dict.clear()
+    final_sessions_loaded_ripple_all_scores_dict.clear()
+    final_sessions_loaded_merged_complete_epoch_stats_df_dict.clear()
+    for _extra_dict in final_sessions_loaded_extra_df_dict.values():
+        if isinstance(_extra_dict, dict):
+            _extra_dict.clear()
+    ## END for _extra_dict in final_sessions_loaded_extra_df_dict.values()...
+    final_sessions_loaded_extra_df_dicts_list = list(final_sessions_loaded_extra_df_dict.values())
     
         
     ## #TODO 2024-09-25 09:42: - [X] FIXED: Unfortunately both `all_sessions_laps_*df` dataframes have all missing values for their ['time_bin_size'] column.
