@@ -7274,10 +7274,12 @@ class Figure5:
         ## INPUTS: full_epoch_occupancy_seconds_dict_dict, full_epoch_occupancy_fractional_dict_dict, time_bin_size, measured_x_col: str = 'binned_x_meas'
         ## When split_by_session=True, optional prefix builds a spanning left label per figure, e.g. outer_group_label_prefix='Animal' → "Animal: gor01"
         outer_group_label_prefix: Optional[str] = kwargs.pop('outer_group_label_prefix', None)
+        skip_plotting_measured: bool = bool(kwargs.pop('skip_plotting_measured', False))
         pre_post_all_epoch_names = ['pre-delta', 'post-delta', 'all']
         _PERIOD_KEYS = set(pre_post_all_epoch_names)
         decoder_color_dict: Dict[types.DecoderName, str] = {'long_LR': '#0099ff', 'long_RL': '#1b115a', 'short_LR': '#f51616', 'short_RL': '#891111'}
-        assert (active_measured_positions_dfs_dict is not None) or (precomputed_measured_occupancy_seconds_dict_dict is not None), "provide active_measured_positions_dfs_dict or precomputed_measured_occupancy_seconds_dict_dict"
+        if not skip_plotting_measured:
+            assert (active_measured_positions_dfs_dict is not None) or (precomputed_measured_occupancy_seconds_dict_dict is not None), "provide active_measured_positions_dfs_dict or precomputed_measured_occupancy_seconds_dict_dict (or pass skip_plotting_measured=True)"
 
         def _is_session_nested_occupancy(occupancy_dict_dict) -> bool:
             return (len(occupancy_dict_dict) > 0) and set(occupancy_dict_dict.keys()).isdisjoint(_PERIOD_KEYS)
@@ -7363,11 +7365,17 @@ class Figure5:
                     width_ratios=[0.08, 1, 1, 1],
                 )
             _data_ax_keys = ['laps_pre-delta', 'laps_post-delta', 'laps_all', 'PBEs_pre-delta', 'PBEs_post-delta', 'PBEs_all']
-            _share_ref_ax = ax_dict[_data_ax_keys[0]]
+            ## Share x across all panels; share y only within each row so Laps scale does not flatten PBEs.
+            _share_x_ref_ax = ax_dict['laps_pre-delta']
             for _ax_key in _data_ax_keys[1:]:
-                ax_dict[_ax_key].sharex(_share_ref_ax)
-                ax_dict[_ax_key].sharey(_share_ref_ax)
+                ax_dict[_ax_key].sharex(_share_x_ref_ax)
             ## END for _ax_key in _data_ax_keys[1:]...
+            for _row_ax_keys in (('laps_pre-delta', 'laps_post-delta', 'laps_all'), ('PBEs_pre-delta', 'PBEs_post-delta', 'PBEs_all')):
+                _share_y_ref_ax = ax_dict[_row_ax_keys[0]]
+                for _ax_key in _row_ax_keys[1:]:
+                    ax_dict[_ax_key].sharey(_share_y_ref_ax)
+                ## END for _ax_key in _row_ax_keys[1:]...
+            ## END for _row_ax_keys in (('laps_pre-delta', 'laps_post-delta', 'laps_all'), ('PBEs_pre-delta', 'PBEs_post-delta', 'PBEs_all'))...
 
             for _row_ax_key, _row_label in (('row_laps', 'Laps'), ('row_PBEs', 'PBEs')):
                 _row_ax = ax_dict[_row_ax_key]
@@ -7441,23 +7449,30 @@ class Figure5:
                 else:
                     ax.set_ylabel('')
 
-                ## measured on twin (secondary) y-axis so its autoscale is independent of decoded magnitude
-                ax_measured = ax.twinx()
-                perform_plot_occupancy(measured_active, xbin_centers=xbin_centers, xbin_edges=xbin_edges, fig=fig, ax=ax_measured,
-                                    label='measured', **_plot_kwargs, alpha=_line_alpha)
-                _color_last_occupancy_stairs(ax_measured, '0.25', linestyle=(0, (1.0, 0.8)), linewidth=0.75)  # denser dotted path than default ':' (~2x closer dots)
-                ax_measured.tick_params(axis='y', labelcolor='0.45')
-                if pre_post == 'all':
-                    ax_measured.set_ylabel('measured (s)')
+                if skip_plotting_measured:
+                    ax.set_title(f"{pre_post_label}  (decoded={decoded_total_s:0.1f}s)")
+                    if legend_handles is None:
+                        decoded_handles, _ = ax.get_legend_handles_labels()
+                        legend_handles = list(decoded_handles)
+                        legend_labels = list(_decoded_legend_labels)  # perform_plot_occupancy hardcodes stairs label='1D Placefield Occupancy'
                 else:
-                    ax_measured.set_ylabel('')
-                ax_measured.set_title('')  # perform_plot_occupancy sets a per-call title on the twin
-                ax.set_title(f"{pre_post_label}  (decoded={decoded_total_s:0.1f}s, measured={measured_total_s:0.1f}s)")
-                if legend_handles is None:
-                    decoded_handles, _ = ax.get_legend_handles_labels()
-                    measured_handles, _ = ax_measured.get_legend_handles_labels()
-                    legend_handles = list(measured_handles) + list(decoded_handles)
-                    legend_labels = ['measured'] + _decoded_legend_labels  # perform_plot_occupancy hardcodes stairs label='1D Placefield Occupancy'
+                    ## measured on twin (secondary) y-axis so its autoscale is independent of decoded magnitude
+                    ax_measured = ax.twinx()
+                    perform_plot_occupancy(measured_active, xbin_centers=xbin_centers, xbin_edges=xbin_edges, fig=fig, ax=ax_measured,
+                                        label='measured', **_plot_kwargs, alpha=_line_alpha)
+                    _color_last_occupancy_stairs(ax_measured, '0.25', linestyle=(0, (1.0, 0.8)), linewidth=0.75)  # denser dotted path than default ':' (~2x closer dots)
+                    ax_measured.tick_params(axis='y', labelcolor='0.45')
+                    if pre_post == 'all':
+                        ax_measured.set_ylabel('measured (s)')
+                    else:
+                        ax_measured.set_ylabel('')
+                    ax_measured.set_title('')  # perform_plot_occupancy sets a per-call title on the twin
+                    ax.set_title(f"{pre_post_label}  (decoded={decoded_total_s:0.1f}s, measured={measured_total_s:0.1f}s)")
+                    if legend_handles is None:
+                        decoded_handles, _ = ax.get_legend_handles_labels()
+                        measured_handles, _ = ax_measured.get_legend_handles_labels()
+                        legend_handles = list(measured_handles) + list(decoded_handles)
+                        legend_labels = ['measured'] + _decoded_legend_labels  # perform_plot_occupancy hardcodes stairs label='1D Placefield Occupancy'
             ## END for lap_PBEs_plus_pre_post in _data_ax_keys...
 
             if legend_handles is not None:
@@ -7473,18 +7488,20 @@ class Figure5:
             use_precomputed_measured: bool = (precomputed_measured_occupancy_seconds_dict_dict is not None)
             if use_precomputed_measured:
                 measured_session_names = set(precomputed_measured_occupancy_seconds_dict_dict.keys())
-            else:
-                assert active_measured_positions_dfs_dict is not None, "split_by_session without precomputed measured requires active_measured_positions_dfs_dict"
+            elif active_measured_positions_dfs_dict is not None:
                 measured_session_names = set()
                 for a_lap_pbe_epoch_name, measured_df in active_measured_positions_dfs_dict.items():
                     assert 'session_name' in measured_df.columns, f"measured df '{a_lap_pbe_epoch_name}' is missing 'session_name' needed for split_by_session"
                     measured_session_names.update(measured_df['session_name'].dropna().unique().tolist())
                 ## END for a_lap_pbe_epoch_name, measured_df in active_measured_positions_dfs_dict.items()....
+            else:
+                assert skip_plotting_measured, "split_by_session without measured requires skip_plotting_measured=True"
+                measured_session_names = set()
 
             decoded_session_names = set(session_names)
             _missing_measured = decoded_session_names.difference(measured_session_names)
             _extra_measured = measured_session_names.difference(decoded_session_names)
-            if len(_missing_measured) > 0:
+            if (not skip_plotting_measured) and (len(_missing_measured) > 0):
                 print(f'WARN: split_by_session: decoded sessions with no measured overlap: {_missing_measured}')
             if len(_extra_measured) > 0:
                 print(f'WARN: split_by_session: measured sessions with no decoded occupancy: {_extra_measured}')
@@ -7517,12 +7534,14 @@ class Figure5:
                             sess_measured_frac[pre_post][epoch_name] = (occ_s / occ_sum) if (occ_sum > 0) else occ_s
                         ## END for epoch_name, occ_s in epoch_dict.items()...
                     ## END for pre_post, epoch_dict in sess_measured_seconds.items()...
-                else:
+                elif active_measured_positions_dfs_dict is not None:
                     sess_measured_dfs_dict = {}
                     for a_lap_pbe_epoch_name, measured_df in active_measured_positions_dfs_dict.items():
                         sess_measured_dfs_dict[a_lap_pbe_epoch_name] = measured_df[measured_df['session_name'] == session_name]
                     ## END for a_lap_pbe_epoch_name, measured_df in active_measured_positions_dfs_dict.items()....
                     sess_measured_seconds, sess_measured_frac = _build_measured_occupancy_dicts(sess_decoded_seconds, sess_measured_dfs_dict, xbin_bin_ids)
+                else:
+                    sess_measured_seconds, sess_measured_frac = {}, {}
 
                 measured_epoch_occupancy_seconds_dict_dict[session_name] = sess_measured_seconds
                 measured_epoch_occupancy_fractional_dict_dict[session_name] = sess_measured_frac
@@ -7580,13 +7599,17 @@ class Figure5:
         xbin_bin_ids = np.arange(n_pos) + 1  # binned_x_meas is 1-indexed
 
         ## INPUTS: active_measured_positions_dfs_dict
-        measured_epoch_occupancy_seconds_dict_dict, measured_epoch_occupancy_fractional_dict_dict = _build_measured_occupancy_dicts(full_epoch_occupancy_seconds_dict_dict, active_measured_positions_dfs_dict, xbin_bin_ids)
+        if active_measured_positions_dfs_dict is not None:
+            measured_epoch_occupancy_seconds_dict_dict, measured_epoch_occupancy_fractional_dict_dict = _build_measured_occupancy_dicts(full_epoch_occupancy_seconds_dict_dict, active_measured_positions_dfs_dict, xbin_bin_ids)
+        else:
+            assert skip_plotting_measured, "non-split Figure5.main without measured requires skip_plotting_measured=True"
+            measured_epoch_occupancy_seconds_dict_dict, measured_epoch_occupancy_fractional_dict_dict = {}, {}
 
         if enable_figure:
             ## single figure mode
             fig = plt.figure(layout='constrained', figsize=[18, 4], dpi=220, clear=True, num=num)
             ax_dict = _plot_occupancy_mosaic(fig, full_epoch_occupancy_seconds_dict_dict, measured_epoch_occupancy_seconds_dict_dict)
-            plt.suptitle(f'Figure 5 — measured x vs decoded occupancy')
+            plt.suptitle(f'Figure 5 — measured x vs decoded occupancy' if (not skip_plotting_measured) else f'Figure 5 — decoded occupancy')
             # _out_figs_dict[a_lap_pbe_epoch_name] = (fig, ax_dict)
         else:
             fig = None
