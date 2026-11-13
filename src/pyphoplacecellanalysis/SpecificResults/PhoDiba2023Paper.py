@@ -4220,7 +4220,7 @@ class PrePostDeltaDistributionComparison:
                 pre_post_delta_stats_results_dict['_perTimeBin_PBEs'],
                 pbe_heuristic_passing_results=pre_post_delta_stats_results_dict.get('_perTimeBin_PBEs_heuristic_passing'),
                 pbe_additional_filter_results=pre_post_delta_stats_results_dict.get('_perTimeBin_PBEs_sig_spearman_z'),
-                pbe_additional_filter_label='sig_spearman_z',
+                pbe_additional_filter_label='spearman-Passing',
                 fignum=f'{fig_name}-pre_post_delta_effect-{metric}',
                 separate_laps_pbes_figures=False,
             )
@@ -4310,6 +4310,9 @@ class PrePostDeltaDistributionComparison:
         )
         if pbe_additional_filter_label is None:
             pbe_additional_filter_label = 'Additional filter'
+        else:
+            # Map raw predicate keys (e.g. sig_spearman_z) to legend text; leave already-human labels unchanged
+            pbe_additional_filter_label = FigureS8.filter_predicate_display_label(pbe_additional_filter_label)
         if pbe_additional_filter_color is None:
             pbe_additional_filter_color = FigureS8.ADDITIONAL_FILTER_PASSING_COLOR
 
@@ -4318,7 +4321,7 @@ class PrePostDeltaDistributionComparison:
         if include_pbes and (pbe_additional_session_summary is not None):
             extra_pbe_series.append(dict(label=str(pbe_additional_filter_label), color=str(pbe_additional_filter_color), summary=pbe_additional_session_summary, p_value=pbe_additional_filter_p_value))
         if include_pbes and (pbe_heuristic_session_summary is not None):
-            extra_pbe_series.append(dict(label='Heuristic-passing', color=FigureS8.HEURISTIC_PASSING_COLOR, summary=pbe_heuristic_session_summary, p_value=pbe_heuristic_p_value))
+            extra_pbe_series.append(dict(label=FigureS8.filter_predicate_display_label('is_heuristic_passing'), color=FigureS8.HEURISTIC_PASSING_COLOR, summary=pbe_heuristic_session_summary, p_value=pbe_heuristic_p_value))
         ## END if include_pbes and (pbe_heuristic_session_summary is not None)...
         n_extra_pbe: int = len(extra_pbe_series)
         has_pbe_extras: bool = (n_extra_pbe > 0)
@@ -5515,11 +5518,26 @@ class FigureS8:
     ADDITIONAL_FILTER_PASSING_COLOR: str = '#1f77b4'  # Matplotlib Tab10 blue; non-heuristic overlay filter (e.g. sig_spearman_z)
     HEURISTIC_EXCLUDED_COLOR: str = 'rgb(100,100,100)'  # darker secondary grey for filter-excluded / background overlay
     HEURISTIC_EXCLUDED_COLOR_HEX: str = '#646464'
+    # Predicate key → legend / summary-bar display text (keys stay machine names in configs / results dicts)
+    FILTER_PREDICATE_DISPLAY_LABELS: Dict[str, str] = {
+        'sig_spearman_z': 'spearman-Passing',
+        'is_heuristic_passing': 'Heuristic-passing',
+        'heuristic_passing': 'Heuristic-passing',
+    }
     _heuristic_filter_color_map: Dict[str, str] = {
         'False': 'rgba(100,100,100,0.45)',
         'True': HEURISTIC_PASSING_COLOR,
     }
     _PREFERRED_ANIMAL_ORDER = ('gor01', 'vvp01', 'pin01')
+
+
+    @classmethod
+    def filter_predicate_display_label(cls, predicate_key: Optional[str]) -> str:
+        """Human-readable legend label for an `additional_filter_predicates` key."""
+        if predicate_key is None:
+            return 'Additional filter'
+        key: str = str(predicate_key)
+        return str(cls.FILTER_PREDICATE_DISPLAY_LABELS.get(key, key))
 
 
     @classmethod
@@ -6519,7 +6537,7 @@ class FigureS8:
                         for suffix in candidate_suffixes:
                             candidate: str = f'{pbes_key}_{suffix}'
                             if candidate in results_dict:
-                                return candidate, suffix
+                                return candidate, cls.filter_predicate_display_label(suffix)
                         ## END for suffix in candidate_suffixes...
                         return None, None
 
