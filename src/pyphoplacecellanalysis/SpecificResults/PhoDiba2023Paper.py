@@ -4456,6 +4456,20 @@ class PrePostDeltaDistributionComparison:
         laps_fig_file_name: Optional[str] = kwargs.pop('laps_fig_file_name', None)
         pbe_fig_file_name: Optional[str] = kwargs.pop('pbe_fig_file_name', None)
         fig2_bar_style = PhoPublicationFigureHelper.get_figure2_bar_style(prepare_for_publication=prepare_for_publication, **{'figure.dpi': str(dpi), 'figure.frameon': False})
+        # Optional compact-style overrides (e.g. FigureS8.SUMMARY_BAR_COMPACT_STYLE). Defaults restore pre-S8 Fig4 behavior.
+        figsize_scale = kwargs.pop('figsize_scale', None)
+        _scatter_s_raw = kwargs.pop('scatter_s', None)
+        _summary_scatter_s: Optional[float] = None if (_scatter_s_raw is None) else float(_scatter_s_raw)
+        _summary_legend_markersize: float = float(kwargs.pop('legend_markersize', 6.0))
+        _save_bbox_inches = kwargs.pop('save_bbox_inches', None)
+        _save_pad_inches: float = float(kwargs.pop('save_pad_inches', 0.0))
+        _summary_scatter_kwargs = dict(edgecolors='white', linewidths=0.4, zorder=4)
+        if _summary_scatter_s is not None:
+            _summary_scatter_kwargs['s'] = _summary_scatter_s
+        _save_bbox_kwargs: Dict[str, Any] = {}
+        if _save_bbox_inches is not None:
+            _save_bbox_kwargs['bbox_inches'] = _save_bbox_inches
+            _save_bbox_kwargs['pad_inches'] = _save_pad_inches
         _decoded_prefix: str = 'Decoded '
         if str(title).startswith(_decoded_prefix):
             title = f"{_decoded_prefix}<weight:bold>{str(title)[len(_decoded_prefix):]}</>"
@@ -4465,8 +4479,7 @@ class PrePostDeltaDistributionComparison:
             panel_saved_paths: List[Path] = []
             if not save_figure:
                 return panel_saved_paths, None
-            # Outside-axes legends (and wide 3-split bars) extend past the default figure box; every export format needs tight bbox.
-            _save_bbox_kwargs = dict(bbox_inches='tight', pad_inches=0.25)
+            # Tight bbox only when caller passes save_bbox_inches (S8 compact); Fig4 keeps legacy figure-box crop.
             save_context = active_context.overwriting_context(display_fn_name=panel_fig_file_name)
             fig_man = None
             export_folder_path = None if export_folder is None else Path(export_folder)
@@ -4502,12 +4515,16 @@ class PrePostDeltaDistributionComparison:
             panel_kwargs.pop('num', None)
             if panel_fignum is not None:
                 panel_kwargs['fignum'] = panel_fignum
-            panel_kwargs.setdefault('scatter_kwargs', dict(edgecolors='white', linewidths=0.4, zorder=4))
+            panel_kwargs.setdefault('scatter_kwargs', dict(_summary_scatter_kwargs))
             if 'figsize' not in panel_kwargs:
                 rc_w, rc_h = mpl.rcParams['figure.figsize']
-                # Full Fig2 width when filter overlays need a right-edge legend; half-width otherwise
-                width_scale = 1.0 if panel_has_extras else 0.5
-                panel_kwargs['figsize'] = (float(rc_w) * width_scale, float(rc_h))
+                if figsize_scale is not None:
+                    _scale = float(figsize_scale)
+                    panel_kwargs['figsize'] = (float(rc_w) * _scale, float(rc_h) * _scale)
+                else:
+                    # Legacy: full Fig2 width when filter overlays need a right-edge legend; half-width otherwise
+                    width_scale = 1.0 if panel_has_extras else 0.5
+                    panel_kwargs['figsize'] = (float(rc_w) * width_scale, float(rc_h))
             panel_kwargs.setdefault('bottom_margin', 0.20)
             y_pre = summary_df[pre_col].to_numpy(dtype=float)
             y_post = summary_df[post_col].to_numpy(dtype=float)
@@ -4583,7 +4600,7 @@ class PrePostDeltaDistributionComparison:
                 legend_animals.extend([a for a in unique_animals if a not in set(preferred_animals)])
                 animal_legend_handles = [
                     Line2D([0], [0], linestyle='None', marker=marker_mapping[animal], color=summary_bar_color,
-                           markerfacecolor=summary_bar_color, markeredgecolor=summary_bar_color, markersize=6,
+                           markerfacecolor=summary_bar_color, markeredgecolor=summary_bar_color, markersize=_summary_legend_markersize,
                            label=_animal_legend_label(animal))
                     for animal in legend_animals
                 ]
@@ -4713,7 +4730,11 @@ class PrePostDeltaDistributionComparison:
         if fignum is not None:
             create_plot_kwargs.setdefault('fignum', fignum)
         create_plot_kwargs.setdefault('bar_colors', [summary_bar_color] * 4)
-        create_plot_kwargs.setdefault('scatter_kwargs', dict(edgecolors='white', linewidths=0.4, zorder=4))
+        create_plot_kwargs.setdefault('scatter_kwargs', dict(_summary_scatter_kwargs))
+        if (figsize_scale is not None) and ('figsize' not in create_plot_kwargs):
+            rc_w, rc_h = mpl.rcParams['figure.figsize']
+            _scale = float(figsize_scale)
+            create_plot_kwargs['figsize'] = (float(rc_w) * _scale, float(rc_h) * _scale)
         if has_pbe_extras:
             pbe_color = summary_bar_color
             # Per PBE column: all | extra0 | extra1... (offsets from _pbe_split_offsets)
@@ -4810,7 +4831,7 @@ class PrePostDeltaDistributionComparison:
                     legend_animals.extend([a for a in unique_animals if a not in set(preferred_animals)])
                     animal_legend_handles = [
                         Line2D([0], [0], linestyle='None', marker=marker_mapping[animal], color=summary_bar_color,
-                               markerfacecolor=summary_bar_color, markeredgecolor=summary_bar_color, markersize=6,
+                               markerfacecolor=summary_bar_color, markeredgecolor=summary_bar_color, markersize=_summary_legend_markersize,
                                label=_animal_legend_label(animal))
                         for animal in legend_animals
                     ]
@@ -4836,7 +4857,6 @@ class PrePostDeltaDistributionComparison:
                         ax.add_artist(animal_legend)
 
                 if save_figure:
-                    _save_bbox_kwargs = dict(bbox_inches='tight', pad_inches=0.25)
                     save_context = active_context.overwriting_context(display_fn_name=fig_file_name)
                     fig_man = None
                     if export_folder is not None:
@@ -5524,6 +5544,14 @@ class FigureS8:
         'is_heuristic_passing': 'Heuristic-passing',
         'heuristic_passing': 'Heuristic-passing',
     }
+    # S8-only compact summary bars (passed into plot_fig2_style_summary_four_bar; Fig4/S9 keep legacy defaults)
+    SUMMARY_BAR_COMPACT_STYLE: Dict[str, Any] = dict(
+        figsize_scale=0.75,
+        scatter_s=18.0,
+        legend_markersize=6.0,
+        save_bbox_inches='tight',
+        save_pad_inches=0.25,
+    )
     _heuristic_filter_color_map: Dict[str, str] = {
         'False': 'rgba(100,100,100,0.45)',
         'True': HEURISTIC_PASSING_COLOR,
@@ -6646,6 +6674,8 @@ class FigureS8:
                                 plot_kwargs['fignum'] = plot_kwargs['laps_fig_file_name'] if laps_key is not None else plot_kwargs['pbe_fig_file_name']
                             if group_name is not None:
                                 plot_kwargs['title'] = f'Decoded $P_{{Short}}$ | {group_name}'
+                            if fig_name == 'Figure S8':
+                                plot_kwargs.update(cls.SUMMARY_BAR_COMPACT_STYLE)
                             _out_extra_plot = PrePostDeltaDistributionComparison.plot_fig2_style_summary_four_bar(
                                 None if laps_key is None else pre_post_delta_stats_results_dict[laps_key],
                                 None if pbes_key is None else pre_post_delta_stats_results_dict[pbes_key],
