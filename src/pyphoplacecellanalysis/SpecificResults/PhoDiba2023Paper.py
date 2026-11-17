@@ -5603,6 +5603,7 @@ class FigureS8:
             title_font=dict(**cls._pub_font, size=text_sizes_px["axes"]),
             tickfont=dict(**cls._pub_font, size=text_sizes_px["axes"]),
             linewidth=1,
+            showgrid=False,  # hide vertical grid (Figure 4 / S3 / S8 / S9)
         )
         a_fig = a_fig.update_yaxes(
             title_font=dict(**cls._pub_font, size=text_sizes_px["axes"]),
