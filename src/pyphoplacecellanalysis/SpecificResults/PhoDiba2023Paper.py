@@ -7769,6 +7769,7 @@ class Figure5:
         Pass either `active_measured_positions_dfs_dict` (FAT time-bin frames) or session-nested `precomputed_measured_occupancy_seconds_dict_dict` from `load_occupancy_long_csvs_to_session_nested_dicts`.
         Returns one 2x3 figure per session (keyed dicts), plus session-keyed measured occupancy dicts.
         Also writes per-session PDFs and a single vertically stacked PDF (`pdf_export_path`, default `output/Figure5_measured_vs_decoded_by_session.pdf`).
+        Pass `skip_plotting_all=True` to omit the ``all`` column (2x2 pre/post only).
         """
         if enable_figure:
             import matplotlib.pyplot as plt
@@ -7778,8 +7779,10 @@ class Figure5:
         ## When split_by_session=True, optional prefix builds a spanning left label per figure, e.g. outer_group_label_prefix='Animal' → "Animal: gor01"
         outer_group_label_prefix: Optional[str] = kwargs.pop('outer_group_label_prefix', None)
         skip_plotting_measured: bool = bool(kwargs.pop('skip_plotting_measured', False))
+        skip_plotting_all: bool = bool(kwargs.pop('skip_plotting_all', False))
         pre_post_all_epoch_names = ['pre-delta', 'post-delta', 'all']
         _PERIOD_KEYS = set(pre_post_all_epoch_names)
+        _plot_period_names = ['pre-delta', 'post-delta'] if skip_plotting_all else list(pre_post_all_epoch_names)
         # decoder_color_dict: Dict[types.DecoderName, str] = {'long_LR': '#0099ff', 'long_RL': '#1b115a', 'short_LR': '#f51616', 'short_RL': '#891111'}
         decoder_color_dict: Dict[types.DecoderName, str] = {'long_LR': '#0077BB', 'long_RL': '#33BBEE', 'short_LR': '#EE7733', 'short_RL': '#CC3311'}  # blue / cyan / orange / red (colorblind-friendlier than navy+dark-red pair)
 
@@ -7849,27 +7852,33 @@ class Figure5:
             return measured_epoch_occupancy_seconds_dict_dict, measured_epoch_occupancy_fractional_dict_dict
 
         def _plot_occupancy_mosaic(fig, decoded_seconds_dict_dict, measured_seconds_dict_dict, outer_row_group_label: Optional[str] = None):
-            """2x3 laps/PBEs × pre/post/all mosaic on `fig`. Decoded on primary (left) y-axis; measured on twin right y-axis (independent autoscale).
+            """2xN laps/PBEs × pre/post[/all] mosaic on `fig`. Decoded on primary (left) y-axis; measured on twin right y-axis (independent autoscale).
 
             Left mosaic columns: optional outer group label (e.g. ``Animal: gor01``, spanning both rows), then whole-row epoch labels (``Laps`` / ``PBEs``).
+            When ``skip_plotting_all`` is True, the ``all`` column is omitted (2x2).
             """
             # Narrow label column(s) sit left of the "decoded (s)" ylabel without colliding.
+            _period_ax_suffixes = [f'_{p}' for p in _plot_period_names]  # ['_pre-delta', '_post-delta'] or + '_all'
+            _n_period_cols: int = len(_plot_period_names)
+            _data_width_ratios = [1] * _n_period_cols
+            _laps_period_keys = [f'laps{s}' for s in _period_ax_suffixes]
+            _PBEs_period_keys = [f'PBEs{s}' for s in _period_ax_suffixes]
             if outer_row_group_label is not None:
                 ax_dict = fig.subplot_mosaic(
-                    [['row_group', 'row_laps', 'laps_pre-delta', 'laps_post-delta', 'laps_all'],
-                     ['row_group', 'row_PBEs', 'PBEs_pre-delta', 'PBEs_post-delta', 'PBEs_all']],
-                    width_ratios=[0.12, 0.08, 1, 1, 1],
+                    [['row_group', 'row_laps', *_laps_period_keys],
+                     ['row_group', 'row_PBEs', *_PBEs_period_keys]],
+                    width_ratios=[0.12, 0.08, *_data_width_ratios],
                 )
                 _group_ax = ax_dict['row_group']
                 _group_ax.set_axis_off()
                 _group_ax.text(0.5, 0.5, outer_row_group_label, transform=_group_ax.transAxes, rotation=90, va='center', ha='center', fontsize=14, fontweight='bold')
             else:
                 ax_dict = fig.subplot_mosaic(
-                    [['row_laps', 'laps_pre-delta', 'laps_post-delta', 'laps_all'],
-                     ['row_PBEs', 'PBEs_pre-delta', 'PBEs_post-delta', 'PBEs_all']],
-                    width_ratios=[0.08, 1, 1, 1],
+                    [['row_laps', *_laps_period_keys],
+                     ['row_PBEs', *_PBEs_period_keys]],
+                    width_ratios=[0.08, *_data_width_ratios],
                 )
-            _data_ax_keys = ['laps_pre-delta', 'laps_post-delta', 'laps_all', 'PBEs_pre-delta', 'PBEs_post-delta', 'PBEs_all']
+            _data_ax_keys = _laps_period_keys + _PBEs_period_keys
             ## Share x across all panels; each panel autoscales y independently (no per-row sharey).
             _share_x_ref_ax = ax_dict['laps_pre-delta']
             for _ax_key in _data_ax_keys[1:]:
@@ -7886,6 +7895,7 @@ class Figure5:
             _plot_kwargs = dict(plot_pos_bin_axes=plot_pos_bin_axes, should_max_normalize=should_max_normalize)
 
             _line_alpha: float = 0.65
+            _measured_ylabel_period: str = _plot_period_names[-1]  # 'all' normally; 'post-delta' when skip_plotting_all
 
             def _color_last_occupancy_stairs(ax, color, linestyle: str = '-', linewidth: Optional[float] = None, alpha: float = _line_alpha):
                 """`perform_plot_occupancy` drops `color` via `overriding_dict_with`; color the last stairs patch instead. Also drops the hardcoded `hatch='//'`."""
@@ -7961,7 +7971,7 @@ class Figure5:
                                         label='measured', **_plot_kwargs, alpha=_line_alpha)
                     _color_last_occupancy_stairs(ax_measured, '0.25', linestyle=(0, (1.0, 0.8)), linewidth=0.75)  # denser dotted path than default ':' (~2x closer dots)
                     ax_measured.tick_params(axis='y', labelcolor='0.45')
-                    if pre_post == 'all':
+                    if pre_post == _measured_ylabel_period:
                         ax_measured.set_ylabel('measured (s)')
                     else:
                         ax_measured.set_ylabel('')
