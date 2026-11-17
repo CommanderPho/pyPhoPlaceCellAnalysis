@@ -7867,17 +7867,11 @@ class Figure5:
                     width_ratios=[0.08, 1, 1, 1],
                 )
             _data_ax_keys = ['laps_pre-delta', 'laps_post-delta', 'laps_all', 'PBEs_pre-delta', 'PBEs_post-delta', 'PBEs_all']
-            ## Share x across all panels; share y only within each row so Laps scale does not flatten PBEs.
+            ## Share x across all panels; each panel autoscales y independently (no per-row sharey).
             _share_x_ref_ax = ax_dict['laps_pre-delta']
             for _ax_key in _data_ax_keys[1:]:
                 ax_dict[_ax_key].sharex(_share_x_ref_ax)
             ## END for _ax_key in _data_ax_keys[1:]...
-            for _row_ax_keys in (('laps_pre-delta', 'laps_post-delta', 'laps_all'), ('PBEs_pre-delta', 'PBEs_post-delta', 'PBEs_all')):
-                _share_y_ref_ax = ax_dict[_row_ax_keys[0]]
-                for _ax_key in _row_ax_keys[1:]:
-                    ax_dict[_ax_key].sharey(_share_y_ref_ax)
-                ## END for _ax_key in _row_ax_keys[1:]...
-            ## END for _row_ax_keys in (('laps_pre-delta', 'laps_post-delta', 'laps_all'), ('PBEs_pre-delta', 'PBEs_post-delta', 'PBEs_all'))...
 
             for _row_ax_key, _row_label in (('row_laps', 'Laps'), ('row_PBEs', 'PBEs')):
                 _row_ax = ax_dict[_row_ax_key]
