@@ -8133,7 +8133,9 @@ class Figure5:
                     with fig5_pub_style.rc_context():
                         sess_fig = plt.figure(layout='constrained', figsize=figsize, dpi=dpi, clear=True, num=f'{num} | {session_name}')
                         _outer_label: Optional[str] = (f'{outer_group_label_prefix}: {session_name}' if (outer_group_label_prefix is not None) else None)
-                        ax_dict = _plot_occupancy_mosaic(sess_fig, sess_decoded_seconds, sess_measured_seconds, outer_row_group_label=_outer_label)
+                        ax_dict, _leg_h, _leg_l = _plot_occupancy_mosaic(sess_fig, sess_decoded_seconds, sess_measured_seconds, outer_row_group_label=_outer_label, include_fig_legend=_include_fig_legend)
+                        if (_captured_legend_handles is None) and (_leg_h is not None):
+                            _captured_legend_handles, _captured_legend_labels = _leg_h, _leg_l
                         _sess_suptitle = f'{session_name}' if prepare_for_publication else f'Figure 5 — measured vs decoded occupancy | {session_name}'
                         sess_fig.suptitle(_sess_suptitle, fontsize=_suptitle_fs)
                     session_figs[session_name] = sess_fig
@@ -8177,7 +8179,17 @@ class Figure5:
                         ## END for session_name, sess_fig in session_figs.items()....
                     merged_pdf_path = PDFHelpers.concatenate_pdfs_vertically(per_session_pdf_paths, merged_pdf_path, padding=8)
 
-            return (session_figs, session_ax_dicts), (measured_epoch_occupancy_seconds_dict_dict, measured_epoch_occupancy_fractional_dict_dict), merged_pdf_path
+                if export_legend_separately and (_captured_legend_handles is not None):
+                    if legend_export_path is not None:
+                        _leg_out = Path(legend_export_path)
+                    elif pdf_export_path is not None:
+                        _merged = Path(pdf_export_path)
+                        _leg_out = _merged.with_name(f'{_merged.stem}_legend{_merged.suffix}')
+                    else:
+                        _leg_out = Path('output') / 'Figure5_legend.pdf'
+                    legend_pdf_path = _export_standalone_legend(_captured_legend_handles, _captured_legend_labels, _leg_out)
+
+            return (session_figs, session_ax_dicts), (measured_epoch_occupancy_seconds_dict_dict, measured_epoch_occupancy_fractional_dict_dict), merged_pdf_path, legend_pdf_path
 
         assert (not is_session_nested), "session-nested occupancy requires split_by_session=True"
 
@@ -8196,15 +8208,24 @@ class Figure5:
             ## single figure mode
             with fig5_pub_style.rc_context():
                 fig = plt.figure(layout='constrained', figsize=figsize, dpi=dpi, clear=True, num=num)
-                ax_dict = _plot_occupancy_mosaic(fig, full_epoch_occupancy_seconds_dict_dict, measured_epoch_occupancy_seconds_dict_dict)
+                ax_dict, _captured_legend_handles, _captured_legend_labels = _plot_occupancy_mosaic(fig, full_epoch_occupancy_seconds_dict_dict, measured_epoch_occupancy_seconds_dict_dict, include_fig_legend=_include_fig_legend)
                 _single_suptitle = ('decoded occupancy' if skip_plotting_measured else 'measured vs decoded occupancy') if prepare_for_publication else (f'Figure 5 — measured x vs decoded occupancy' if (not skip_plotting_measured) else f'Figure 5 — decoded occupancy')
                 plt.suptitle(_single_suptitle, fontsize=_suptitle_fs)
+            if export_legend_separately and (_captured_legend_handles is not None):
+                if legend_export_path is not None:
+                    _leg_out = Path(legend_export_path)
+                elif pdf_export_path is not None:
+                    _merged = Path(pdf_export_path)
+                    _leg_out = _merged.with_name(f'{_merged.stem}_legend{_merged.suffix}')
+                else:
+                    _leg_out = Path('output') / 'Figure5_legend.pdf'
+                legend_pdf_path = _export_standalone_legend(_captured_legend_handles, _captured_legend_labels, _leg_out)
             # _out_figs_dict[a_lap_pbe_epoch_name] = (fig, ax_dict)
         else:
             fig = None
             ax_dict = None
 
-        return (fig, ax_dict), (measured_epoch_occupancy_seconds_dict_dict, measured_epoch_occupancy_fractional_dict_dict), None
+        return (fig, ax_dict), (measured_epoch_occupancy_seconds_dict_dict, measured_epoch_occupancy_fractional_dict_dict), None, legend_pdf_path
 
 
     @classmethod
