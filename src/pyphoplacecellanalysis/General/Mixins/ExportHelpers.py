@@ -1346,6 +1346,284 @@ def programmatic_render_to_file(curr_active_pipeline, curr_display_function_name
 
 
 
+def _svg_safe_gid(gid: str) -> str:
+    """XML/SVG id-safe token (axes labels like ax_lap_spikes[05] → ax_lap_spikes_05_)."""
+    return re.sub(r'[^A-Za-z0-9_\-.]', '_', str(gid))
+
+
+@function_attributes(short_name=None, tags=['file','export','output','matplotlib','SVG','Illustrator','gid'], input_requires=[], output_provides=[], uses=[], used_by=['savefig_svg_semantic'], creation_date='2026-11-17 01:41', related_items=['matplotlib SVG Histogram gallery'])
+def prepare_figure_artists_for_semantic_svg(fig, a_fig_container=None) -> None:
+    """Assign hierarchical SVG-safe gids and clear clips so Illustrator can select subplot layers.
+
+    Naming convention (``__`` separators) enables post-save regrouping in ``savefig_svg_semantic``:
+      ``{ax_gid}``, ``{ax_gid}__ticks__x_0``, ``{ax_gid}__axes__spine_left``,
+      ``{ax_gid}__labels__xlabel``, ``{ax_gid}__data__line_0``, twin roots ``{primary}__twin``.
+    """
+    fig.patch.set_visible(False)
+    fig.patch.set_facecolor('none')
+    fig.patch.set_edgecolor('none')
+    try:
+        fig.set_facecolor('none')
+    except Exception:
+        pass
+
+    # Map twin axes → primary axes label for nested twin groups
+    twin_to_primary_gid: Dict[Any, str] = {}
+    for ax in fig.axes:
+        ax_label = ax.get_label() or ''
+        ax_gid = _svg_safe_gid(ax_label) if ax_label else ''
+        for twin_attr in ('right_ax', 'left_ax', 'top_ax', 'bottom_ax'):
+            twin = getattr(ax, twin_attr, None)
+            if twin is not None and twin is not ax and ax_gid:
+                twin_to_primary_gid[id(twin)] = ax_gid
+        ## END for twin_attr in ('right_ax', 'left_ax', 'top_ax', 'bottom_ax')...
+    ## END for ax in fig.axes...
+
+    for ax_i, ax in enumerate(fig.axes):
+        ax_label = ax.get_label() or ''
+        base_gid = _svg_safe_gid(ax_label) if ax_label else f'axes_{ax_i}'
+        primary_gid = twin_to_primary_gid.get(id(ax))
+        ax_gid = f'{primary_gid}__twin' if primary_gid else base_gid
+        ax.set_gid(ax_gid)
+
+        ax.patch.set_visible(False)
+        ax.patch.set_facecolor('none')
+        ax.patch.set_edgecolor('none')
+        ax.set_facecolor('none')
+        ax.patch.set_gid(f'{ax_gid}__axes__patch')
+
+        for spine_name, spine in ax.spines.items():
+            spine.set_gid(f'{ax_gid}__axes__spine_{_svg_safe_gid(spine_name)}')
+        ## END for spine_name, spine in ax.spines.items()...
+
+        for i, tick in enumerate(ax.xaxis.get_major_ticks()):
+            tick.tick1line.set_gid(f'{ax_gid}__ticks__x_{i}')
+            tick.tick2line.set_gid(f'{ax_gid}__ticks__x_{i}_top')
+            if tick.label1 is not None:
+                tick.label1.set_gid(f'{ax_gid}__ticks__x_{i}_label')
+            if tick.label2 is not None:
+                tick.label2.set_gid(f'{ax_gid}__ticks__x_{i}_label2')
+        ## END for i, tick in enumerate(ax.xaxis.get_major_ticks())...
+        for i, tick in enumerate(ax.yaxis.get_major_ticks()):
+            tick.tick1line.set_gid(f'{ax_gid}__ticks__y_{i}')
+            tick.tick2line.set_gid(f'{ax_gid}__ticks__y_{i}_right')
+            if tick.label1 is not None:
+                tick.label1.set_gid(f'{ax_gid}__ticks__y_{i}_label')
+            if tick.label2 is not None:
+                tick.label2.set_gid(f'{ax_gid}__ticks__y_{i}_label2')
+        ## END for i, tick in enumerate(ax.yaxis.get_major_ticks())...
+
+        if ax.title is not None:
+            ax.title.set_gid(f'{ax_gid}__labels__title')
+        if ax.xaxis.label is not None:
+            ax.xaxis.label.set_gid(f'{ax_gid}__labels__xlabel')
+        if ax.yaxis.label is not None:
+            ax.yaxis.label.set_gid(f'{ax_gid}__labels__ylabel')
+
+        for i, line in enumerate(ax.lines):
+            existing = line.get_gid()
+            label = line.get_label() or ''
+            if existing:
+                line.set_gid(_svg_safe_gid(existing) if '__data__' in str(existing) or '__' in str(existing) else f'{ax_gid}__data__{_svg_safe_gid(existing)}')
+            elif label and not label.startswith('_'):
+                line.set_gid(f'{ax_gid}__data__{_svg_safe_gid(label)}')
+            else:
+                line.set_gid(f'{ax_gid}__data__line_{i}')
+        ## END for i, line in enumerate(ax.lines)...
+        for i, coll in enumerate(ax.collections):
+            existing = coll.get_gid()
+            label = coll.get_label() or ''
+            if existing:
+                coll.set_gid(_svg_safe_gid(existing) if '__data__' in str(existing) or '__' in str(existing) else f'{ax_gid}__data__{_svg_safe_gid(existing)}')
+            elif label and not label.startswith('_'):
+                coll.set_gid(f'{ax_gid}__data__{_svg_safe_gid(label)}')
+            else:
+                coll.set_gid(f'{ax_gid}__data__collection_{i}')
+        ## END for i, coll in enumerate(ax.collections)...
+        for i, patch in enumerate(ax.patches):
+            existing = patch.get_gid()
+            label = patch.get_label() or ''
+            if existing:
+                patch.set_gid(_svg_safe_gid(existing) if '__data__' in str(existing) or '__' in str(existing) else f'{ax_gid}__data__{_svg_safe_gid(existing)}')
+            elif label and not label.startswith('_'):
+                patch.set_gid(f'{ax_gid}__data__{_svg_safe_gid(label)}')
+            else:
+                patch.set_gid(f'{ax_gid}__data__patch_{i}')
+        ## END for i, patch in enumerate(ax.patches)...
+        for i, txt in enumerate(ax.texts):
+            existing = txt.get_gid()
+            if existing:
+                txt.set_gid(_svg_safe_gid(existing) if '__' in str(existing) else f'{ax_gid}__data__{_svg_safe_gid(existing)}')
+            else:
+                txt.set_gid(f'{ax_gid}__data__text_{i}')
+        ## END for i, txt in enumerate(ax.texts)...
+    ## END for ax_i, ax in enumerate(fig.axes)...
+
+    if a_fig_container is not None:
+        for i, a_subfig in enumerate(getattr(a_fig_container, 'subfigs', None) or []):
+            try:
+                if not a_subfig.get_gid():
+                    a_subfig.set_gid(f'cell_row_{i}')
+            except Exception:
+                pass
+        ## END for i, a_subfig in enumerate(...)...
+
+    for an_artist in fig.findobj():
+        try:
+            an_artist.set_clip_on(False)
+            an_artist.set_clip_path(None)
+        except Exception:
+            pass
+    ## END for an_artist in fig.findobj()...
+
+
+def _restructure_svg_into_semantic_groups(svg_bytes: bytes) -> Any:
+    """Nest Matplotlib SVG elements into subplot → ticks|axes|labels|data groups via ElementTree XMLID."""
+    import xml.etree.ElementTree as ET
+    from collections import defaultdict
+
+    SVG_NS = 'http://www.w3.org/2000/svg'
+    ET.register_namespace('', SVG_NS)
+    ET.register_namespace('xlink', 'http://www.w3.org/1999/xlink')
+
+    tree, xmlid = ET.XMLID(svg_bytes)
+    # Collect leaf gids that follow ``{subplot}__{category}__...``
+    by_subplot_category: Dict[str, Dict[str, List[str]]] = defaultdict(lambda: defaultdict(list))
+    subplot_roots: Dict[str, str] = {}  # subplot_gid -> element id if present as exact match
+
+    for eid in list(xmlid.keys()):
+        if '__' not in eid:
+            # Possible subplot root gid (no category suffix)
+            if eid in xmlid:
+                subplot_roots[eid] = eid
+            continue
+        parts = eid.split('__')
+        if len(parts) < 2:
+            continue
+        # Twin roots look like ``laps_pre-delta__twin__ticks__x_0`` → subplot ``laps_pre-delta__twin``, cat ``ticks``
+        category = None
+        subplot_gid = None
+        for cat in ('ticks', 'axes', 'labels', 'data'):
+            marker = f'__{cat}__'
+            if marker in eid:
+                subplot_gid = eid.split(marker, 1)[0]
+                category = cat
+                break
+            if eid.endswith(f'__{cat}'):
+                subplot_gid = eid[: -(len(cat) + 2)]
+                category = cat
+                break
+        ## END for cat in ('ticks', 'axes', 'labels', 'data')...
+        if subplot_gid and category:
+            by_subplot_category[subplot_gid][category].append(eid)
+    ## END for eid in list(xmlid.keys())...
+
+    # Find a parent container to attach regrouped subplots (prefer figure group, else root svg)
+    def _find_insert_parent(root: ET.Element) -> ET.Element:
+        for child in list(root):
+            cid = child.get('id') or ''
+            if cid.startswith('figure') or child.tag.endswith('g'):
+                return child
+        ## END for child in list(root)...
+        return root
+
+    insert_parent = _find_insert_parent(tree)
+    categories_order = ('axes', 'ticks', 'labels', 'data')
+
+    for subplot_gid, cat_map in by_subplot_category.items():
+        # Build or reuse subplot group
+        subplot_el = xmlid.get(subplot_gid)
+        if subplot_el is None:
+            subplot_el = ET.Element(f'{{{SVG_NS}}}g', {'id': subplot_gid})
+            insert_parent.append(subplot_el)
+            xmlid[subplot_gid] = subplot_el
+        else:
+            # Ensure subplot group sits under insert_parent for Illustrator layer order
+            parent = None
+            for cand in insert_parent.iter():
+                if subplot_el in list(cand):
+                    parent = cand
+                    break
+            ## END for cand in insert_parent.iter()...
+            if parent is not None and parent is not insert_parent:
+                parent.remove(subplot_el)
+                insert_parent.append(subplot_el)
+
+        for cat in categories_order:
+            eids = cat_map.get(cat) or []
+            if not eids:
+                continue
+            cat_gid = f'{subplot_gid}__{cat}'
+            cat_el = xmlid.get(cat_gid)
+            if cat_el is None:
+                cat_el = ET.Element(f'{{{SVG_NS}}}g', {'id': cat_gid})
+                subplot_el.append(cat_el)
+                xmlid[cat_gid] = cat_el
+            elif cat_el not in list(subplot_el):
+                # Move existing category group under subplot
+                for cand in tree.iter():
+                    if cat_el in list(cand):
+                        cand.remove(cat_el)
+                        break
+                ## END for cand in tree.iter()...
+                subplot_el.append(cat_el)
+
+            for eid in eids:
+                el = xmlid.get(eid)
+                if el is None:
+                    continue
+                # Detach from current parent
+                for cand in tree.iter():
+                    children = list(cand)
+                    if el in children:
+                        cand.remove(el)
+                        break
+                ## END for cand in tree.iter()...
+                cat_el.append(el)
+            ## END for eid in eids...
+        ## END for cat in categories_order...
+    ## END for subplot_gid, cat_map in by_subplot_category.items()...
+
+    return tree
+
+
+@function_attributes(short_name=None, tags=['file','export','output','matplotlib','SVG','Illustrator','semantic'], input_requires=[], output_provides=[], uses=['prepare_figure_artists_for_semantic_svg', 'postprocess_matplotlib_svg_for_publication'], used_by=['Figure5.main', '_perform_save_single_plotted_fig'], creation_date='2026-11-17 01:41', related_items=['matplotlib SVG Histogram gallery'])
+def savefig_svg_semantic(fig, svg_path: Union[str, Path], a_fig_container=None, transparent: bool = True, bbox_inches: Optional[str] = 'tight', pad_inches: Optional[float] = 0.02, dpi: Optional[Union[int, float]] = None, run_publication_postprocess: bool = True, **savefig_kwargs) -> Path:
+    """Save a Matplotlib figure as an Illustrator-friendly SVG with nested semantic groups.
+
+    Assigns hierarchical gids, writes SVG (via BytesIO), regroups elements into
+    ``subplot → ticks|axes|labels|data``, then applies ``postprocess_matplotlib_svg_for_publication``.
+    """
+    from io import BytesIO
+    import xml.etree.ElementTree as ET
+    import matplotlib as mpl
+
+    svg_path = Path(svg_path)
+    if svg_path.suffix.lower() != '.svg':
+        svg_path = svg_path.with_suffix('.svg')
+    svg_path.parent.mkdir(parents=True, exist_ok=True)
+
+    prepare_figure_artists_for_semantic_svg(fig, a_fig_container=a_fig_container)
+
+    save_kw = dict(format='svg', transparent=transparent, facecolor='none', edgecolor='none', **savefig_kwargs)
+    if bbox_inches is not None:
+        save_kw['bbox_inches'] = bbox_inches
+    if pad_inches is not None:
+        save_kw['pad_inches'] = pad_inches
+    if dpi is not None:
+        save_kw['dpi'] = dpi
+
+    buf = BytesIO()
+    with mpl.rc_context({'svg.fonttype': 'none', 'savefig.transparent': True}):
+        fig.savefig(buf, **save_kw)
+    tree = _restructure_svg_into_semantic_groups(buf.getvalue())
+    ET.ElementTree(tree).write(svg_path, encoding='utf-8', xml_declaration=True)
+
+    if run_publication_postprocess:
+        postprocess_matplotlib_svg_for_publication(svg_path)
+    return svg_path
+
+
 @function_attributes(short_name=None, tags=['file','export','output','matplotlib','SVG','publication','Illustrator'], input_requires=[], output_provides=[], uses=[], used_by=['write_to_file'], creation_date='2026-11-04 02:58', related_items=['matplotlib#13200', 'matplotlib#14283'])
 def postprocess_matplotlib_svg_for_publication(svg_path: Path) -> Path:
     """ Fix matplotlib SVG text whitespace after `svg.fonttype='none'` savefig.

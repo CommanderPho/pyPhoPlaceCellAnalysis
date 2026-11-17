@@ -34,7 +34,7 @@ from pyphoplacecellanalysis.General.Model.SpecificComputationValidation import S
 from pyphoplacecellanalysis.General.Mixins.CrossComputationComparisonHelpers import SplitPartitionMembership # needed for batch_extended_computations, batch_programmatic_figures
 from pyphoplacecellanalysis.General.Mixins.ExportHelpers import programmatic_display_to_PDF, programmatic_render_to_file
 from pyphoplacecellanalysis.General.Mixins.ExportHelpers import build_pdf_metadata_from_display_context # newer version of build_pdf_export_metadata
-from pyphoplacecellanalysis.General.Mixins.ExportHelpers import postprocess_matplotlib_svg_for_publication
+from pyphoplacecellanalysis.General.Mixins.ExportHelpers import postprocess_matplotlib_svg_for_publication, savefig_svg_semantic
 from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import NeuropyPipeline, PipelineSavingScheme # for batch_load_session
 
 from pyphoplacecellanalysis.SpecificResults.fourthYearPresentation import export_active_relative_entropy_results_videos
@@ -1105,7 +1105,7 @@ class BatchPhoJonathanFiguresHelper:
         return _batch_plot_kwargs_list
 
 
-    @function_attributes(short_name=None, tags=['save', 'export', 'single-figure'], input_requires=[], output_provides=[], uses=['_subfn_prepare_figure_for_svg_export'], used_by=['cls._perform_save_batch_plotted_figures'], creation_date='2025-06-30 22:45', related_items=[])
+    @function_attributes(short_name=None, tags=['save', 'export', 'single-figure'], input_requires=[], output_provides=[], uses=['savefig_svg_semantic'], used_by=['cls._perform_save_batch_plotted_figures'], creation_date='2025-06-30 22:45', related_items=[])
     @classmethod
     def _perform_save_single_plotted_fig(cls, curr_active_pipeline, curr_active_identifying_ctx: IdentifyingContext, a_fig_container: MatplotlibRenderPlots, subset_includelist=None, subset_excludelist=None, write_vector_format=False, write_png=True, vector_format: str = 'svg', override_fig_man: Optional[FileOutputManager]=None, progress_print=True, debug_print=False):
         """ Saves a single figure produced by the first half of `_perform_batch_plot` 
@@ -1116,71 +1116,6 @@ class BatchPhoJonathanFiguresHelper:
         
         vector_format: 'svg' (default) or 'pdf' when write_vector_format=True
         """
-        # Transparent background, no clip groups, and SVG gids from axes labels / existing artist gids.
-        def _subfn_prepare_figure_for_svg_export(a_fig, a_fig_container: Optional[MatplotlibRenderPlots] = None):
-            # XML/SVG id-safe token (axes labels like ax_lap_spikes[05] → ax_lap_spikes_05_).
-            def _subfn_svg_safe_gid(gid: str) -> str:
-                import re
-                return re.sub(r'[^A-Za-z0-9_\-.]', '_', gid)
-
-            a_fig.patch.set_visible(False)
-            a_fig.patch.set_facecolor('none')
-            a_fig.patch.set_edgecolor('none')
-            try:
-                a_fig.set_facecolor('none')
-            except Exception:
-                pass
-
-            for ax in a_fig.axes:
-                ax_label = ax.get_label() or ''
-                ax_gid = _subfn_svg_safe_gid(ax_label) if ax_label else ''
-                if ax_gid:
-                    ax.set_gid(ax_gid)
-                ax.patch.set_visible(False)
-                ax.patch.set_facecolor('none')
-                ax.patch.set_edgecolor('none')
-                ax.set_facecolor('none')
-                # Name ungrouped children under this axis for Illustrator layer picking
-                for i, line in enumerate(ax.lines):
-                    existing = line.get_gid()
-                    if existing:
-                        line.set_gid(_subfn_svg_safe_gid(existing))
-                    else:
-                        line.set_gid(f'{ax_gid}_line_{i}' if ax_gid else f'line_{i}')
-                ## END for i, line in enumerate(ax.lines)...
-                for i, coll in enumerate(ax.collections):
-                    existing = coll.get_gid()
-                    if existing:
-                        coll.set_gid(_subfn_svg_safe_gid(existing))
-                    else:
-                        coll.set_gid(f'{ax_gid}_collection_{i}' if ax_gid else f'collection_{i}')
-                ## END for i, coll in enumerate(ax.collections)...
-                for i, patch in enumerate(ax.patches):
-                    existing = patch.get_gid()
-                    if existing:
-                        patch.set_gid(_subfn_svg_safe_gid(existing))
-                    else:
-                        patch.set_gid(f'{ax_gid}_patch_{i}' if ax_gid else f'patch_{i}')
-                ## END for i, patch in enumerate(ax.patches)...
-            ## END for ax in a_fig.axes...
-
-            if a_fig_container is not None:
-                for i, a_subfig in enumerate(getattr(a_fig_container, 'subfigs', None) or []):
-                    try:
-                        if not a_subfig.get_gid():
-                            a_subfig.set_gid(f'cell_row_{i}')
-                    except Exception:
-                        pass
-                ## END for i, a_subfig in enumerate(...)...
-
-            for an_artist in a_fig.findobj():
-                try:
-                    an_artist.set_clip_on(False)
-                    an_artist.set_clip_path(None)
-                except Exception:
-                    pass
-            ## END for an_artist in a_fig.findobj()...
-
         output_file_paths = []
         if override_fig_man is None:
             fig_man = curr_active_pipeline.get_output_manager()
@@ -1202,10 +1137,7 @@ class BatchPhoJonathanFiguresHelper:
 
             if vector_format_norm == 'svg':
                 curr_vector_save_path = final_figure_file_path.with_suffix('.svg')
-                _subfn_prepare_figure_for_svg_export(a_fig, a_fig_container=a_fig_container)
-                with mpl.rc_context({'svg.fonttype': 'none', 'savefig.transparent': True}):
-                    a_fig.savefig(curr_vector_save_path, format='svg', transparent=True, facecolor='none', edgecolor='none')
-                postprocess_matplotlib_svg_for_publication(curr_vector_save_path)
+                savefig_svg_semantic(a_fig, curr_vector_save_path, a_fig_container=a_fig_container, bbox_inches=None, pad_inches=None)
                 output_metadata = {'context': curr_active_identifying_ctx, 'fig': (a_fig), 'fig_format': 'matplotlib_svg'}
             else:
                 active_pdf_metadata, _UNUSED_pdf_save_filename = build_pdf_metadata_from_display_context(curr_active_identifying_ctx, subset_includelist=subset_includelist, subset_excludelist=subset_excludelist)

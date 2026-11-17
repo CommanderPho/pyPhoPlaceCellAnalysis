@@ -7768,10 +7768,10 @@ class Figure5:
         When `split_by_session=True`, `full_epoch_occupancy_seconds_dict_dict` must be session-nested (from `compute_decoded_occupancy(..., split_by_session=True)` or CSV load).
         Pass either `active_measured_positions_dfs_dict` (FAT time-bin frames) or session-nested `precomputed_measured_occupancy_seconds_dict_dict` from `load_occupancy_long_csvs_to_session_nested_dicts`.
         Returns one 2x3 figure per session (keyed dicts), plus session-keyed measured occupancy dicts.
-        Also writes per-session PDFs and a single vertically stacked PDF (`pdf_export_path`, default `output/Figure5_measured_vs_decoded_by_session.pdf`).
+        Also writes per-session SVGs and a single vertically stacked SVG (`pdf_export_path` coerced to `.svg`, e.g. `output/Figure5_measured_vs_decoded_by_session.svg`) via `savefig_svg_semantic`.
         Pass `skip_plotting_all=True` to omit the ``all`` column (2x2 pre/post only).
         Pass `prepare_for_publication=True` to apply `PhoPublicationFigureHelper` Artboard-3 fonts/spines and 6.5" max width.
-        Pass `export_legend_separately=True` to omit the on-figure legend and write a standalone legend PDF (next to `pdf_export_path`, or `legend_export_path` if given).
+        Pass `export_legend_separately=True` to omit the on-figure legend and write a standalone legend SVG (next to `pdf_export_path`, or `legend_export_path` if given).
         """
         if enable_figure:
             import matplotlib.pyplot as plt
@@ -7796,7 +7796,7 @@ class Figure5:
         if figsize is None:
             if prepare_for_publication:
                 # max width 6.5"; 2-row mosaic — slightly taller when only pre/post columns
-                figsize = [6.5, 2.5] if skip_plotting_all else [6.5, 2.2]
+                figsize = [6.25, 2.5] if skip_plotting_all else [6.25, 2.2]
             else:
                 figsize = [18, 4]
         _pub_title_fs: float = float(fig5_pub_style.title_font_size) if (fig5_pub_style.title_font_size is not None) else 9.0
@@ -7893,18 +7893,21 @@ class Figure5:
 
 
         def _export_standalone_legend(handles, labels, out_path: Path) -> Path:
-            """Write a legend-only PDF using Line2D proxies."""
+            """Write a legend-only SVG using Line2D proxies (semantic groups via ``savefig_svg_semantic``)."""
             from matplotlib.figure import Figure
+            from pyphoplacecellanalysis.General.Mixins.ExportHelpers import savefig_svg_semantic
             proxy_handles, proxy_labels = _proxify_legend_handles(handles, labels)
             out_path = Path(out_path).resolve()
+            if out_path.suffix.lower() != '.svg':
+                out_path = out_path.with_suffix('.svg')
             out_path.parent.mkdir(parents=True, exist_ok=True)
             _leg_figsize = (2.6, 1.5) if prepare_for_publication else (3.2, 2.0)
             with fig5_pub_style.rc_context():
-                fig_leg = Figure(figsize=_leg_figsize, dpi=dpi, clear=True)
+                fig_leg = Figure(figsize=_leg_figsize, dpi=dpi)
                 fig_leg.legend(proxy_handles, proxy_labels, loc='center', frameon=True, fontsize=_legend_fs)
-                fig_leg.savefig(out_path, format='pdf', bbox_inches='tight', pad_inches=0.02, dpi=dpi, transparent=True)
+                savefig_svg_semantic(fig_leg, out_path, bbox_inches='tight', pad_inches=0.02, dpi=dpi, transparent=True)
                 plt.close(fig_leg)
-            print(f'exported Figure5 legend PDF: {out_path}')
+            print(f'exported Figure5 legend SVG: {out_path}')
             return out_path
 
 
@@ -7955,7 +7958,7 @@ class Figure5:
             _line_alpha: float = 0.65
             _measured_ylabel_period: str = _plot_period_names[-1]  # 'all' normally; 'post-delta' when skip_plotting_all
 
-            def _color_last_occupancy_stairs(ax, color, linestyle: str = '-', linewidth: Optional[float] = None, alpha: float = _line_alpha):
+            def _color_last_occupancy_stairs(ax, color, linestyle: str = '-', linewidth: Optional[float] = None, alpha: float = _line_alpha, gid: Optional[str] = None):
                 """`perform_plot_occupancy` drops `color` via `overriding_dict_with`; color the last stairs patch instead. Also drops the hardcoded `hatch='//'`."""
                 patch = ax.patches[-1]
                 patch.set_hatch('')
@@ -7966,6 +7969,8 @@ class Figure5:
                 _lw = linewidth if (linewidth is not None) else _pub_line_lw
                 if _lw is not None:
                     patch.set_linewidth(_lw)
+                if gid is not None:
+                    patch.set_gid(gid)
 
             ## Same display strings as Figure 2 publication xticklabels (`PaperFigureTwo._apply_publication_grouped_xticklabels`)
             _pre_post_display_label = {'pre-delta': r'pre-$\Delta$', 'post-delta': r'post-$\Delta$', 'all': 'all'}
@@ -8004,7 +8009,7 @@ class Figure5:
                     for decoder_name, decoder_occ in decoded_active.items():
                         perform_plot_occupancy(decoder_occ, xbin_centers=xbin_centers, xbin_edges=xbin_edges, fig=fig, ax=ax,
                                             label=f'decoded[{decoder_name}]', **_plot_kwargs, alpha=_line_alpha)
-                        _color_last_occupancy_stairs(ax, decoder_color_dict[decoder_name])
+                        _color_last_occupancy_stairs(ax, decoder_color_dict[decoder_name], gid=f'decoded_{decoder_name}')
                     ## END for decoder_name, decoder_occ in decoded_active.items()....
 
                 else:
@@ -8012,7 +8017,7 @@ class Figure5:
                     _decoded_legend_labels = ['decoded']
                     perform_plot_occupancy(decoded_active, xbin_centers=xbin_centers, xbin_edges=xbin_edges, fig=fig, ax=ax,
                                         label='decoded', **_plot_kwargs, alpha=_line_alpha)
-                    _color_last_occupancy_stairs(ax, 'C0')
+                    _color_last_occupancy_stairs(ax, 'C0', gid='decoded')
                 if pre_post == 'pre-delta':
                     ax.set_ylabel('decoded (s)')
                 else:
@@ -8030,7 +8035,7 @@ class Figure5:
                     ax_measured = ax.twinx()
                     perform_plot_occupancy(measured_active, xbin_centers=xbin_centers, xbin_edges=xbin_edges, fig=fig, ax=ax_measured,
                                         label='measured', **_plot_kwargs, alpha=_line_alpha)
-                    _color_last_occupancy_stairs(ax_measured, '0.25', linestyle=(0, (1.0, 0.8)), linewidth=(_pub_line_lw if (_pub_line_lw is not None) else 0.75))  # denser dotted path than default ':' (~2x closer dots)
+                    _color_last_occupancy_stairs(ax_measured, '0.25', linestyle=(0, (1.0, 0.8)), linewidth=(_pub_line_lw if (_pub_line_lw is not None) else 0.75), gid='measured')  # denser dotted path than default ':' (~2x closer dots)
                     _measured_tick_kwargs = dict(axis='y', labelcolor='0.45')
                     if prepare_for_publication:
                         _measured_tick_kwargs['labelsize'] = _pub_tick_fs
@@ -8062,7 +8067,7 @@ class Figure5:
         _include_fig_legend: bool = (not export_legend_separately)
         _captured_legend_handles = None
         _captured_legend_labels = None
-        legend_pdf_path = None
+        legend_svg_path = None
         if split_by_session:
             assert is_session_nested, "split_by_session=True requires session-nested occupancy from compute_decoded_occupancy(..., split_by_session=True)"
             session_names = list(full_epoch_occupancy_seconds_dict_dict.keys())
@@ -8136,8 +8141,10 @@ class Figure5:
                         ax_dict, _leg_h, _leg_l = _plot_occupancy_mosaic(sess_fig, sess_decoded_seconds, sess_measured_seconds, outer_row_group_label=_outer_label, include_fig_legend=_include_fig_legend)
                         if (_captured_legend_handles is None) and (_leg_h is not None):
                             _captured_legend_handles, _captured_legend_labels = _leg_h, _leg_l
-                        _sess_suptitle = f'{session_name}' if prepare_for_publication else f'Figure 5 — measured vs decoded occupancy | {session_name}'
-                        sess_fig.suptitle(_sess_suptitle, fontsize=_suptitle_fs)
+                        # Skip figure-level title when left spanning label already names the group (e.g. "Animal: gor01")
+                        if _outer_label is None:
+                            _sess_suptitle = f'{session_name}' if prepare_for_publication else f'Figure 5 — measured vs decoded occupancy | {session_name}'
+                            sess_fig.suptitle(_sess_suptitle, fontsize=_suptitle_fs)
                     session_figs[session_name] = sess_fig
                     session_ax_dicts[session_name] = ax_dict
             ## END for session_name in session_names....
@@ -8146,12 +8153,13 @@ class Figure5:
                 session_figs = None
                 session_ax_dicts = None
 
-            merged_pdf_path = None
+            merged_svg_path = None
             if enable_figure and (session_figs is not None) and (len(session_figs) > 0):
                 from matplotlib.lines import Line2D
-                from pyphocorehelpers.plotting.media_output_helpers import PDFHelpers
+                from pyphocorehelpers.plotting.media_output_helpers import SVGHelpers
+                from pyphoplacecellanalysis.General.Mixins.ExportHelpers import savefig_svg_semantic
                 # if pdf_export_path is None:
-                #     pdf_export_path = Path('output') / 'Figure5_measured_vs_decoded_by_session.pdf'
+                #     pdf_export_path = Path('output') / 'Figure5_measured_vs_decoded_by_session.svg'
                 ## Thin black separators between stacked animals/sessions (all but last figure)
                 _session_fig_items = list(session_figs.items())
                 _n_sess_figs: int = len(_session_fig_items)
@@ -8164,32 +8172,38 @@ class Figure5:
                     ## END for _i, (_session_name, _sess_fig) in enumerate(_session_fig_items)...
 
                 if pdf_export_path is not None:
-                    merged_pdf_path = Path(pdf_export_path).resolve()
-                    merged_pdf_path.parent.mkdir(parents=True, exist_ok=True)
-                    per_session_pdf_dir = merged_pdf_path.parent.joinpath(merged_pdf_path.stem)
-                    per_session_pdf_dir.mkdir(parents=True, exist_ok=True)
-                    per_session_pdf_paths = []
-                    _savefig_rc = dict(fig5_pub_style.mpl_rc) if prepare_for_publication else {'savefig.transparent': True, 'ps.fonttype': 42, 'pdf.fonttype': 42}
+                    merged_svg_path = Path(pdf_export_path).resolve()
+                    if merged_svg_path.suffix.lower() != '.svg':
+                        merged_svg_path = merged_svg_path.with_suffix('.svg')
+                    merged_svg_path.parent.mkdir(parents=True, exist_ok=True)
+                    per_session_svg_dir = merged_svg_path.parent.joinpath(merged_svg_path.stem)
+                    per_session_svg_dir.mkdir(parents=True, exist_ok=True)
+                    per_session_svg_paths = []
+                    _savefig_rc = dict(fig5_pub_style.mpl_rc) if prepare_for_publication else {'savefig.transparent': True, 'svg.fonttype': 'none'}
+                    if 'svg.fonttype' not in _savefig_rc:
+                        _savefig_rc['svg.fonttype'] = 'none'
                     with mpl.rc_context(_savefig_rc):
                         for session_name, sess_fig in session_figs.items():
                             sess_stem: str = str(session_name).replace('/', '_').replace('\\', '_').replace('|', '_').replace(':', '_')
-                            sess_pdf_path = per_session_pdf_dir.joinpath(f'{sess_stem}.pdf')
-                            sess_fig.savefig(sess_pdf_path, format='pdf', bbox_inches='tight', pad_inches=0.02, dpi=dpi)
-                            per_session_pdf_paths.append(sess_pdf_path)
+                            sess_svg_path = per_session_svg_dir.joinpath(f'{sess_stem}.svg')
+                            savefig_svg_semantic(sess_fig, sess_svg_path, bbox_inches='tight', pad_inches=0.02, dpi=dpi)
+                            per_session_svg_paths.append(sess_svg_path)
                         ## END for session_name, sess_fig in session_figs.items()....
-                    merged_pdf_path = PDFHelpers.concatenate_pdfs_vertically(per_session_pdf_paths, merged_pdf_path, padding=8)
+                    merged_svg_path = SVGHelpers.concatenate_svgs_vertically(per_session_svg_paths, merged_svg_path, padding=8)
 
                 if export_legend_separately and (_captured_legend_handles is not None):
                     if legend_export_path is not None:
                         _leg_out = Path(legend_export_path)
                     elif pdf_export_path is not None:
                         _merged = Path(pdf_export_path)
-                        _leg_out = _merged.with_name(f'{_merged.stem}_legend{_merged.suffix}')
+                        if _merged.suffix.lower() != '.svg':
+                            _merged = _merged.with_suffix('.svg')
+                        _leg_out = _merged.with_name(f'{_merged.stem}_legend.svg')
                     else:
-                        _leg_out = Path('output') / 'Figure5_legend.pdf'
-                    legend_pdf_path = _export_standalone_legend(_captured_legend_handles, _captured_legend_labels, _leg_out)
+                        _leg_out = Path('output') / 'Figure5_legend.svg'
+                    legend_svg_path = _export_standalone_legend(_captured_legend_handles, _captured_legend_labels, _leg_out)
 
-            return (session_figs, session_ax_dicts), (measured_epoch_occupancy_seconds_dict_dict, measured_epoch_occupancy_fractional_dict_dict), merged_pdf_path, legend_pdf_path
+            return (session_figs, session_ax_dicts), (measured_epoch_occupancy_seconds_dict_dict, measured_epoch_occupancy_fractional_dict_dict), merged_svg_path, legend_svg_path
 
         assert (not is_session_nested), "session-nested occupancy requires split_by_session=True"
 
@@ -8216,16 +8230,18 @@ class Figure5:
                     _leg_out = Path(legend_export_path)
                 elif pdf_export_path is not None:
                     _merged = Path(pdf_export_path)
-                    _leg_out = _merged.with_name(f'{_merged.stem}_legend{_merged.suffix}')
+                    if _merged.suffix.lower() != '.svg':
+                        _merged = _merged.with_suffix('.svg')
+                    _leg_out = _merged.with_name(f'{_merged.stem}_legend.svg')
                 else:
-                    _leg_out = Path('output') / 'Figure5_legend.pdf'
-                legend_pdf_path = _export_standalone_legend(_captured_legend_handles, _captured_legend_labels, _leg_out)
+                    _leg_out = Path('output') / 'Figure5_legend.svg'
+                legend_svg_path = _export_standalone_legend(_captured_legend_handles, _captured_legend_labels, _leg_out)
             # _out_figs_dict[a_lap_pbe_epoch_name] = (fig, ax_dict)
         else:
             fig = None
             ax_dict = None
 
-        return (fig, ax_dict), (measured_epoch_occupancy_seconds_dict_dict, measured_epoch_occupancy_fractional_dict_dict), None, legend_pdf_path
+        return (fig, ax_dict), (measured_epoch_occupancy_seconds_dict_dict, measured_epoch_occupancy_fractional_dict_dict), None, legend_svg_path
 
 
     @classmethod
