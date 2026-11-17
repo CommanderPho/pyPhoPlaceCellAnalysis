@@ -4236,7 +4236,7 @@ class PrePostDeltaDistributionComparison:
         from matplotlib.lines import Line2D
         from matplotlib.patches import Patch
         from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import FigureCollector
-        from pyphoplacecellanalysis.General.Mixins.ExportHelpers import FileOutputManager, FigureOutputLocation, ContextToPathMode, build_and_write_to_file, postprocess_matplotlib_svg_for_publication
+        from pyphoplacecellanalysis.General.Mixins.ExportHelpers import FileOutputManager, FigureOutputLocation, ContextToPathMode, build_and_write_to_file, savefig_svg_semantic
         from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionsVisualizations
         from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import PaperFigureTwo, add_significance_bars, PhoPublicationFigureHelper
 
@@ -4505,8 +4505,7 @@ class PrePostDeltaDistributionComparison:
                     if fig_man is None:
                         fig_man = FileOutputManager(figure_output_location=FigureOutputLocation.DAILY_PROGRAMMATIC_OUTPUT_FOLDER, context_to_path_mode=ContextToPathMode.GLOBAL_UNIQUE)
                     svg_path = fig_man.get_figure_save_file_path(save_context, make_folder_if_needed=True).with_suffix('.svg')
-                fig.savefig(svg_path, format='svg', transparent=True, **_save_bbox_kwargs)
-                postprocess_matplotlib_svg_for_publication(svg_path)
+                savefig_svg_semantic(fig, svg_path, transparent=True, bbox_inches=_save_bbox_kwargs.get('bbox_inches'), pad_inches=_save_bbox_kwargs.get('pad_inches'))
                 panel_saved_paths.append(svg_path)
             return panel_saved_paths, (panel_saved_paths[0] if panel_saved_paths else None)
 
@@ -4882,8 +4881,7 @@ class PrePostDeltaDistributionComparison:
                             if fig_man is None:
                                 fig_man = FileOutputManager(figure_output_location=FigureOutputLocation.DAILY_PROGRAMMATIC_OUTPUT_FOLDER, context_to_path_mode=ContextToPathMode.GLOBAL_UNIQUE)
                             svg_path = fig_man.get_figure_save_file_path(save_context, make_folder_if_needed=True).with_suffix('.svg')
-                        fig.savefig(svg_path, format='svg', transparent=True, **_save_bbox_kwargs)
-                        postprocess_matplotlib_svg_for_publication(svg_path)
+                        savefig_svg_semantic(fig, svg_path, transparent=True, bbox_inches=_save_bbox_kwargs.get('bbox_inches'), pad_inches=_save_bbox_kwargs.get('pad_inches'))
                         saved_paths.append(svg_path)
                     saved_path = saved_paths[0] if saved_paths else None
 
@@ -4930,7 +4928,7 @@ class PrePostDeltaDistributionComparison:
         from matplotlib.lines import Line2D
         from matplotlib.patches import Patch
         from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import FigureCollector
-        from pyphoplacecellanalysis.General.Mixins.ExportHelpers import FileOutputManager, FigureOutputLocation, ContextToPathMode, build_and_write_to_file, postprocess_matplotlib_svg_for_publication
+        from pyphoplacecellanalysis.General.Mixins.ExportHelpers import FileOutputManager, FigureOutputLocation, ContextToPathMode, build_and_write_to_file, savefig_svg_semantic
         from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionsVisualizations
         from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import PaperFigureTwo, add_significance_bars, PhoPublicationFigureHelper
 
@@ -5197,8 +5195,7 @@ class PrePostDeltaDistributionComparison:
                             if fig_man is None:
                                 fig_man = FileOutputManager(figure_output_location=FigureOutputLocation.DAILY_PROGRAMMATIC_OUTPUT_FOLDER, context_to_path_mode=ContextToPathMode.GLOBAL_UNIQUE)
                             svg_path = fig_man.get_figure_save_file_path(save_context, make_folder_if_needed=True).with_suffix('.svg')
-                        fig.savefig(svg_path, format='svg', transparent=True)
-                        postprocess_matplotlib_svg_for_publication(svg_path)
+                        savefig_svg_semantic(fig, svg_path, transparent=True, bbox_inches=None, pad_inches=None)
                         saved_paths.append(svg_path)
                     saved_path = saved_paths[0] if saved_paths else None
 
@@ -5527,16 +5524,27 @@ class FigureS8:
 
 
     Sizes:
-        Final export (SVG/PDF page) for figure 4, S6, S8: (w: 5.3956 in, h: 2.18 in)
-        Plotly layout canvas stays PUB_FIG_SIZE CSS px (792 x 320, same aspect). Kaleido writes unitless px; `_save_publication_figs` stamps PUB_FIG_SIZE_INCHES onto the SVG so Illustrator/cairosvg honor the inch size (previously PDF came out at 0.75x).
+        Layout width (not figure-name identity) picks the preset:
+          - reduced_width (Fig 4; summary bars side-by-side with each scatter): 5.3956 x 2.18 in, CSS 792 x 320
+          - full_width (Fig S3 / S8 / S9; separate combined summary figure): 6.4377 x 2.5227 in, CSS 945 x 370
+        Kaleido writes unitless px; `_save_publication_figs` stamps PUB_FIG_SIZE_INCHES onto the SVG.
+        Select via `pub_fig_size_key` on `main` / `figures_config_dict` (`'reduced_width'` / `'full_width'`; aliases `'fig4'` / `'s8'`/`'s9'`).
 
         layer_names = ['kdiba_4_figure4_summary_four_bar-Laps.vectorcraft', 'ScatterOverTime_Laps_perTimeBin.svg', 'ScatterOverTime_PBEs_perTimeBin.svg', 'kdiba_4_figure4_summary_four_bar-PBEs.vectorcraft']
 
 
     """
     plotly_helpers: PlotlyHelpers = None
-    PUB_FIG_SIZE_INCHES: Dict = dict(width=5.3956, height=2.18)  # final SVG/PDF page size
-    PUB_FIG_SIZE: Dict = dict(width=792, height=320)  # Plotly CSS px; same aspect as PUB_FIG_SIZE_INCHES (5.3956/8.25 == 2.18/(320/96))
+    # Presets keyed by layout width: inches for Illustrator page; css_px for Plotly layout (same aspect).
+    PUB_FIG_SIZE_PRESETS: ClassVar[Dict[str, Dict[str, Dict[str, float]]]] = {
+        'reduced_width': {'inches': dict(width=5.3956, height=2.18), 'css_px': dict(width=792, height=320)},  # Figure 4
+        'full_width': {'inches': dict(width=6.4377, height=2.5227), 'css_px': dict(width=945, height=370)},  # Figure S3 / S8 / S9
+    }
+    # Aliases kept for older call sites / configs
+    _PUB_FIG_SIZE_KEY_ALIASES: ClassVar[Dict[str, str]] = {'fig4': 'reduced_width', 's8': 'full_width', 's9': 'full_width'}
+    FULL_WIDTH_FIGURE_NAMES: ClassVar[Tuple[str, ...]] = ('Figure S3', 'Figure S8', 'Figure S9')
+    PUB_FIG_SIZE_INCHES: Dict = dict(width=5.3956, height=2.18)  # active final SVG/PDF page size (default reduced_width)
+    PUB_FIG_SIZE: Dict = dict(width=792, height=320)  # active Plotly CSS px (default reduced_width)
     figures_parent_folder: Path = None
     last_debug_values: Optional[Dict] = None
     _transparent_bgcolor: str = "rgba(0,0,0,0)"  # Kaleido PDF ignores this (always white); SVG+cairosvg preserves it.
@@ -5573,6 +5581,34 @@ class FigureS8:
             return 'Additional filter'
         key: str = str(predicate_key)
         return str(cls.FILTER_PREDICATE_DISPLAY_LABELS.get(key, key))
+
+
+    @classmethod
+    def resolve_pub_fig_size_key(cls, pub_fig_size_key: Optional[str] = None, fig_name: Optional[str] = None) -> str:
+        """Map config / figure name → ``'reduced_width'`` or ``'full_width'``.
+
+        Full-width figures (separate combined summary): Figure S3, S8, S9.
+        Reduced-width (summary side-by-side with each scatter): Figure 4.
+        """
+        if pub_fig_size_key is not None:
+            key: str = str(pub_fig_size_key)
+            key = cls._PUB_FIG_SIZE_KEY_ALIASES.get(key, key)
+            if key not in cls.PUB_FIG_SIZE_PRESETS:
+                raise KeyError(f"pub_fig_size_key={pub_fig_size_key!r} not in PUB_FIG_SIZE_PRESETS {list(cls.PUB_FIG_SIZE_PRESETS)} (aliases: {cls._PUB_FIG_SIZE_KEY_ALIASES})")
+            return key
+        if fig_name is not None and str(fig_name) in cls.FULL_WIDTH_FIGURE_NAMES:
+            return 'full_width'
+        return 'reduced_width'
+
+
+    @classmethod
+    def set_pub_fig_size(cls, pub_fig_size_key: str = 'reduced_width') -> str:
+        """Set active ``PUB_FIG_SIZE_INCHES`` / ``PUB_FIG_SIZE`` from ``PUB_FIG_SIZE_PRESETS``."""
+        key: str = cls.resolve_pub_fig_size_key(pub_fig_size_key)
+        preset = cls.PUB_FIG_SIZE_PRESETS[key]
+        cls.PUB_FIG_SIZE_INCHES = dict(preset['inches'])
+        cls.PUB_FIG_SIZE = dict(preset['css_px'])
+        return key
 
 
     @classmethod
@@ -6066,7 +6102,7 @@ class FigureS8:
     def main(cls, df_filter, plotly_helpers: PlotlyHelpers, additional_filter_predicates: Dict, figures_parent_folder: Path, active_filter_constraints: Optional[Dict]=None, should_concatenate_figures: bool=False, enable_heuristic_filtered_outputs: bool = False, split_by_column: Optional[str] = None,
             should_compute_stats: bool = True, enable_add_stats_to_figures: bool = False, debug_print: bool = False, store_debug_values: bool = False,
             color_by_time_bin_size: bool = False, enabled_granularities: Optional[Sequence[str]] = None, enabled_epoch_kinds: Optional[Sequence[str]] = None, overlay_filter_panels: Optional[Sequence[Tuple[str, str]]] = None, legend_groups_to_hide: Optional[List] = None, show_scatter_legend: Optional[bool] = None,
-            enable_main_figures: bool = True,
+            enable_main_figures: bool = True, pub_fig_size_key: str = 'reduced_width',
         ):
         """ Performs the main plotting and adds optional stats
 
@@ -6079,6 +6115,7 @@ class FigureS8:
             Each panel uses grey-background overlay style with the named `additional_filter_predicates` key.
             When unset, `enable_heuristic_filtered_outputs=True` still does a single `is_heuristic_passing` overlay.
             `enable_main_figures=False`: skip Plotly scatter build/SVG export (stats still run for summary figs).
+            `pub_fig_size_key`: ``'reduced_width'``/``'fig4'`` (5.3956×2.18 in) or ``'full_width'``/``'s8'``/``'s9'`` (6.4377×2.5227 in).
 
 
             from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import FigureS8
@@ -6127,9 +6164,8 @@ class FigureS8:
         cls.template = cls.plotly_helpers.update_plotly_template(is_dark_mode=False, is_publication=True)
         pio.templates.default = cls.template
 
-        cls.PUB_FIG_SIZE_INCHES = dict(width=5.3956, height=2.18)  # final SVG/PDF page size
-        cls.PUB_FIG_SIZE = dict(width=792, height=320)  # Plotly CSS px; same aspect as PUB_FIG_SIZE_INCHES. Kaleido unitless px used to export at 0.75x (792x320 -> 594x240 pt)
-        print(f'PUB_FIG_SIZE: {cls.PUB_FIG_SIZE}, PUB_FIG_SIZE_INCHES: {cls.PUB_FIG_SIZE_INCHES}')
+        _resolved_size_key: str = cls.set_pub_fig_size(pub_fig_size_key)
+        print(f'pub_fig_size_key: {_resolved_size_key}, PUB_FIG_SIZE: {cls.PUB_FIG_SIZE}, PUB_FIG_SIZE_INCHES: {cls.PUB_FIG_SIZE_INCHES}')
         # PUB_FIG_SIZE = dict() ## NO OVERRIDES
 
         cls._pub_font = dict(family="Arial", color="black")
@@ -6506,6 +6542,8 @@ class FigureS8:
                 fig_overlay_filter_panels = fig_config_dict.get('overlay_filter_panels', None)
                 fig_enabled_epoch_kinds = fig_config_dict.get('enabled_epoch_kinds', None)
                 fig_enable_main_figures: bool = bool(fig_config_dict.pop('enable_main_figures', enable_main_figures))
+                # full_width: S3/S8/S9 (separate combined summary); reduced_width: Figure 4 (summary side-by-side).
+                fig_pub_fig_size_key: str = cls.resolve_pub_fig_size_key(fig_config_dict.pop('pub_fig_size_key', None), fig_name=fig_name)
                 fig_include_laps: bool = (fig_enabled_epoch_kinds is None) or ('Laps' in fig_enabled_epoch_kinds)
                 fig_include_pbes: bool = (fig_enabled_epoch_kinds is None) or ('PBEs' in fig_enabled_epoch_kinds)
                 fig_color_by_time_bin_size: bool = bool(fig_config_dict.get('color_by_time_bin_size', False))
@@ -6517,7 +6555,7 @@ class FigureS8:
                     _out = cls.main(df_filter=df_filter, plotly_helpers=plotly_helpers, additional_filter_predicates=additional_filter_predicates, figures_parent_folder=figures_parent_folder,
                                     should_concatenate_figures=should_concatenate_figures, split_by_column=split_by_column,
                                     should_compute_stats=fig_should_compute_stats, enable_add_stats_to_figures=fig_enable_add_stats_to_figures, store_debug_values=store_debug_values,
-                                    legend_groups_to_hide=fig_legend_groups_to_hide, enable_main_figures=fig_enable_main_figures,
+                                    legend_groups_to_hide=fig_legend_groups_to_hide, enable_main_figures=fig_enable_main_figures, pub_fig_size_key=fig_pub_fig_size_key,
                                     **{**kwargs, **fig_config_dict},
                     )
                 finally:
