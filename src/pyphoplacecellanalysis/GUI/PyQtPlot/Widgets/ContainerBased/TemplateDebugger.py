@@ -219,15 +219,24 @@ class BaseTemplateDebuggingMixin:
         dummy_decoder_name_key: str = 'only'
         dummy_decoders_dict = {dummy_decoder_name_key: decoder}
         included_any_context_neuron_ids_dict_dict = {dummy_decoder_name_key: included_any_context_neuron_ids}
-        # sortable_values_list_dict = {k:deepcopy(np.argmax(a_decoder.pf.ratemap.normalized_tuning_curves, axis=1)) for k, a_decoder in dummy_decoders_dict.items()} # tuning_curve peak location
-        sortable_values_list_dict = {k:deepcopy(a_decoder.pf.peak_tuning_curve_center_of_masses) for k, a_decoder in dummy_decoders_dict.items()} # tuning_curve CoM location
+        pf_sort_mode: str = getattr(_out_data, 'pf_sort_mode', 'CoM')
+        if pf_sort_mode == 'peaks':
+            sortable_values_list_dict = {k: deepcopy(np.argmax(a_decoder.pf.ratemap.normalized_tuning_curves, axis=1).astype(float)) for k, a_decoder in dummy_decoders_dict.items()} # tuning_curve peak bin index
+        else:
+            sortable_values_list_dict = {k: deepcopy(a_decoder.pf.peak_tuning_curve_center_of_masses) for k, a_decoder in dummy_decoders_dict.items()} # tuning_curve CoM location
+        ## END if pf_sort_mode == 'peaks'...
         # sorted_neuron_IDs_lists, sort_helper_neuron_id_to_neuron_colors_dicts, sort_helper_neuron_id_to_sort_IDX_dicts, (unsorted_original_neuron_IDs_lists, unsorted_neuron_IDs_lists, unsorted_sortable_values_lists, unsorted_unit_colors_map) = paired_separately_sort_neurons(dummy_decoders_dict, included_any_context_neuron_ids_dict_dict=included_any_context_neuron_ids, sortable_values_list_dict=sortable_values_list_dict)
         sorted_neuron_IDs_lists, sort_helper_neuron_id_to_neuron_colors_dicts, sort_helper_neuron_id_to_sort_IDX_dicts, (unsorted_original_neuron_IDs_lists, unsorted_neuron_IDs_lists, unsorted_sortable_values_lists, unsorted_unit_colors_map) = paired_separately_sort_neurons(dummy_decoders_dict, included_any_context_neuron_ids_dict_dict=included_any_context_neuron_ids_dict_dict, sortable_values_list_dict=sortable_values_list_dict)
         
         ## dict-based way
         sorted_pf_tuning_curves = [a_decoder.pf.ratemap.pdf_normalized_tuning_curves[np.array(list(a_sort_helper_neuron_id_to_IDX_dict.values())), :] for a_decoder, a_sort_helper_neuron_id_to_IDX_dict in zip(dummy_decoders_dict.values(), sort_helper_neuron_id_to_sort_IDX_dicts)]
-        # Get the peak locations for the tuning curves:
-        sorted_pf_peak_location_list = [a_decoder.pf.ratemap.peak_tuning_curve_center_of_masses[np.array(list(a_sort_helper_neuron_id_to_IDX_dict.values()))] for a_decoder, a_sort_helper_neuron_id_to_IDX_dict in zip(dummy_decoders_dict.values(), sort_helper_neuron_id_to_sort_IDX_dicts)]
+        # Get the peak / CoM locations for indicator lines (in position space):
+        if pf_sort_mode == 'peaks':
+            unsorted_peak_location_list = [a_decoder.pf.ratemap.xbin_centers[np.argmax(a_decoder.pf.ratemap.normalized_tuning_curves, axis=1)] for a_decoder in dummy_decoders_dict.values()]
+        else:
+            unsorted_peak_location_list = [a_decoder.pf.ratemap.peak_tuning_curve_center_of_masses for a_decoder in dummy_decoders_dict.values()]
+        ## END if pf_sort_mode == 'peaks'...
+        sorted_pf_peak_location_list = [unsorted_peak_locs[np.array(list(a_sort_helper_neuron_id_to_IDX_dict.values()))] for unsorted_peak_locs, a_sort_helper_neuron_id_to_IDX_dict in zip(unsorted_peak_location_list, sort_helper_neuron_id_to_sort_IDX_dicts)]
         img_extents_dict = {a_decoder_name:[a_decoder.pf.ratemap.xbin[0], 0, (a_decoder.pf.ratemap.xbin[-1]-a_decoder.pf.ratemap.xbin[0]), (float(len(sorted_neuron_IDs_lists[i]))-0.0)] for i, (a_decoder_name, a_decoder) in enumerate(dummy_decoders_dict.items()) } # these extents are  (x, y, w, h)
         sorted_neuron_IDs = sorted_neuron_IDs_lists[0]
         
@@ -648,7 +657,7 @@ class TemplateDebugger:
     
     @function_attributes(short_name=None, tags=['init', 'buildUI'], input_requires=[], output_provides=[], uses=['buildUI_directional_template_debugger_data'], used_by=[], creation_date='2024-10-21 19:22', related_items=[])
     @classmethod
-    def init_templates_debugger(cls, track_templates: TrackTemplates, included_any_context_neuron_ids=None, use_incremental_sorting:bool=False, enable_pf_peak_indicator_lines:bool=True, prepare_for_publication: bool=False, enable_track_boundary_lines: bool=True, **kwargs):
+    def init_templates_debugger(cls, track_templates: TrackTemplates, included_any_context_neuron_ids=None, use_incremental_sorting:bool=False, enable_pf_peak_indicator_lines:bool=True, prepare_for_publication: bool=False, enable_track_boundary_lines: bool=True, pf_sort_mode: str = 'CoM', **kwargs):
         """
         long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
         global_spikes_df = deepcopy(curr_active_pipeline.computation_results[global_epoch_name]['computed_data'].pf1D.spikes_df)
@@ -668,6 +677,7 @@ class TemplateDebugger:
         else:
             track_templates: TrackTemplates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values) # non-shared-only
 
+        pf_sort_mode: str - 'CoM' (default) sorts by tuning-curve center-of-mass; 'peaks' sorts by peak firing-location bin.
         """
         from pyphoplacecellanalysis.Pho2D.track_shape_drawing import resolve_1D_track_boundary_x_positions
 
@@ -681,6 +691,8 @@ class TemplateDebugger:
 
         enable_cell_colored_heatmap_rows: bool = kwargs.pop('enable_cell_colored_heatmap_rows', True)
         use_shared_aclus_only_templates: bool = kwargs.pop('use_shared_aclus_only_templates', False)
+        pf_sort_mode = kwargs.pop('pf_sort_mode', pf_sort_mode)
+        assert pf_sort_mode in ('CoM', 'peaks'), f"pf_sort_mode must be 'CoM' or 'peaks', got {pf_sort_mode!r}"
 
         # Optional track-bound position sources (prefer sess_config / loaded_track_limits; fall back to decoder grid_bin_bounds)
         sess_config = kwargs.pop('sess_config', None)
@@ -693,12 +705,12 @@ class TemplateDebugger:
                   
 
         figure_name: str = kwargs.pop('figure_name', 'directional_laps_overview_figure')
-        _out_data = RenderPlotsData(name=figure_name, track_templates=deepcopy(track_templates), out_colors_heatmap_image_matrix_dicts={}, sorted_neuron_IDs_lists=None, sort_helper_neuron_id_to_neuron_colors_dicts=None, sort_helper_neuron_id_to_sort_IDX_dicts=None, sorted_pf_tuning_curves=None, sorted_pf_peak_location_list=None, active_pfs_img_extents_dict=None, unsorted_included_any_context_neuron_ids=None, ref_decoder_name=None)
+        _out_data = RenderPlotsData(name=figure_name, track_templates=deepcopy(track_templates), out_colors_heatmap_image_matrix_dicts={}, sorted_neuron_IDs_lists=None, sort_helper_neuron_id_to_neuron_colors_dicts=None, sort_helper_neuron_id_to_sort_IDX_dicts=None, sorted_pf_tuning_curves=None, sorted_pf_peak_location_list=None, active_pfs_img_extents_dict=None, unsorted_included_any_context_neuron_ids=None, ref_decoder_name=None, pf_sort_mode=pf_sort_mode)
         _out_plots = RenderPlots(name=figure_name, pf1D_heatmaps=None)
         _out_params = VisualizationParameters(name=figure_name, enable_cell_colored_heatmap_rows=enable_cell_colored_heatmap_rows, use_shared_aclus_only_templates=use_shared_aclus_only_templates,
                                              debug_print=debug_print, debug_draw=debug_draw, use_incremental_sorting=use_incremental_sorting, enable_pf_peak_indicator_lines=enable_pf_peak_indicator_lines, included_any_context_neuron_ids=included_any_context_neuron_ids,
                                              solo_emphasized_aclus=None, prepare_for_publication=prepare_for_publication, enable_cell_text_labels=True,
-                                             enable_track_boundary_lines=enable_track_boundary_lines,
+                                             enable_track_boundary_lines=enable_track_boundary_lines, pf_sort_mode=pf_sort_mode,
                                              publication_titles = dict(zip(('long_LR', 'long_RL', 'short_LR', 'short_RL'), [html.escape(v) for v in ('Long <', 'Long >', 'Short <', 'Short >')])), 
                                              **kwargs)
 
@@ -933,6 +945,8 @@ class TemplateDebugger:
 
         """
 
+        pf_sort_mode: str = getattr(_out_data, 'pf_sort_mode', 'CoM')
+
         if use_incremental_sorting:
             # INCRIMENTAL SORTING:
             ref_decoder_name: Optional[str] = list(decoders_dict.keys())[0] # name of the reference coder. Should be 'long_LR'
@@ -940,14 +954,23 @@ class TemplateDebugger:
         else:
             # INDIVIDUAL SORTING:
             ref_decoder_name: Optional[str] = None
-            # sortable_values_list_dict = {k:deepcopy(np.argmax(a_decoder.pf.ratemap.normalized_tuning_curves, axis=1)) for k, a_decoder in decoders_dict.items()} # tuning_curve peak location
-            sortable_values_list_dict = {k:deepcopy(a_decoder.pf.peak_tuning_curve_center_of_masses) for k, a_decoder in decoders_dict.items()} # tuning_curve CoM location
+            if pf_sort_mode == 'peaks':
+                sortable_values_list_dict = {k: deepcopy(np.argmax(a_decoder.pf.ratemap.normalized_tuning_curves, axis=1).astype(float)) for k, a_decoder in decoders_dict.items()} # tuning_curve peak bin index
+            else:
+                sortable_values_list_dict = {k: deepcopy(a_decoder.pf.peak_tuning_curve_center_of_masses) for k, a_decoder in decoders_dict.items()} # tuning_curve CoM location
+            ## END if pf_sort_mode == 'peaks'...
             sorted_neuron_IDs_lists, sort_helper_neuron_id_to_neuron_colors_dicts, sort_helper_neuron_id_to_sort_IDX_dicts, (unsorted_original_neuron_IDs_lists, unsorted_neuron_IDs_lists, unsorted_sortable_values_lists, unsorted_unit_colors_map) = paired_separately_sort_neurons(decoders_dict, included_any_context_neuron_ids, sortable_values_list_dict=sortable_values_list_dict)
+        ## END if use_incremental_sorting...
 
         sorted_pf_tuning_curves = [a_decoder.pf.ratemap.pdf_normalized_tuning_curves[np.array(list(a_sort_helper_neuron_id_to_IDX_dict.values())), :] for a_decoder, a_sort_helper_neuron_id_to_IDX_dict in zip(decoders_dict.values(), sort_helper_neuron_id_to_sort_IDX_dicts)]
         # sorted_pf_tuning_curves_dict = {a_decoder_name:a_decoder.pf.ratemap.pdf_normalized_tuning_curves[np.array(list(a_sort_helper_neuron_id_to_IDX_dict.values())), :] for a_decoder, a_decoder_name, a_sort_helper_neuron_id_to_IDX_dict in zip(decoders_dict.values(), sort_helper_neuron_id_to_sort_IDX_dicts.keys(), sort_helper_neuron_id_to_sort_IDX_dicts.values())}
-        # Get the peak locations for the tuning curves:
-        sorted_pf_peak_location_list = [a_decoder.pf.ratemap.peak_tuning_curve_center_of_masses[np.array(list(a_sort_helper_neuron_id_to_IDX_dict.values()))] for a_decoder, a_sort_helper_neuron_id_to_IDX_dict in zip(decoders_dict.values(), sort_helper_neuron_id_to_sort_IDX_dicts)]
+        # Get the peak / CoM locations for indicator lines (in position space):
+        if pf_sort_mode == 'peaks':
+            unsorted_peak_location_list = [a_decoder.pf.ratemap.xbin_centers[np.argmax(a_decoder.pf.ratemap.normalized_tuning_curves, axis=1)] for a_decoder in decoders_dict.values()]
+        else:
+            unsorted_peak_location_list = [a_decoder.pf.ratemap.peak_tuning_curve_center_of_masses for a_decoder in decoders_dict.values()]
+        ## END if pf_sort_mode == 'peaks'...
+        sorted_pf_peak_location_list = [unsorted_peak_locs[np.array(list(a_sort_helper_neuron_id_to_IDX_dict.values()))] for unsorted_peak_locs, a_sort_helper_neuron_id_to_IDX_dict in zip(unsorted_peak_location_list, sort_helper_neuron_id_to_sort_IDX_dicts)]
         # track_templates.decoder_peak_location_list
 
         # sorted_pf_image_bounds_list = [pyqtplot_build_image_bounds_extent(a_decoder.pf.ratemap.xbins, a_decoder.pf.ratemap.ybins, margin=0.0, debug_print=False) for a_decoder in decoders_dict.values()]
