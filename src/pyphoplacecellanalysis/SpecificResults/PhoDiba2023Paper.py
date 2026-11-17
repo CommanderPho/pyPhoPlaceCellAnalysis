@@ -7770,6 +7770,8 @@ class Figure5:
         Returns one 2x3 figure per session (keyed dicts), plus session-keyed measured occupancy dicts.
         Also writes per-session PDFs and a single vertically stacked PDF (`pdf_export_path`, default `output/Figure5_measured_vs_decoded_by_session.pdf`).
         Pass `skip_plotting_all=True` to omit the ``all`` column (2x2 pre/post only).
+        Pass `prepare_for_publication=True` to apply `PhoPublicationFigureHelper` Artboard-3 fonts/spines and 6.5" max width.
+        Pass `export_legend_separately=True` to omit the on-figure legend and write a standalone legend PDF (next to `pdf_export_path`, or `legend_export_path` if given).
         """
         if enable_figure:
             import matplotlib.pyplot as plt
@@ -7780,11 +7782,32 @@ class Figure5:
         outer_group_label_prefix: Optional[str] = kwargs.pop('outer_group_label_prefix', None)
         skip_plotting_measured: bool = bool(kwargs.pop('skip_plotting_measured', False))
         skip_plotting_all: bool = bool(kwargs.pop('skip_plotting_all', False))
+        prepare_for_publication: bool = bool(kwargs.pop('prepare_for_publication', False))
+        export_legend_separately: bool = bool(kwargs.pop('export_legend_separately', False))
+        legend_export_path = kwargs.pop('legend_export_path', None)
+        dpi = int(kwargs.pop('dpi', 220))
+        figsize = kwargs.pop('figsize', None)
         pre_post_all_epoch_names = ['pre-delta', 'post-delta', 'all']
         _PERIOD_KEYS = set(pre_post_all_epoch_names)
         _plot_period_names = ['pre-delta', 'post-delta'] if skip_plotting_all else list(pre_post_all_epoch_names)
         # decoder_color_dict: Dict[types.DecoderName, str] = {'long_LR': '#0099ff', 'long_RL': '#1b115a', 'short_LR': '#f51616', 'short_RL': '#891111'}
         decoder_color_dict: Dict[types.DecoderName, str] = {'long_LR': '#0077BB', 'long_RL': '#33BBEE', 'short_LR': '#EE7733', 'short_RL': '#CC3311'}  # blue / cyan / orange / red (colorblind-friendlier than navy+dark-red pair)
+        fig5_pub_style = PhoPublicationFigureHelper.get_figure2_bar_style(prepare_for_publication=prepare_for_publication, **{'figure.dpi': str(dpi), 'figure.frameon': False})
+        if figsize is None:
+            if prepare_for_publication:
+                # max width 6.5"; 2-row mosaic — slightly taller when only pre/post columns
+                figsize = [6.5, 2.5] if skip_plotting_all else [6.5, 2.2]
+            else:
+                figsize = [18, 4]
+        _pub_title_fs: float = float(fig5_pub_style.title_font_size) if (fig5_pub_style.title_font_size is not None) else 9.0
+        _pub_label_fs: float = float(fig5_pub_style.axis_labelsize) if (fig5_pub_style.axis_labelsize is not None) else 8.0
+        _pub_tick_fs: float = float(fig5_pub_style.tick_labelsize) if (fig5_pub_style.tick_labelsize is not None) else 8.0
+        _row_label_fs: float = _pub_title_fs if prepare_for_publication else 12.0
+        _group_label_fs: float = _pub_title_fs if prepare_for_publication else 14.0
+        _panel_title_fs: float = _pub_title_fs if prepare_for_publication else 12.0
+        _legend_fs: float = _pub_tick_fs if prepare_for_publication else 10.0
+        _suptitle_fs: float = _pub_title_fs if prepare_for_publication else 12.0
+        _pub_line_lw: Optional[float] = float(fig5_pub_style.axes_linewidth) if (prepare_for_publication and fig5_pub_style.axes_linewidth is not None) else None
 
         if not skip_plotting_measured:
             assert (active_measured_positions_dfs_dict is not None) or (precomputed_measured_occupancy_seconds_dict_dict is not None), "provide active_measured_positions_dfs_dict or precomputed_measured_occupancy_seconds_dict_dict (or pass skip_plotting_measured=True)"
@@ -7851,11 +7874,46 @@ class Figure5:
             ## END for a_lap_pbe_epoch_name in laps_pbe_epoch_names....
             return measured_epoch_occupancy_seconds_dict_dict, measured_epoch_occupancy_fractional_dict_dict
 
-        def _plot_occupancy_mosaic(fig, decoded_seconds_dict_dict, measured_seconds_dict_dict, outer_row_group_label: Optional[str] = None):
+        def _proxify_legend_handles(handles, labels):
+            """Build Line2D proxies so a legend can be drawn on a separate figure (stairs patches are axes-bound)."""
+            from matplotlib.lines import Line2D
+            _lw = _pub_line_lw if (_pub_line_lw is not None) else 1.5
+            out_handles, out_labels = [], []
+            for _h, lab in zip(handles, labels):
+                if lab == 'measured':
+                    out_handles.append(Line2D([0], [0], color='0.25', linestyle=(0, (1.0, 0.8)), linewidth=0.75, alpha=0.65))
+                elif isinstance(lab, str) and lab.startswith('decoded[') and lab.endswith(']'):
+                    decoder_name = lab[len('decoded['):-1]
+                    out_handles.append(Line2D([0], [0], color=decoder_color_dict.get(decoder_name, 'C0'), linewidth=_lw, alpha=0.65))
+                else:
+                    out_handles.append(Line2D([0], [0], color='C0', linewidth=_lw, alpha=0.65))
+                out_labels.append(lab)
+            ## END for _h, lab in zip(handles, labels)...
+            return out_handles, out_labels
+
+
+        def _export_standalone_legend(handles, labels, out_path: Path) -> Path:
+            """Write a legend-only PDF using Line2D proxies."""
+            from matplotlib.figure import Figure
+            proxy_handles, proxy_labels = _proxify_legend_handles(handles, labels)
+            out_path = Path(out_path).resolve()
+            out_path.parent.mkdir(parents=True, exist_ok=True)
+            _leg_figsize = (2.6, 1.5) if prepare_for_publication else (3.2, 2.0)
+            with fig5_pub_style.rc_context():
+                fig_leg = Figure(figsize=_leg_figsize, dpi=dpi, clear=True)
+                fig_leg.legend(proxy_handles, proxy_labels, loc='center', frameon=True, fontsize=_legend_fs)
+                fig_leg.savefig(out_path, format='pdf', bbox_inches='tight', pad_inches=0.02, dpi=dpi, transparent=True)
+                plt.close(fig_leg)
+            print(f'exported Figure5 legend PDF: {out_path}')
+            return out_path
+
+
+        def _plot_occupancy_mosaic(fig, decoded_seconds_dict_dict, measured_seconds_dict_dict, outer_row_group_label: Optional[str] = None, include_fig_legend: bool = True):
             """2xN laps/PBEs × pre/post[/all] mosaic on `fig`. Decoded on primary (left) y-axis; measured on twin right y-axis (independent autoscale).
 
             Left mosaic columns: optional outer group label (e.g. ``Animal: gor01``, spanning both rows), then whole-row epoch labels (``Laps`` / ``PBEs``).
             When ``skip_plotting_all`` is True, the ``all`` column is omitted (2x2).
+            Returns ``(ax_dict, legend_handles, legend_labels)``.
             """
             # Narrow label column(s) sit left of the "decoded (s)" ylabel without colliding.
             _period_ax_suffixes = [f'_{p}' for p in _plot_period_names]  # ['_pre-delta', '_post-delta'] or + '_all'
@@ -7871,7 +7929,7 @@ class Figure5:
                 )
                 _group_ax = ax_dict['row_group']
                 _group_ax.set_axis_off()
-                _group_ax.text(0.5, 0.5, outer_row_group_label, transform=_group_ax.transAxes, rotation=90, va='center', ha='center', fontsize=14, fontweight='bold')
+                _group_ax.text(0.5, 0.5, outer_row_group_label, transform=_group_ax.transAxes, rotation=90, va='center', ha='center', fontsize=_group_label_fs, fontweight='bold')
             else:
                 ax_dict = fig.subplot_mosaic(
                     [['row_laps', *_laps_period_keys],
@@ -7888,7 +7946,7 @@ class Figure5:
             for _row_ax_key, _row_label in (('row_laps', 'Laps'), ('row_PBEs', 'PBEs')):
                 _row_ax = ax_dict[_row_ax_key]
                 _row_ax.set_axis_off()
-                _row_ax.text(0.5, 0.5, _row_label, transform=_row_ax.transAxes, rotation=90, va='center', ha='center', fontsize=12, fontweight='bold')
+                _row_ax.text(0.5, 0.5, _row_label, transform=_row_ax.transAxes, rotation=90, va='center', ha='center', fontsize=_row_label_fs, fontweight='bold')
             ## END for _row_ax_key, _row_label in (('row_laps', 'Laps'), ('row_PBEs', 'PBEs'))...
 
             # _plot_kwargs = dict(plot_pos_bin_axes=False, should_max_normalize=False)
@@ -7905,8 +7963,9 @@ class Figure5:
                 patch.set_facecolor('none')
                 patch.set_linestyle(linestyle)
                 patch.set_alpha(alpha)
-                if linewidth is not None:
-                    patch.set_linewidth(linewidth)
+                _lw = linewidth if (linewidth is not None) else _pub_line_lw
+                if _lw is not None:
+                    patch.set_linewidth(_lw)
 
             ## Same display strings as Figure 2 publication xticklabels (`PaperFigureTwo._apply_publication_grouped_xticklabels`)
             _pre_post_display_label = {'pre-delta': r'pre-$\Delta$', 'post-delta': r'post-$\Delta$', 'all': 'all'}
@@ -7920,7 +7979,8 @@ class Figure5:
                 decoded_active = decoded_seconds_dict_dict.get(pre_post, {}).get(a_lap_pbe_epoch_name)
                 measured_active = measured_seconds_dict_dict.get(pre_post, {}).get(a_lap_pbe_epoch_name)
                 if (decoded_active is None) and (measured_active is None):
-                    ax.set_title(f"{pre_post_label}  (no data)")
+                    ax.set_title(f"{pre_post_label}  (no data)", fontsize=_panel_title_fs)
+                    fig5_pub_style.apply_to_axes(ax)
                     continue
 
                 # xbin_edges = np.linspace(loaded_track_limits['long_xlim'][0], loaded_track_limits['long_xlim'][1], n_pos + 1) ## I think always using 'long*' here is why both tracks are stretched to the long track length, but it would make since because they both use the same pos bins right? Oh, the bins aren't right from the bounds alone.
@@ -7959,36 +8019,50 @@ class Figure5:
                     ax.set_ylabel('')
 
                 if skip_plotting_measured:
-                    ax.set_title(f"{pre_post_label}  (decoded={decoded_total_s:0.1f}s)")
+                    ax.set_title(f"{pre_post_label}  (decoded={decoded_total_s:0.1f}s)", fontsize=_panel_title_fs)
                     if legend_handles is None:
                         decoded_handles, _ = ax.get_legend_handles_labels()
                         legend_handles = list(decoded_handles)
                         legend_labels = list(_decoded_legend_labels)  # perform_plot_occupancy hardcodes stairs label='1D Placefield Occupancy'
+                    fig5_pub_style.apply_to_axes(ax)
                 else:
                     ## measured on twin (secondary) y-axis so its autoscale is independent of decoded magnitude
                     ax_measured = ax.twinx()
                     perform_plot_occupancy(measured_active, xbin_centers=xbin_centers, xbin_edges=xbin_edges, fig=fig, ax=ax_measured,
                                         label='measured', **_plot_kwargs, alpha=_line_alpha)
-                    _color_last_occupancy_stairs(ax_measured, '0.25', linestyle=(0, (1.0, 0.8)), linewidth=0.75)  # denser dotted path than default ':' (~2x closer dots)
-                    ax_measured.tick_params(axis='y', labelcolor='0.45')
+                    _color_last_occupancy_stairs(ax_measured, '0.25', linestyle=(0, (1.0, 0.8)), linewidth=(_pub_line_lw if (_pub_line_lw is not None) else 0.75))  # denser dotted path than default ':' (~2x closer dots)
+                    _measured_tick_kwargs = dict(axis='y', labelcolor='0.45')
+                    if prepare_for_publication:
+                        _measured_tick_kwargs['labelsize'] = _pub_tick_fs
+                    ax_measured.tick_params(**_measured_tick_kwargs)
                     if pre_post == _measured_ylabel_period:
                         ax_measured.set_ylabel('measured (s)')
                     else:
                         ax_measured.set_ylabel('')
                     ax_measured.set_title('')  # perform_plot_occupancy sets a per-call title on the twin
-                    ax.set_title(f"{pre_post_label}  (decoded={decoded_total_s:0.1f}s, measured={measured_total_s:0.1f}s)")
+                    ax.set_title(f"{pre_post_label}  (decoded={decoded_total_s:0.1f}s, measured={measured_total_s:0.1f}s)", fontsize=_panel_title_fs)
                     if legend_handles is None:
                         decoded_handles, _ = ax.get_legend_handles_labels()
                         measured_handles, _ = ax_measured.get_legend_handles_labels()
                         legend_handles = list(measured_handles) + list(decoded_handles)
                         legend_labels = ['measured'] + _decoded_legend_labels  # perform_plot_occupancy hardcodes stairs label='1D Placefield Occupancy'
+                    fig5_pub_style.apply_to_axes(ax)
+                    if prepare_for_publication:
+                        # twin keeps right spine for measured y; hide top only
+                        ax_measured.spines['top'].set_visible(False)
+                        if fig5_pub_style.axes_linewidth is not None:
+                            ax_measured.spines['right'].set_linewidth(fig5_pub_style.axes_linewidth)
             ## END for lap_PBEs_plus_pre_post in _data_ax_keys...
 
-            if legend_handles is not None:
-                fig.legend(legend_handles, legend_labels, loc='outside right', frameon=True)
-            return ax_dict
+            if (legend_handles is not None) and include_fig_legend:
+                fig.legend(legend_handles, legend_labels, loc='outside right', frameon=True, fontsize=_legend_fs)
+            return ax_dict, legend_handles, legend_labels
 
         is_session_nested: bool = _is_session_nested_occupancy(full_epoch_occupancy_seconds_dict_dict)
+        _include_fig_legend: bool = (not export_legend_separately)
+        _captured_legend_handles = None
+        _captured_legend_labels = None
+        legend_pdf_path = None
         if split_by_session:
             assert is_session_nested, "split_by_session=True requires session-nested occupancy from compute_decoded_occupancy(..., split_by_session=True)"
             session_names = list(full_epoch_occupancy_seconds_dict_dict.keys())
@@ -8056,10 +8130,12 @@ class Figure5:
                 measured_epoch_occupancy_fractional_dict_dict[session_name] = sess_measured_frac
 
                 if enable_figure:
-                    sess_fig = plt.figure(layout='constrained', figsize=[18, 4], dpi=220, clear=True, num=f'{num} | {session_name}')
-                    _outer_label: Optional[str] = (f'{outer_group_label_prefix}: {session_name}' if (outer_group_label_prefix is not None) else None)
-                    ax_dict = _plot_occupancy_mosaic(sess_fig, sess_decoded_seconds, sess_measured_seconds, outer_row_group_label=_outer_label)
-                    sess_fig.suptitle(f'Figure 5 — measured vs decoded occupancy | {session_name}')
+                    with fig5_pub_style.rc_context():
+                        sess_fig = plt.figure(layout='constrained', figsize=figsize, dpi=dpi, clear=True, num=f'{num} | {session_name}')
+                        _outer_label: Optional[str] = (f'{outer_group_label_prefix}: {session_name}' if (outer_group_label_prefix is not None) else None)
+                        ax_dict = _plot_occupancy_mosaic(sess_fig, sess_decoded_seconds, sess_measured_seconds, outer_row_group_label=_outer_label)
+                        _sess_suptitle = f'{session_name}' if prepare_for_publication else f'Figure 5 — measured vs decoded occupancy | {session_name}'
+                        sess_fig.suptitle(_sess_suptitle, fontsize=_suptitle_fs)
                     session_figs[session_name] = sess_fig
                     session_ax_dicts[session_name] = ax_dict
             ## END for session_name in session_names....
@@ -8077,10 +8153,11 @@ class Figure5:
                 ## Thin black separators between stacked animals/sessions (all but last figure)
                 _session_fig_items = list(session_figs.items())
                 _n_sess_figs: int = len(_session_fig_items)
+                _sep_lw: float = float(fig5_pub_style.axes_linewidth) if (prepare_for_publication and fig5_pub_style.axes_linewidth is not None) else 0.9
                 if _n_sess_figs > 1:
                     for _i, (_session_name, _sess_fig) in enumerate(_session_fig_items):
                         if _i < (_n_sess_figs - 1):
-                            _sess_fig.add_artist(Line2D([0.0, 1.0], [0.0, 0.0], transform=_sess_fig.transFigure, color='black', linewidth=0.9, clip_on=False))
+                            _sess_fig.add_artist(Line2D([0.0, 1.0], [0.0, 0.0], transform=_sess_fig.transFigure, color='black', linewidth=_sep_lw, clip_on=False))
                         ## END if _i < (_n_sess_figs - 1)...
                     ## END for _i, (_session_name, _sess_fig) in enumerate(_session_fig_items)...
 
@@ -8090,11 +8167,12 @@ class Figure5:
                     per_session_pdf_dir = merged_pdf_path.parent.joinpath(merged_pdf_path.stem)
                     per_session_pdf_dir.mkdir(parents=True, exist_ok=True)
                     per_session_pdf_paths = []
-                    with mpl.rc_context({'savefig.transparent': True, 'ps.fonttype': 42, 'pdf.fonttype': 42}):
+                    _savefig_rc = dict(fig5_pub_style.mpl_rc) if prepare_for_publication else {'savefig.transparent': True, 'ps.fonttype': 42, 'pdf.fonttype': 42}
+                    with mpl.rc_context(_savefig_rc):
                         for session_name, sess_fig in session_figs.items():
                             sess_stem: str = str(session_name).replace('/', '_').replace('\\', '_').replace('|', '_').replace(':', '_')
                             sess_pdf_path = per_session_pdf_dir.joinpath(f'{sess_stem}.pdf')
-                            sess_fig.savefig(sess_pdf_path, format='pdf', bbox_inches='tight', dpi=220)
+                            sess_fig.savefig(sess_pdf_path, format='pdf', bbox_inches='tight', pad_inches=0.02, dpi=dpi)
                             per_session_pdf_paths.append(sess_pdf_path)
                         ## END for session_name, sess_fig in session_figs.items()....
                     merged_pdf_path = PDFHelpers.concatenate_pdfs_vertically(per_session_pdf_paths, merged_pdf_path, padding=8)
@@ -8116,9 +8194,11 @@ class Figure5:
 
         if enable_figure:
             ## single figure mode
-            fig = plt.figure(layout='constrained', figsize=[18, 4], dpi=220, clear=True, num=num)
-            ax_dict = _plot_occupancy_mosaic(fig, full_epoch_occupancy_seconds_dict_dict, measured_epoch_occupancy_seconds_dict_dict)
-            plt.suptitle(f'Figure 5 — measured x vs decoded occupancy' if (not skip_plotting_measured) else f'Figure 5 — decoded occupancy')
+            with fig5_pub_style.rc_context():
+                fig = plt.figure(layout='constrained', figsize=figsize, dpi=dpi, clear=True, num=num)
+                ax_dict = _plot_occupancy_mosaic(fig, full_epoch_occupancy_seconds_dict_dict, measured_epoch_occupancy_seconds_dict_dict)
+                _single_suptitle = ('decoded occupancy' if skip_plotting_measured else 'measured vs decoded occupancy') if prepare_for_publication else (f'Figure 5 — measured x vs decoded occupancy' if (not skip_plotting_measured) else f'Figure 5 — decoded occupancy')
+                plt.suptitle(_single_suptitle, fontsize=_suptitle_fs)
             # _out_figs_dict[a_lap_pbe_epoch_name] = (fig, ax_dict)
         else:
             fig = None
