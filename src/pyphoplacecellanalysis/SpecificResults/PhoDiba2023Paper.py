@@ -7792,6 +7792,8 @@ class Figure5:
         _plot_period_names = ['pre-delta', 'post-delta'] if skip_plotting_all else list(pre_post_all_epoch_names)
         # decoder_color_dict: Dict[types.DecoderName, str] = {'long_LR': '#0099ff', 'long_RL': '#1b115a', 'short_LR': '#f51616', 'short_RL': '#891111'}
         decoder_color_dict: Dict[types.DecoderName, str] = {'long_LR': '#0077BB', 'long_RL': '#33BBEE', 'short_LR': '#EE7733', 'short_RL': '#CC3311'}  # blue / cyan / orange / red (colorblind-friendlier than navy+dark-red pair)
+        # decoder_color_dict: Dict[types.DecoderName, str] = {'long_LR': '#0077BB', 'long_RL': '#33BBEE', 'short_LR': '#AA0000', 'short_RL': '#FF0206'}  # blue / cyan / orange / red (colorblind-friendlier than navy+dark-red pair)
+
         fig5_pub_style = PhoPublicationFigureHelper.get_figure2_bar_style(prepare_for_publication=prepare_for_publication, **{'figure.dpi': str(dpi), 'figure.frameon': False})
         if figsize is None:
             if prepare_for_publication:
@@ -8019,7 +8021,7 @@ class Figure5:
                                         label='decoded', **_plot_kwargs, alpha=_line_alpha)
                     _color_last_occupancy_stairs(ax, 'C0', gid='decoded')
                 if pre_post == 'pre-delta':
-                    ax.set_ylabel('decoded (s)')
+                    ax.set_ylabel('decoded (rel)' if should_max_normalize else 'decoded (s)')
                 else:
                     ax.set_ylabel('')
 
