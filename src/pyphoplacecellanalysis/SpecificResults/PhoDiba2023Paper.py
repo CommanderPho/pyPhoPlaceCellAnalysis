@@ -7779,7 +7779,9 @@ class Figure5:
         skip_plotting_measured: bool = bool(kwargs.pop('skip_plotting_measured', False))
         pre_post_all_epoch_names = ['pre-delta', 'post-delta', 'all']
         _PERIOD_KEYS = set(pre_post_all_epoch_names)
-        decoder_color_dict: Dict[types.DecoderName, str] = {'long_LR': '#0099ff', 'long_RL': '#1b115a', 'short_LR': '#f51616', 'short_RL': '#891111'}
+        # decoder_color_dict: Dict[types.DecoderName, str] = {'long_LR': '#0099ff', 'long_RL': '#1b115a', 'short_LR': '#f51616', 'short_RL': '#891111'}
+        decoder_color_dict: Dict[types.DecoderName, str] = {'long_LR': '#0077BB', 'long_RL': '#33BBEE', 'short_LR': '#EE7733', 'short_RL': '#CC3311'}  # blue / cyan / orange / red (colorblind-friendlier than navy+dark-red pair)
+
         if not skip_plotting_measured:
             assert (active_measured_positions_dfs_dict is not None) or (precomputed_measured_occupancy_seconds_dict_dict is not None), "provide active_measured_positions_dfs_dict or precomputed_measured_occupancy_seconds_dict_dict (or pass skip_plotting_measured=True)"
 
