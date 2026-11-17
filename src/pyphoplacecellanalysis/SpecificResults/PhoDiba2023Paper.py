@@ -4463,8 +4463,10 @@ class PrePostDeltaDistributionComparison:
         laps_fig_file_name: Optional[str] = kwargs.pop('laps_fig_file_name', None)
         pbe_fig_file_name: Optional[str] = kwargs.pop('pbe_fig_file_name', None)
         fig2_bar_style = PhoPublicationFigureHelper.get_figure2_bar_style(prepare_for_publication=prepare_for_publication, **{'figure.dpi': str(dpi), 'figure.frameon': False})
-        # Optional compact-style overrides (e.g. FigureS8.SUMMARY_BAR_COMPACT_STYLE). Defaults restore pre-S8 Fig4 behavior.
+        # Fixed figsize inches (FigureS8.SUMMARY_BAR_FIGSIZE_PRESETS) preferred; figsize_scale is legacy fallback only.
+        _summary_figsize = kwargs.pop('figsize', None)
         figsize_scale = kwargs.pop('figsize_scale', None)
+        show_animal_legend: bool = bool(kwargs.pop('show_animal_legend', True))
         _scatter_s_raw = kwargs.pop('scatter_s', None)
         _summary_scatter_s: Optional[float] = None if (_scatter_s_raw is None) else float(_scatter_s_raw)
         _summary_legend_markersize: float = float(kwargs.pop('legend_markersize', 6.0))
@@ -4482,11 +4484,24 @@ class PrePostDeltaDistributionComparison:
             title = f"{_decoded_prefix}<weight:bold>{str(title)[len(_decoded_prefix):]}</>"
         _summary_title_kwargs = {**fig2_bar_style.create_plot_kwargs(), 'bold_epochs_name': False}
 
+        def _resolve_summary_figsize(has_extras: bool = False) -> Tuple[float, float]:
+            if _summary_figsize is not None:
+                return (float(_summary_figsize[0]), float(_summary_figsize[1]))
+            if figsize_scale is not None:
+                rc_w, rc_h = mpl.rcParams['figure.figsize']
+                _scale = float(figsize_scale)
+                return (float(rc_w) * _scale, float(rc_h) * _scale)
+            # Default: reduced_width fixed size (Figure 4); legacy full-rc width only if overlays need legend room and no figsize was passed
+            if has_extras:
+                rc_w, rc_h = mpl.rcParams['figure.figsize']
+                return (float(rc_w), float(rc_h))
+            return (1.35, 2.18)
+
         def _save_panel_figure(fig, panel_fig_file_name: str) -> Tuple[List[Path], Optional[Path]]:
             panel_saved_paths: List[Path] = []
             if not save_figure:
                 return panel_saved_paths, None
-            # Tight bbox only when caller passes save_bbox_inches (S8 compact); Fig4 keeps legacy figure-box crop.
+            # Prefer exact figure-box crop so fixed figsize inches survive; tight only when caller opts in.
             save_context = active_context.overwriting_context(display_fn_name=panel_fig_file_name)
             fig_man = None
             export_folder_path = None if export_folder is None else Path(export_folder)
@@ -4506,6 +4521,9 @@ class PrePostDeltaDistributionComparison:
                         fig_man = FileOutputManager(figure_output_location=FigureOutputLocation.DAILY_PROGRAMMATIC_OUTPUT_FOLDER, context_to_path_mode=ContextToPathMode.GLOBAL_UNIQUE)
                     svg_path = fig_man.get_figure_save_file_path(save_context, make_folder_if_needed=True).with_suffix('.svg')
                 savefig_svg_semantic(fig, svg_path, transparent=True, bbox_inches=_save_bbox_kwargs.get('bbox_inches'), pad_inches=_save_bbox_kwargs.get('pad_inches'))
+                if (_summary_figsize is not None) and (_save_bbox_inches is None):
+                    from pyphocorehelpers.plotting.media_output_helpers import SVGHelpers
+                    SVGHelpers.set_physical_size_inches(svg_path, width_in=float(_summary_figsize[0]), height_in=float(_summary_figsize[1]))
                 panel_saved_paths.append(svg_path)
             return panel_saved_paths, (panel_saved_paths[0] if panel_saved_paths else None)
 
@@ -4523,14 +4541,7 @@ class PrePostDeltaDistributionComparison:
                 panel_kwargs['fignum'] = panel_fignum
             panel_kwargs.setdefault('scatter_kwargs', dict(_summary_scatter_kwargs))
             if 'figsize' not in panel_kwargs:
-                rc_w, rc_h = mpl.rcParams['figure.figsize']
-                if figsize_scale is not None:
-                    _scale = float(figsize_scale)
-                    panel_kwargs['figsize'] = (float(rc_w) * _scale, float(rc_h) * _scale)
-                else:
-                    # Legacy: full Fig2 width when filter overlays need a right-edge legend; half-width otherwise
-                    width_scale = 1.0 if panel_has_extras else 0.5
-                    panel_kwargs['figsize'] = (float(rc_w) * width_scale, float(rc_h))
+                panel_kwargs['figsize'] = _resolve_summary_figsize(has_extras=panel_has_extras)
             panel_kwargs.setdefault('bottom_margin', 0.20)
             y_pre = summary_df[pre_col].to_numpy(dtype=float)
             y_post = summary_df[post_col].to_numpy(dtype=float)
@@ -4601,7 +4612,7 @@ class PrePostDeltaDistributionComparison:
                 add_significance_bars(ax, bracket_p, x1=x1, x2=x2, y=bracket_y, color=bracket_color)
             ## END for bi, (x1, x2, bracket_p, bracket_color) in enumerate(panel_sig_brackets)...
             animal_legend = None
-            if has_animal and marker_mapping:
+            if show_animal_legend and has_animal and marker_mapping:
                 legend_animals = [a for a in preferred_animals if a in marker_mapping]
                 legend_animals.extend([a for a in unique_animals if a not in set(preferred_animals)])
                 animal_legend_handles = [
@@ -4737,10 +4748,8 @@ class PrePostDeltaDistributionComparison:
             create_plot_kwargs.setdefault('fignum', fignum)
         create_plot_kwargs.setdefault('bar_colors', [summary_bar_color] * 4)
         create_plot_kwargs.setdefault('scatter_kwargs', dict(_summary_scatter_kwargs))
-        if (figsize_scale is not None) and ('figsize' not in create_plot_kwargs):
-            rc_w, rc_h = mpl.rcParams['figure.figsize']
-            _scale = float(figsize_scale)
-            create_plot_kwargs['figsize'] = (float(rc_w) * _scale, float(rc_h) * _scale)
+        if 'figsize' not in create_plot_kwargs:
+            create_plot_kwargs['figsize'] = _resolve_summary_figsize(has_extras=has_pbe_extras)
         if has_pbe_extras:
             pbe_color = summary_bar_color
             # Per PBE column: all | extra0 | extra1... (offsets from _pbe_split_offsets)
@@ -4832,7 +4841,7 @@ class PrePostDeltaDistributionComparison:
                     add_significance_bars(ax, pbe_p_value, x1=2.0, x2=3.0, y=y_max)
 
                 animal_legend = None
-                if has_animal and marker_mapping:
+                if show_animal_legend and has_animal and marker_mapping:
                     legend_animals = [a for a in preferred_animals if a in marker_mapping]
                     legend_animals.extend([a for a in unique_animals if a not in set(preferred_animals)])
                     animal_legend_handles = [
@@ -4882,6 +4891,9 @@ class PrePostDeltaDistributionComparison:
                                 fig_man = FileOutputManager(figure_output_location=FigureOutputLocation.DAILY_PROGRAMMATIC_OUTPUT_FOLDER, context_to_path_mode=ContextToPathMode.GLOBAL_UNIQUE)
                             svg_path = fig_man.get_figure_save_file_path(save_context, make_folder_if_needed=True).with_suffix('.svg')
                         savefig_svg_semantic(fig, svg_path, transparent=True, bbox_inches=_save_bbox_kwargs.get('bbox_inches'), pad_inches=_save_bbox_kwargs.get('pad_inches'))
+                        if (_summary_figsize is not None) and (_save_bbox_inches is None):
+                            from pyphocorehelpers.plotting.media_output_helpers import SVGHelpers
+                            SVGHelpers.set_physical_size_inches(svg_path, width_in=float(_summary_figsize[0]), height_in=float(_summary_figsize[1]))
                         saved_paths.append(svg_path)
                     saved_path = saved_paths[0] if saved_paths else None
 
@@ -5099,6 +5111,7 @@ class PrePostDeltaDistributionComparison:
             active_context = IdentifyingContext(format_name='kdiba', fig='S3', display_fn_name='pre_post_delta_summary_multi_tbin_bars')
 
         dpi = kwargs.pop('dpi', 220)
+        _summary_figsize = kwargs.pop('figsize', None)
         fig2_bar_style = PhoPublicationFigureHelper.get_figure2_bar_style(prepare_for_publication=prepare_for_publication, **{'figure.dpi': str(dpi), 'figure.frameon': False})
         _decoded_prefix: str = 'Decoded '
         if str(title).startswith(_decoded_prefix):
@@ -5108,6 +5121,10 @@ class PrePostDeltaDistributionComparison:
         create_plot_kwargs = dict(kwargs)
         if fignum is not None:
             create_plot_kwargs.setdefault('fignum', fignum)
+        if _summary_figsize is not None:
+            create_plot_kwargs.setdefault('figsize', (float(_summary_figsize[0]), float(_summary_figsize[1])))
+        else:
+            create_plot_kwargs.setdefault('figsize', (3.843, 2.9482))  # full_width default (Figure S3)
         create_plot_kwargs.update(dict(
             bar_x=np.asarray(bar_x_list, dtype=float),
             bar_width=np.asarray(bar_width_list, dtype=float),
@@ -5196,6 +5213,10 @@ class PrePostDeltaDistributionComparison:
                                 fig_man = FileOutputManager(figure_output_location=FigureOutputLocation.DAILY_PROGRAMMATIC_OUTPUT_FOLDER, context_to_path_mode=ContextToPathMode.GLOBAL_UNIQUE)
                             svg_path = fig_man.get_figure_save_file_path(save_context, make_folder_if_needed=True).with_suffix('.svg')
                         savefig_svg_semantic(fig, svg_path, transparent=True, bbox_inches=None, pad_inches=None)
+                        _stamp_figsize = create_plot_kwargs.get('figsize')
+                        if _stamp_figsize is not None:
+                            from pyphocorehelpers.plotting.media_output_helpers import SVGHelpers
+                            SVGHelpers.set_physical_size_inches(svg_path, width_in=float(_stamp_figsize[0]), height_in=float(_stamp_figsize[1]))
                         saved_paths.append(svg_path)
                     saved_path = saved_paths[0] if saved_paths else None
 
@@ -5487,7 +5508,7 @@ class PrePostDeltaDistributionComparison:
 import plotly.graph_objects as go
 import plotly.io as pio
 from pyphoplacecellanalysis.Pho2D.plotly.Extensions.plotly_helpers import PlotlyFigureContainer
-from pyphoplacecellanalysis.Pho2D.plotly.plotly_templates import PlotlyHelpers, text_sizes_px
+from pyphoplacecellanalysis.Pho2D.plotly.plotly_templates import PlotlyHelpers, text_sizes_pts, text_sizes_px
 from pyphocorehelpers.plotting.media_output_helpers import PDFHelpers, SVGHelpers ## for outputs
 
 
@@ -5500,7 +5521,7 @@ class FigureS8:
             import plotly.graph_objects as go
             import plotly.io as pio
             from pyphoplacecellanalysis.Pho2D.plotly.Extensions.plotly_helpers import PlotlyFigureContainer
-            from pyphoplacecellanalysis.Pho2D.plotly.plotly_templates import PlotlyHelpers, text_sizes_px
+            from pyphoplacecellanalysis.Pho2D.plotly.plotly_templates import PlotlyHelpers, text_sizes_pts
             from pyphocorehelpers.plotting.media_output_helpers import PDFHelpers, SVGHelpers ## for outputs
 
             from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import FigureS8
@@ -5528,6 +5549,8 @@ class FigureS8:
           - reduced_width (Fig 4; summary bars side-by-side with each scatter): 5.3956 x 2.18 in, CSS 792 x 320
           - full_width (Fig S3 / S8 / S9; separate combined summary figure): 6.4377 x 2.5227 in, CSS 945 x 370
         Kaleido writes unitless px; `_save_publication_figs` stamps PUB_FIG_SIZE_INCHES onto the SVG.
+        Type sizes are authored in real-world pt (`text_sizes_pts`); `_post_hoc_format_figure` converts via `pub_pt_to_css_px`
+        using the active canvas width so Illustrator reads the intended pt after the inch stamp.
         Select via `pub_fig_size_key` on `main` / `figures_config_dict` (`'reduced_width'` / `'full_width'`; aliases `'fig4'` / `'s8'`/`'s9'`).
 
         layer_names = ['kdiba_4_figure4_summary_four_bar-Laps.vectorcraft', 'ScatterOverTime_Laps_perTimeBin.svg', 'ScatterOverTime_PBEs_perTimeBin.svg', 'kdiba_4_figure4_summary_four_bar-PBEs.vectorcraft']
@@ -5559,13 +5582,15 @@ class FigureS8:
         'is_heuristic_passing': 'Heuristic-passing',
         'heuristic_passing': 'Heuristic-passing',
     }
-    # S8-only compact summary bars (passed into plot_fig2_style_summary_four_bar; Fig4/S9 keep legacy defaults)
-    SUMMARY_BAR_COMPACT_STYLE: Dict[str, Any] = dict(
-        figsize_scale=0.75,
+    # Fixed summary-bar page sizes (matplotlib figsize inches) — same reduced/full layout rule as scatter presets.
+    SUMMARY_BAR_FIGSIZE_PRESETS: ClassVar[Dict[str, Tuple[float, float]]] = {
+        'reduced_width': (1.35, 2.18),  # Figure 4
+        'full_width': (3.843, 2.9482),  # Figure S3 / S8 / S9
+    }
+    # Optional scatter/legend tweaks passed into plot_fig2_style_summary_four_bar (figsize comes from SUMMARY_BAR_FIGSIZE_PRESETS).
+    SUMMARY_BAR_STYLE: Dict[str, Any] = dict(
         scatter_s=18.0,
         legend_markersize=6.0,
-        save_bbox_inches='tight',
-        save_pad_inches=0.25,
     )
     _heuristic_filter_color_map: Dict[str, str] = {
         'False': 'rgba(100,100,100,0.45)',
@@ -5612,6 +5637,32 @@ class FigureS8:
 
 
     @classmethod
+    def pub_pt_to_css_px(cls, pt: float, width_css: Optional[float] = None, width_in: Optional[float] = None) -> float:
+        """Convert real-world type size (pt) → Plotly/Kaleido CSS px for the active stamped page.
+
+        ``css_px = pt * width_css / (width_in * 72)`` so after ``set_physical_size_inches(width_in, ...)``
+        Illustrator reads approximately ``pt``. Defaults use active ``PUB_FIG_SIZE`` / ``PUB_FIG_SIZE_INCHES``.
+        """
+        _width_css: float = float(cls.PUB_FIG_SIZE['width'] if width_css is None else width_css)
+        _width_in: float = float(cls.PUB_FIG_SIZE_INCHES['width'] if width_in is None else width_in)
+        return float(pt) * _width_css / (_width_in * 72.0)
+
+
+    @classmethod
+    def pub_text_sizes_css_px(cls, sizes_pts: Optional[Dict[str, float]] = None) -> Dict[str, float]:
+        """Map ``text_sizes_pts`` (or override) → CSS px using the active publication page size."""
+        src = dict(text_sizes_pts if sizes_pts is None else sizes_pts)
+        return {k: cls.pub_pt_to_css_px(float(v)) for k, v in src.items()}
+
+
+    @classmethod
+    def summary_bar_figsize_for_fig_name(cls, fig_name: Optional[str] = None, pub_fig_size_key: Optional[str] = None) -> Tuple[float, float]:
+        """Fixed summary-stats bar ``figsize`` (inches) for a figure name / layout key."""
+        key: str = cls.resolve_pub_fig_size_key(pub_fig_size_key, fig_name=fig_name)
+        return tuple(cls.SUMMARY_BAR_FIGSIZE_PRESETS[key])
+
+
+    @classmethod
     def figures_intermediates_parent_folder(cls) -> Path:
         """Where temporary/intermediate figures are written."""
         if cls.figures_parent_folder is None:
@@ -5624,17 +5675,22 @@ class FigureS8:
 
     @classmethod
     def _post_hoc_format_figure(cls, a_fig: go.Figure, showlegend: bool = True, legend_title_text: str = 'Heuristic-Passing') -> go.Figure:
-        """Force publication fonts onto the figure object (templates are only fallbacks)."""
+        """Force publication fonts onto the figure object (templates are only fallbacks).
+
+        Font sizes are taken from ``text_sizes_pts`` (real-world pt) and converted to Plotly CSS px via
+        ``pub_pt_to_css_px`` so the stamped SVG/PDF page yields those pt sizes in Illustrator.
+        """
+        sizes_px: Dict[str, float] = cls.pub_text_sizes_css_px()
         layout_kwargs = dict(
             template=cls.template,
             **cls.PUB_FIG_SIZE,
             paper_bgcolor=cls._transparent_bgcolor,
             plot_bgcolor=cls._transparent_bgcolor,
             showlegend=showlegend,
-            font=dict(**cls._pub_font, size=text_sizes_px["insets"]),
-            title_font=dict(**cls._pub_font, size=text_sizes_px["titles"]),
-            legend_font=dict(**cls._pub_font, size=text_sizes_px["insets"]),
-            legend_title_font=dict(**cls._pub_font, size=text_sizes_px["insets"]),
+            font=dict(**cls._pub_font, size=sizes_px["insets"]),
+            title_font=dict(**cls._pub_font, size=sizes_px["titles"]),
+            legend_font=dict(**cls._pub_font, size=sizes_px["insets"]),
+            legend_title_font=dict(**cls._pub_font, size=sizes_px["insets"]),
             margin=dict(l=50, r=40, t=36, b=50),
         )
         if showlegend:
@@ -5643,14 +5699,14 @@ class FigureS8:
             layout_kwargs['margin'] = dict(l=50, r=40, t=36, b=88)
         a_fig = a_fig.update_layout(**layout_kwargs)
         a_fig = a_fig.update_xaxes(
-            title_font=dict(**cls._pub_font, size=text_sizes_px["axes"]),
-            tickfont=dict(**cls._pub_font, size=text_sizes_px["axes"]),
+            title_font=dict(**cls._pub_font, size=sizes_px["axes"]),
+            tickfont=dict(**cls._pub_font, size=sizes_px["axes"]),
             linewidth=1,
             showgrid=False,  # hide vertical grid (Figure 4 / S3 / S8 / S9)
         )
         a_fig = a_fig.update_yaxes(
-            title_font=dict(**cls._pub_font, size=text_sizes_px["axes"]),
-            tickfont=dict(**cls._pub_font, size=text_sizes_px["axes"]),
+            title_font=dict(**cls._pub_font, size=sizes_px["axes"]),
+            tickfont=dict(**cls._pub_font, size=sizes_px["axes"]),
             linewidth=1,
         )
         # Do not bump all annotations to title size — Pre-Δ / Post-Δ / axis labels are annotations and become unreadable.
@@ -5837,7 +5893,7 @@ class FigureS8:
             text='<br>'.join(lines),
             xref='x2 domain', yref='y2 domain', x=0.99, y=0.98,
             xanchor='right', yanchor='top', showarrow=False, align='right',
-            font=dict(family='Arial', size=text_sizes_px['insets'], color='black'),
+            font=dict(family='Arial', size=cls.pub_pt_to_css_px(float(text_sizes_pts['insets'])), color='black'),
             bgcolor='rgba(255,255,255,0.75)', borderpad=3,
             name='pre_post_delta_stats',
         )
@@ -6691,13 +6747,14 @@ class FigureS8:
                             if (group_name is not None) and (laps_key is not None) and (pbes_key is not None)
                         }
                         combined_basename: str = f'{fig_name}_SummaryStats_{grainularity_token}_by_time_bin_size'
+                        _summary_figsize = cls.summary_bar_figsize_for_fig_name(fig_name)
                         _out_extra_plot = PrePostDeltaDistributionComparison.plot_fig2_style_summary_multi_tbin_bars(
                             results_by_tbin,
                             time_bin_color_map=PrePostDeltaDistributionComparison.time_bin_size_discrete_color_map(ordered_tbins),
                             fignum=combined_basename, fig_file_name=combined_basename, save_figure=True, export_folder=figures_parent_folder,
                             title='Decoded $P_{Short}$',
                             active_context=IdentifyingContext(display_fn_name=combined_basename),
-                            defer_show=True, 
+                            defer_show=True, figsize=_summary_figsize,
                         )
                         _out_figs_dict_dict_dict['fig_summary'] = _out_extra_plot
                         print(f'\tFigure S3 multi-tbin summary: "{combined_basename}" saved_paths={_out_extra_plot.get("saved_paths")}')
@@ -6713,15 +6770,15 @@ class FigureS8:
                                 if intermediates_folder is not None:
                                     save_folder = intermediates_folder
                             plot_kwargs = dict(fignum=combined_basename, fig_file_name=combined_basename, save_figure=True, export_folder=save_folder, separate_laps_pbes_figures=fig_separate_laps_pbes_figures,
-                                               active_context=IdentifyingContext(display_fn_name=combined_basename))
+                                               active_context=IdentifyingContext(display_fn_name=combined_basename),
+                                               figsize=cls.summary_bar_figsize_for_fig_name(fig_name),
+                                               show_animal_legend=(fig_name != 'Figure 4'), **cls.SUMMARY_BAR_STYLE)
                             if fig_separate_laps_pbes_figures:
                                 plot_kwargs['laps_fig_file_name'] = _subfn_summary_fig_file_name('Laps', group_name)
                                 plot_kwargs['pbe_fig_file_name'] = _subfn_summary_fig_file_name('PBEs', group_name)
                                 plot_kwargs['fignum'] = plot_kwargs['laps_fig_file_name'] if laps_key is not None else plot_kwargs['pbe_fig_file_name']
                             if group_name is not None:
                                 plot_kwargs['title'] = f'Decoded $P_{{Short}}$ | {group_name}'
-                            if fig_name == 'Figure S8':
-                                plot_kwargs.update(cls.SUMMARY_BAR_COMPACT_STYLE)
                             _out_extra_plot = PrePostDeltaDistributionComparison.plot_fig2_style_summary_four_bar(
                                 None if laps_key is None else pre_post_delta_stats_results_dict[laps_key],
                                 None if pbes_key is None else pre_post_delta_stats_results_dict[pbes_key],

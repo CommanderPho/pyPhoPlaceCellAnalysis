@@ -63,23 +63,13 @@ pio.templates["pho_poster_light"] = go.layout.Template(
 )
 
 
-# titles: 9, axes: 7, insets: 5
-# titles: 23px, axes: 9.2, insets: 6.7
-text_sizes_pts = {'titles': 9, 'axes': 7, 'insets': 5}
+# Final SVG/PDF type sizes in real-world points (Illustrator). Floor 6.75pt for ticks / body text.
+# Convert to Plotly CSS px via FigureS8.pub_pt_to_css_px (uses active PUB_FIG_SIZE / PUB_FIG_SIZE_INCHES), not screen DPI.
+# titles: 9, axes: 6.75, insets: 6.75
+text_sizes_pts = {'titles': 9.0, 'axes': 6.75, 'insets': 6.75}
 
-# def points_to_pixels(pts: float, dpi: float=300.0) -> float:
-#     """ 
-#     `Pixеls (px) = Points (pt) * (DPI / 72)`
-#     """
-#     return float(pts) * (float(dpi) / 72.0)
-
-# text_sizes_px = {'titles': 23, 'axes': 9.2, 'insets': 6.7} #2025-07-03 6pm - original sizes
-# text_sizes_px = {k:points_to_pixels(v) for k, v in text_sizes_pts.items()}
-# text_sizes_px = {'titles': 38, 'axes': 29, 'insets': 20}
-# text_sizes_px = {'titles': 38, 'axes': 29, 'insets': 20}
-
-
-#TODO 2025-07-03 19:00: - [ ] NEW
+# Legacy CSS-px table (pre stamp-aware conversion). Prefer text_sizes_pts + pub_pt_to_css_px for Figure 4/S3/S8/S9 exports.
+# text_sizes_px = {'titles': 17.25, 'axes': 9.33333333333333, 'insets': 6.7}  # produced ~4.58pt ticks on Fig4 5.3956in stamp
 text_sizes_px = {'titles': 17.25, 'axes': 9.33333333333333, 'insets': 6.7}
 
 
