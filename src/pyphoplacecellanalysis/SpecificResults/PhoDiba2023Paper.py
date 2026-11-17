@@ -1033,7 +1033,7 @@ class HierarchicalSessionInventory:
     @classmethod
     @function_attributes(short_name=None, tags=['matplotlib', 'table', 'figure', 'svg', 'output'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-11-10 03:30', related_items=[])
     def export_hierarchical_table(cls, df: pd.DataFrame,
-            output_stem="output/recording_table", save_image_extensions = [".svg"], width=8.0, row_height=0.25, fontsize=9, save_csv: bool = False, **kwargs):
+            output_stem="output/recording_table", save_image_extensions = [".svg"], width=6.25, row_height=0.25, fontsize=9, save_csv: bool = False, **kwargs):
         """Render contiguous animal/session groups as visually merged cells.
         Input: one row per animal × session × period.
 
@@ -1045,6 +1045,8 @@ class HierarchicalSessionInventory:
             animal | session |
             pre-delta  → Laps/PBEs → events/time bins |
             post-delta → Laps/PBEs → events/time bins
+
+        Figure size: default width 6.25" (publication column); height = (header + n_rows) * row_height.
 
         Usage:
             from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import HierarchicalSessionInventory
@@ -1065,6 +1067,7 @@ class HierarchicalSessionInventory:
 
         """
         periods = ["pre-delta", "post-delta"]
+        period_display_labels = {"pre-delta": r"pre-$\Delta$", "post-delta": r"post-$\Delta$"}
         metrics = ["lap_events", "lap_bins", "pbe_events", "pbe_bins"]
         keys = ["animal", "session"]
 
@@ -1136,9 +1139,10 @@ class HierarchicalSessionInventory:
         h1, h2, h3 = header_heights
         header_height = sum(header_heights)
         total_height = header_height + n
+        fig_height = total_height * row_height  # inches; scales with session rows
 
         fig, ax = plt.subplots(
-            figsize=(width, total_height * row_height),
+            figsize=(width, fig_height),
             facecolor="white",
         )
         fig.subplots_adjust(left=0.01, right=0.99, top=0.99, bottom=0.01)
@@ -1189,11 +1193,11 @@ class HierarchicalSessionInventory:
             first = 2 + p * 4
             last = first + 4
 
-            # Tier 1: pre-delta / post-delta.
+            # Tier 1: pre-Δ / post-Δ (mathtext).
             text(
                 (edges[first] + edges[last]) / 2,
                 h1 / 2,
-                period,
+                period_display_labels.get(period, period),
                 bold=True,
             )
             rule(h1, edges[first] + 0.08, edges[last] - 0.08)
@@ -1298,9 +1302,12 @@ class HierarchicalSessionInventory:
             
             for extension in save_image_extensions:
                 save_path = stem.with_suffix(extension)
-                fig.savefig(save_path, dpi=600, bbox_inches="tight", pad_inches=0.04, facecolor="white")
+                # Keep exact figsize (default 6.25" × auto height); avoid bbox_inches='tight' resizing the SVG.
+                fig.savefig(save_path, dpi=600, bbox_inches=None, pad_inches=0, facecolor="white")
                 print(f'saved to "{save_path.as_posix()}"')
                 _out_files.append(save_path)
+            ## END for extension in save_image_extensions...
+
 
             if save_csv:
                 # Preserve the hierarchical column headers in the CSV.
