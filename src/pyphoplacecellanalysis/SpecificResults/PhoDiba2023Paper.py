@@ -4462,6 +4462,13 @@ class PrePostDeltaDistributionComparison:
         dpi = kwargs.pop('dpi', 220)
         laps_fig_file_name: Optional[str] = kwargs.pop('laps_fig_file_name', None)
         pbe_fig_file_name: Optional[str] = kwargs.pop('pbe_fig_file_name', None)
+        # Optional per-panel title overrides (Figure 4a: title='Laps short-bias', metric_name='', title_subtitle='')
+        laps_panel_title: Optional[str] = kwargs.pop('laps_panel_title', None)
+        laps_panel_metric_name: Optional[str] = kwargs.pop('laps_panel_metric_name', None)
+        laps_panel_title_subtitle: Optional[str] = kwargs.pop('laps_panel_title_subtitle', None)
+        pbe_panel_title: Optional[str] = kwargs.pop('pbe_panel_title', None)
+        pbe_panel_metric_name: Optional[str] = kwargs.pop('pbe_panel_metric_name', None)
+        pbe_panel_title_subtitle: Optional[str] = kwargs.pop('pbe_panel_title_subtitle', None)
         fig2_bar_style = PhoPublicationFigureHelper.get_figure2_bar_style(prepare_for_publication=prepare_for_publication, **{'figure.dpi': str(dpi), 'figure.frameon': False})
         # Fixed figsize inches (FigureS8.SUMMARY_BAR_FIGSIZE_PRESETS) preferred; figsize_scale is legacy fallback only.
         _summary_figsize = kwargs.pop('figsize', None)
@@ -4529,7 +4536,8 @@ class PrePostDeltaDistributionComparison:
 
         def _plot_one_panel(group_label: str, summary_df: pd.DataFrame, p_value: Optional[float],
                             panel_fig_name: str, panel_fignum, panel_fig_file_name: str, collector,
-                            panel_extra_series: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
+                            panel_extra_series: Optional[List[Dict[str, Any]]] = None,
+                            panel_title: Optional[str] = None, panel_metric_name: Optional[str] = None, panel_title_subtitle: Optional[str] = None) -> Dict[str, Any]:
             """One 2-bar (or multi-split) pre/post panel for the separate-figures path."""
             panel_extra_series = list(panel_extra_series or [])
             n_panel_extra: int = len(panel_extra_series)
@@ -4583,11 +4591,14 @@ class PrePostDeltaDistributionComparison:
                 pair_specs = [(0, 1, 'gray', 0.3)]
                 all_sig_x = (0.0, 1.0)
                 panel_sig_brackets.append((0.0, 1.0, p_value, 'k'))
+            active_panel_title: str = title if (panel_title is None) else str(panel_title)
+            active_panel_metric_name: str = 'Session Means' if (panel_metric_name is None) else str(panel_metric_name)
+            active_panel_title_subtitle: str = f'for {group_label}' if (panel_title_subtitle is None) else str(panel_title_subtitle)
             render = PaperFigureTwo.create_plot(
-                panel_x_labels, panel_y, panel_scatter, ylabel, title, panel_fig_name, active_context, True,
+                panel_x_labels, panel_y, panel_scatter, ylabel, active_panel_title, panel_fig_name, active_context, True,
                 prepare_for_publication=prepare_for_publication,
-                publication_group_labels=(group_label,), metric_name='Session Means',
-                title_subtitle=f'for {group_label}', xlabel='',
+                publication_group_labels=(group_label,), metric_name=active_panel_metric_name,
+                title_subtitle=active_panel_title_subtitle, xlabel='',
                 **{**_summary_title_kwargs, **panel_kwargs},
             )
             collector.post_hoc_append(figs=[render.fig], axes=render.axes, contexts=[render.context])
@@ -4609,7 +4620,10 @@ class PrePostDeltaDistributionComparison:
                 if bracket_p is None:
                     continue
                 bracket_y = y_max if bi == 0 else (y_max + (0.10 * bi * max(abs(y_max), 1e-12)))
-                add_significance_bars(ax, bracket_p, x1=x1, x2=x2, y=bracket_y, color=bracket_color)
+                # _signifiance_bar_offset_kwargs = dict(y_offset_frac=0.04, text_additional_y_offset=0.002)
+                _signifiance_bar_offset_kwargs = dict(y_offset_frac=-0.02, text_additional_y_offset=0.000)
+                # _signifiance_bar_offset_kwargs = dict()
+                add_significance_bars(ax, bracket_p, x1=x1, x2=x2, y=bracket_y, color=bracket_color, **_signifiance_bar_offset_kwargs)
             ## END for bi, (x1, x2, bracket_p, bracket_color) in enumerate(panel_sig_brackets)...
             animal_legend = None
             if show_animal_legend and has_animal and marker_mapping:
@@ -4671,8 +4685,9 @@ class PrePostDeltaDistributionComparison:
             collector = None
             with fig2_bar_style.rc_context():
                 with FigureCollector(name='fig4_summary_four_bar', base_context=active_context) as collector:
+                    _single_title_kw = dict(panel_title=pbe_panel_title, panel_metric_name=pbe_panel_metric_name, panel_title_subtitle=pbe_panel_title_subtitle) if single_is_pbe else dict(panel_title=laps_panel_title, panel_metric_name=laps_panel_metric_name, panel_title_subtitle=laps_panel_title_subtitle)
                     single_panel = _plot_one_panel(single_label, single_summary, single_p, f'fig4_summary_{single_suffix}_bars', single_fignum, single_fig_file_name, collector,
-                                                   panel_extra_series=(extra_pbe_series if (single_is_pbe and has_pbe_extras) else None))
+                                                   panel_extra_series=(extra_pbe_series if (single_is_pbe and has_pbe_extras) else None), **_single_title_kw)
                     if not defer_show:
                         plt.show()
             return dict(
@@ -4714,9 +4729,11 @@ class PrePostDeltaDistributionComparison:
             pbe_fignum = None if fignum is None else pbe_fig_file_name
             with fig2_bar_style.rc_context():
                 with FigureCollector(name='fig4_summary_four_bar', base_context=active_context) as collector:
-                    laps_panel = _plot_one_panel(group_labels[0], laps_session_summary, laps_p_value, 'fig4_summary_laps_bars', laps_fignum, laps_fig_file_name, collector)
+                    laps_panel = _plot_one_panel(group_labels[0], laps_session_summary, laps_p_value, 'fig4_summary_laps_bars', laps_fignum, laps_fig_file_name, collector,
+                                                 panel_title=laps_panel_title, panel_metric_name=laps_panel_metric_name, panel_title_subtitle=laps_panel_title_subtitle)
                     pbe_panel = _plot_one_panel(group_labels[1], pbe_session_summary, pbe_p_value, 'fig4_summary_pbe_bars', pbe_fignum, pbe_fig_file_name, collector,
-                                                panel_extra_series=extra_pbe_series if has_pbe_extras else None)
+                                                panel_extra_series=extra_pbe_series if has_pbe_extras else None,
+                                                panel_title=pbe_panel_title, panel_metric_name=pbe_panel_metric_name, panel_title_subtitle=pbe_panel_title_subtitle)
                     if not defer_show:
                         plt.show()
             combined_saved_paths = list(laps_panel['saved_paths'] or []) + list(pbe_panel['saved_paths'] or [])
@@ -5920,6 +5937,7 @@ class FigureS8:
                                                     should_export_initially_filtered: bool = False, should_export_iteratively_constrainted: bool = True, should_overlay_heuristic_filter: bool = False, overlay_filter_predicate_key: Optional[str] = None, split_by_column: Optional[str] = None,
                                                     should_compute_stats: bool = False, enable_add_stats_to_figures: bool = False, stats_class_kwargs: Optional[Dict] = None, stats_run_kwargs: Optional[Dict] = None,
                                                     store_debug_values: bool = False, color_by_time_bin_size: bool = False, legend_groups_to_hide: Optional[List] = None, show_scatter_legend: Optional[bool] = None,
+                                                    scatter_title_style: str = 'default',
         ):
         """Plot the constrained pre/post-delta scatter. Also does stats when `should_compute_stats == True`
 
@@ -5933,6 +5951,8 @@ class FigureS8:
         Overlay: grey background = full constrained df; green foreground = rows passing `overlay_filter_predicate_key`
         (looked up in `additional_filter_predicates`). `should_overlay_heuristic_filter=True` is a compat shim for
         `overlay_filter_predicate_key='is_heuristic_passing'`.
+
+        `scatter_title_style`: ``'default'`` → long center title; ``'short_bias_two_line'`` → Plotly ``{Laps|PBEs}<br>Short-bias`` (Figure 4).
         """
         if (overlay_filter_predicate_key is None) and should_overlay_heuristic_filter:
             overlay_filter_predicate_key = 'is_heuristic_passing'
@@ -5942,7 +5962,11 @@ class FigureS8:
 
         predicates = {k: additional_filter_predicates[k] for k in constraint_keys}
         plot_kind: str = 'PBEs' if ('PBEs' in export_suffix) else 'Laps'
-        main_title: str = f"Short-track Decoded Likelihood during {plot_kind}{title_suffix}" # keep the center subplot title short so it does not collide with Pre-Δ / Post-Δ
+        if str(scatter_title_style) == 'short_bias_two_line':
+            # Figure 4: two-line center subplot title (Plotly annotation HTML)
+            main_title: str = f"{plot_kind}<br>Short-bias{title_suffix}"
+        else:
+            main_title = f"Short-track Decoded Likelihood during {plot_kind}{title_suffix}"  # keep short enough to avoid Pre-Δ / Post-Δ collision
         should_compute_or_annotate_stats: bool = bool(should_compute_stats or enable_add_stats_to_figures)
         if stats_class_kwargs is None:
             stats_class_kwargs = {}
@@ -6158,7 +6182,7 @@ class FigureS8:
     def main(cls, df_filter, plotly_helpers: PlotlyHelpers, additional_filter_predicates: Dict, figures_parent_folder: Path, active_filter_constraints: Optional[Dict]=None, should_concatenate_figures: bool=False, enable_heuristic_filtered_outputs: bool = False, split_by_column: Optional[str] = None,
             should_compute_stats: bool = True, enable_add_stats_to_figures: bool = False, debug_print: bool = False, store_debug_values: bool = False,
             color_by_time_bin_size: bool = False, enabled_granularities: Optional[Sequence[str]] = None, enabled_epoch_kinds: Optional[Sequence[str]] = None, overlay_filter_panels: Optional[Sequence[Tuple[str, str]]] = None, legend_groups_to_hide: Optional[List] = None, show_scatter_legend: Optional[bool] = None,
-            enable_main_figures: bool = True, pub_fig_size_key: str = 'reduced_width',
+            enable_main_figures: bool = True, pub_fig_size_key: str = 'reduced_width', scatter_title_style: Optional[str] = None,
         ):
         """ Performs the main plotting and adds optional stats
 
@@ -6172,6 +6196,8 @@ class FigureS8:
             When unset, `enable_heuristic_filtered_outputs=True` still does a single `is_heuristic_passing` overlay.
             `enable_main_figures=False`: skip Plotly scatter build/SVG export (stats still run for summary figs).
             `pub_fig_size_key`: ``'reduced_width'``/``'fig4'`` (5.3956×2.18 in) or ``'full_width'``/``'s8'``/``'s9'`` (6.4377×2.5227 in).
+            `scatter_title_style`: ``None`` → ``'short_bias_two_line'`` for reduced_width (Figure 4), else ``'default'``.
+            Pass ``'short_bias_two_line'`` for ``{Laps|PBEs}<br>Short-bias`` center titles.
 
 
             from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import FigureS8
@@ -6223,6 +6249,9 @@ class FigureS8:
         _resolved_size_key: str = cls.set_pub_fig_size(pub_fig_size_key)
         print(f'pub_fig_size_key: {_resolved_size_key}, PUB_FIG_SIZE: {cls.PUB_FIG_SIZE}, PUB_FIG_SIZE_INCHES: {cls.PUB_FIG_SIZE_INCHES}')
         # PUB_FIG_SIZE = dict() ## NO OVERRIDES
+        # Figure 4 (reduced_width): two-line "{Laps|PBEs}<br>Short-bias"; S3/S8/S9 keep the long default title.
+        _scatter_title_style: str = scatter_title_style if (scatter_title_style is not None) else ('short_bias_two_line' if (_resolved_size_key == 'reduced_width') else 'default')
+        print(f'scatter_title_style: {_scatter_title_style}')
 
         cls._pub_font = dict(family="Arial", color="black")
 
@@ -6407,6 +6436,7 @@ class FigureS8:
                                                                                                                     color_by_time_bin_size=color_by_time_bin_size,
                                                                                                                     legend_groups_to_hide=legend_groups_to_hide,
                                                                                                                     show_scatter_legend=show_scatter_legend,
+                                                                                                                    scatter_title_style=_scatter_title_style,
                                                                                                                 )
                     if store_debug_values:
                         _out_debug_values['plot_data'][active_key] = a_stage_debug_dict
@@ -6598,6 +6628,13 @@ class FigureS8:
                 fig_overlay_filter_panels = fig_config_dict.get('overlay_filter_panels', None)
                 fig_enabled_epoch_kinds = fig_config_dict.get('enabled_epoch_kinds', None)
                 fig_enable_main_figures: bool = bool(fig_config_dict.pop('enable_main_figures', enable_main_figures))
+                # Summary-bar title overrides (Figure 4a/b) — pop before **fig_config_dict → main()
+                _summary_panel_title_keys = ('laps_panel_title', 'laps_panel_metric_name', 'laps_panel_title_subtitle', 'pbe_panel_title', 'pbe_panel_metric_name', 'pbe_panel_title_subtitle')
+                fig_summary_bar_kwargs: Dict[str, Any] = dict(fig_config_dict.pop('summary_bar_kwargs', None) or {})
+                for _k in _summary_panel_title_keys:
+                    if _k in fig_config_dict:
+                        fig_summary_bar_kwargs[_k] = fig_config_dict.pop(_k)
+                ## END for _k in _summary_panel_title_keys...
                 # full_width: S3/S8/S9 (separate combined summary); reduced_width: Figure 4 (summary side-by-side).
                 fig_pub_fig_size_key: str = cls.resolve_pub_fig_size_key(fig_config_dict.pop('pub_fig_size_key', None), fig_name=fig_name)
                 fig_include_laps: bool = (fig_enabled_epoch_kinds is None) or ('Laps' in fig_enabled_epoch_kinds)
@@ -6777,6 +6814,17 @@ class FigureS8:
                                 plot_kwargs['laps_fig_file_name'] = _subfn_summary_fig_file_name('Laps', group_name)
                                 plot_kwargs['pbe_fig_file_name'] = _subfn_summary_fig_file_name('PBEs', group_name)
                                 plot_kwargs['fignum'] = plot_kwargs['laps_fig_file_name'] if laps_key is not None else plot_kwargs['pbe_fig_file_name']
+                            # Notebook / figures_config_dict panel-title overrides → plot_fig2_style_summary_four_bar
+                            if fig_summary_bar_kwargs:
+                                plot_kwargs.update(fig_summary_bar_kwargs)
+                            elif fig_name == 'Figure 4':
+                                # Default Fig 4a/b titles when config omits them
+                                plot_kwargs.setdefault('laps_panel_title', 'Laps short-bias')
+                                plot_kwargs.setdefault('laps_panel_metric_name', '')
+                                plot_kwargs.setdefault('laps_panel_title_subtitle', '')
+                                plot_kwargs.setdefault('pbe_panel_title', 'PBEs short-bias')
+                                plot_kwargs.setdefault('pbe_panel_metric_name', '')
+                                plot_kwargs.setdefault('pbe_panel_title_subtitle', '')
                             if group_name is not None:
                                 plot_kwargs['title'] = f'Decoded $P_{{Short}}$ | {group_name}'
                             _out_extra_plot = PrePostDeltaDistributionComparison.plot_fig2_style_summary_four_bar(
@@ -9329,6 +9377,9 @@ def add_significance_bars(ax, p_value, x1, x2, y, significance_level:float=0.05,
     When `y_offset` / `text_additional_y_offset` are None, they scale with |y|
     (`y_offset_frac * |y|` and `0.02 * |y|`) so participation (0–1) and Hz modes both get proportional headroom.
 
+    `y_offset_frac` — height of the bracket above the tallest point (main gap)
+    `text_additional_y_offset` — extra lift of the *** above the bracket line
+
 
     Usage:
 
@@ -9344,7 +9395,7 @@ def add_significance_bars(ax, p_value, x1, x2, y, significance_level:float=0.05,
     if y_offset is None:
         y_offset = y_offset_frac * y_scale
     if text_additional_y_offset is None:
-        text_additional_y_offset = 0.02 * y_scale
+        text_additional_y_offset = 0.005 * y_scale #TODO 2026-11-17 19:33: - [ ] This has no effect on the '***' locations
     _out_ann = {}
     _out_ann['bar'] = ax.plot([x1, x1, x2, x2], [y, (y + y_offset), (y + y_offset), y], color=color)
     
@@ -9364,7 +9415,7 @@ def add_significance_bars(ax, p_value, x1, x2, y, significance_level:float=0.05,
 
     # create_plot may have pinned ylim before overlays; expand top so the bracket/label are not clipped (keep floor at 0)
     _ymin, _ymax = ax.get_ylim()
-    ax.set_ylim(0.0, max(float(_ymax), label_y * 1.08))
+    ax.set_ylim(0.0, max(float(_ymax), (label_y * 1.08)))
 
     return _out_ann
 
@@ -9714,6 +9765,8 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
         epochs_bit = f"<weight:bold>{epochs_name}</>" if bold_epochs_name else f"{epochs_name}"
         metric_suffix: str = f"{_nbsp}{metric_name}" if (metric_name is not None and str(metric_name).strip()) else ""
         title_span: str = f"<size:{title_font_size}>{epochs_bit}{metric_suffix}</>"
+        if (subtitle is None) or (not str(subtitle).strip()):
+            return title_span
         subtitle_span: str = f"<size:{subtitle_font_size}>{subtitle}</>"
         if single_line_title:
             return f"{title_span}{_nbsp}{subtitle_span}"
@@ -10190,13 +10243,16 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
                 max_PBEs_y: float = float(np.nanmax(np.concatenate([v.values for v in self.computation_result.Fig2_Replay_FR])))
 
                 # Add significance bars between groups
+                # _signifiance_bar_offset_kwargs = dict(y_offset_frac=0.04, text_additional_y_offset=0.002)
+                _signifiance_bar_offset_kwargs = dict()
+
                 ax = _fig_2_theta_out.ax
-                _out_ann_AB = add_significance_bars(ax, LxC_Laps_T_result.pvalue, x1=0, x2=1, y=max_laps_y)
-                _out_ann_CD = add_significance_bars(ax, SxC_Laps_T_result.pvalue, x1=2, x2=3, y=max_laps_y)
+                _out_ann_AB = add_significance_bars(ax, LxC_Laps_T_result.pvalue, x1=0, x2=1, y=max_laps_y, **_signifiance_bar_offset_kwargs)
+                _out_ann_CD = add_significance_bars(ax, SxC_Laps_T_result.pvalue, x1=2, x2=3, y=max_laps_y, **_signifiance_bar_offset_kwargs)
 
                 ax = _fig_2_replay_out.ax
-                _out_ann_AB = add_significance_bars(ax, LxC_Replay_T_result.pvalue, x1=0, x2=1, y=max_PBEs_y)
-                _out_ann_CD = add_significance_bars(ax, SxC_Replay_T_result.pvalue, x1=2, x2=3, y=max_PBEs_y)
+                _out_ann_AB = add_significance_bars(ax, LxC_Replay_T_result.pvalue, x1=0, x2=1, y=max_PBEs_y, **_signifiance_bar_offset_kwargs)
+                _out_ann_CD = add_significance_bars(ax, SxC_Replay_T_result.pvalue, x1=2, x2=3, y=max_PBEs_y, **_signifiance_bar_offset_kwargs)
 
 
             if include_non_XdC_cells_as_inset:
