@@ -5634,6 +5634,16 @@ class FigureS8:
 
 
     @classmethod
+    def overlay_filter_title_suffix(cls, predicate_key: Optional[str]) -> str:
+        """Colored Plotly-HTML title suffix, e.g. `` (<span style="color:#1f77b4">spearman-Passing</span>)``."""
+        if predicate_key is None:
+            return ''
+        label: str = cls.filter_predicate_display_label(predicate_key)
+        color: str = cls.overlay_filter_passing_color(predicate_key)
+        return f' (<span style="color:{color}">{label}</span>)'
+
+
+    @classmethod
     def resolve_pub_fig_size_key(cls, pub_fig_size_key: Optional[str] = None, fig_name: Optional[str] = None) -> str:
         """Map config / figure name → ``'reduced_width'`` or ``'full_width'``.
 
@@ -6420,7 +6430,7 @@ class FigureS8:
                     panel_specs = [(None, None)]
 
                 for panel_id, overlay_filter_predicate_key in panel_specs:
-                    title_suffix: str = f' ({overlay_filter_predicate_key})' if (overlay_filter_predicate_key is not None) else ''
+                    title_suffix: str = cls.overlay_filter_title_suffix(overlay_filter_predicate_key)
                     active_key_parts = [a_grainularity, epoch_kind]
                     if panel_id is not None:
                         active_key_parts.append(str(panel_id))
