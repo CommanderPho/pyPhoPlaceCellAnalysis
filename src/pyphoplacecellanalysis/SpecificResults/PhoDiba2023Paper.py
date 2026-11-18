@@ -5952,7 +5952,7 @@ class FigureS8:
         (looked up in `additional_filter_predicates`). `should_overlay_heuristic_filter=True` is a compat shim for
         `overlay_filter_predicate_key='is_heuristic_passing'`.
 
-        `scatter_title_style`: ``'default'`` → long center title; ``'short_bias_two_line'`` → Plotly ``{Laps|PBEs}<br>$P_{Short}$`` (Figure 4).
+        `scatter_title_style`: ``'default'`` → ``Short-track Decoded Likelihood during {Laps|PBEs}`` (Figure 4 / S3 / S8 / S9).
         """
         if (overlay_filter_predicate_key is None) and should_overlay_heuristic_filter:
             overlay_filter_predicate_key = 'is_heuristic_passing'
@@ -5962,11 +5962,8 @@ class FigureS8:
 
         predicates = {k: additional_filter_predicates[k] for k in constraint_keys}
         plot_kind: str = 'PBEs' if ('PBEs' in export_suffix) else 'Laps'
-        if str(scatter_title_style) == 'short_bias_two_line':
-            # Figure 4: two-line center subplot title (Plotly MathJax / LaTeX)
-            main_title: str = f"{plot_kind}<br>$P_{{Short}}${title_suffix}"
-        else:
-            main_title = f"Short-track Decoded Likelihood during {plot_kind}{title_suffix}"  # keep short enough to avoid Pre-Δ / Post-Δ collision
+        # Hist-scatter-hist center title (summary-bar titles are separate: laps_panel_title / pbe_panel_title)
+        main_title: str = f"Short-track Decoded Likelihood during {plot_kind}{title_suffix}"  # keep short enough to avoid Pre-Δ / Post-Δ collision
         should_compute_or_annotate_stats: bool = bool(should_compute_stats or enable_add_stats_to_figures)
         if stats_class_kwargs is None:
             stats_class_kwargs = {}
@@ -6196,8 +6193,7 @@ class FigureS8:
             When unset, `enable_heuristic_filtered_outputs=True` still does a single `is_heuristic_passing` overlay.
             `enable_main_figures=False`: skip Plotly scatter build/SVG export (stats still run for summary figs).
             `pub_fig_size_key`: ``'reduced_width'``/``'fig4'`` (5.3956×2.18 in) or ``'full_width'``/``'s8'``/``'s9'`` (6.4377×2.5227 in).
-            `scatter_title_style`: ``None`` → ``'short_bias_two_line'`` for reduced_width (Figure 4), else ``'default'``.
-            Pass ``'short_bias_two_line'`` for ``{Laps|PBEs}<br>$P_{Short}$`` center titles.
+            `scatter_title_style`: kept for API compat; hist-scatter-hist titles always use the long ``Short-track Decoded Likelihood…`` form. Summary-bar titles use ``laps_panel_title`` / ``pbe_panel_title``.
 
 
             from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import FigureS8
@@ -6249,8 +6245,8 @@ class FigureS8:
         _resolved_size_key: str = cls.set_pub_fig_size(pub_fig_size_key)
         print(f'pub_fig_size_key: {_resolved_size_key}, PUB_FIG_SIZE: {cls.PUB_FIG_SIZE}, PUB_FIG_SIZE_INCHES: {cls.PUB_FIG_SIZE_INCHES}')
         # PUB_FIG_SIZE = dict() ## NO OVERRIDES
-        # Figure 4 (reduced_width): two-line "{Laps|PBEs}<br>$P_{Short}$"; S3/S8/S9 keep the long default title.
-        _scatter_title_style: str = scatter_title_style if (scatter_title_style is not None) else ('short_bias_two_line' if (_resolved_size_key == 'reduced_width') else 'default')
+        # Hist-scatter-hist always uses the long Short-track Decoded Likelihood title (Fig 4 summary bars use $P_{Short}$ separately).
+        _scatter_title_style: str = scatter_title_style if (scatter_title_style is not None) else 'default'
         print(f'scatter_title_style: {_scatter_title_style}')
 
         cls._pub_font = dict(family="Arial", color="black")
