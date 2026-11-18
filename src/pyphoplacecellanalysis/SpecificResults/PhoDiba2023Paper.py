@@ -9374,11 +9374,11 @@ def PAPER_FIGURE_figure_1_full(curr_active_pipeline, defer_show=False, save_figu
 def add_significance_bars(ax, p_value, x1, x2, y, significance_level:float=0.05, y_offset: Optional[float] = None, text_additional_y_offset: Optional[float] = None, ns_fontsize: float = 10, y_offset_frac: float = 0.08, color: str = 'black'):
     """Add significance bars to a boxplot.
 
-    When `y_offset` / `text_additional_y_offset` are None, they scale with |y|
-    (`y_offset_frac * |y|` and `0.02 * |y|`) so participation (0–1) and Hz modes both get proportional headroom.
+    When `y_offset` is None it scales with |y| via `y_offset_frac * |y|`.
+    When `text_additional_y_offset` is None it defaults to 0 (*** centered on the bracket via ``va='center'``).
 
-    `y_offset_frac` — height of the bracket above the tallest point (main gap)
-    `text_additional_y_offset` — extra lift of the *** above the bracket line
+    `y_offset_frac` — height of the bracket above the tallest point (moves bracket + stars together)
+    `text_additional_y_offset` — data-unit nudge of *** relative to the bracket line (positive = above)
 
 
     Usage:
@@ -9394,6 +9394,7 @@ def add_significance_bars(ax, p_value, x1, x2, y, significance_level:float=0.05,
     y_scale: float = max(abs(float(y)), 1e-12)
     if y_offset is None:
         y_offset = y_offset_frac * y_scale
+    # Default 0: place label on the bracket line. `va='center'` makes *** overlap the bar; nudge with text_additional_y_offset in data units.
     if text_additional_y_offset is None:
         text_additional_y_offset = 0.005 * y_scale #TODO 2026-11-17 19:33: - [ ] This has no effect on the '***' locations
     _out_ann = {}
@@ -9408,10 +9409,11 @@ def add_significance_bars(ax, p_value, x1, x2, y, significance_level:float=0.05,
     if p_value < significance_level / 100:
         sig_astrisks_str += '*'
     ## OUTPUT:
+    # Bracket top is (y + y_offset). va='center' pins glyph center on that line so *** overlaps the bar (baseline va floated them above).
     label_y: float = float(y + y_offset + text_additional_y_offset)
     if sig_astrisks_str:
         label_fontsize = ns_fontsize if (sig_astrisks_str == 'N.S.') else 16
-        _out_ann['label'] = ax.text(((x1 + x2) / 2), label_y, sig_astrisks_str, fontsize=label_fontsize, ha='center', color=color)
+        _out_ann['label'] = ax.text(((x1 + x2) / 2), label_y, sig_astrisks_str, fontsize=label_fontsize, ha='center', va='center', color=color)
 
     # create_plot may have pinned ylim before overlays; expand top so the bracket/label are not clipped (keep floor at 0)
     _ymin, _ymax = ax.get_ylim()
