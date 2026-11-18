@@ -5563,12 +5563,12 @@ class FigureS8:
 
     Sizes:
         Layout width (not figure-name identity) picks the preset:
-          - reduced_width (Fig 4; summary bars side-by-side with each scatter): 5.3956 x 2.18 in, CSS 792 x 320
-          - full_width (Fig S3 / S8 / S9; separate combined summary figure): 6.4377 x 2.5227 in, CSS 945 x 370
+          - reduced_width (Fig 4 / S9; summary bars side-by-side with each scatter): 5.3956 x 2.18 in, CSS 792 x 320
+          - full_width (Fig S3 / S8; separate combined summary figure): 6.4377 x 2.5227 in, CSS 945 x 370
         Kaleido writes unitless px; `_save_publication_figs` stamps PUB_FIG_SIZE_INCHES onto the SVG.
         Type sizes are authored in real-world pt (`text_sizes_pts`); `_post_hoc_format_figure` converts via `pub_pt_to_css_px`
         using the active canvas width so Illustrator reads the intended pt after the inch stamp.
-        Select via `pub_fig_size_key` on `main` / `figures_config_dict` (`'reduced_width'` / `'full_width'`; aliases `'fig4'` / `'s8'`/`'s9'`).
+        Select via `pub_fig_size_key` on `main` / `figures_config_dict` (`'reduced_width'` / `'full_width'`; aliases `'fig4'`/`'s9'` / `'s8'`).
 
         layer_names = ['kdiba_4_figure4_summary_four_bar-Laps.vectorcraft', 'ScatterOverTime_Laps_perTimeBin.svg', 'ScatterOverTime_PBEs_perTimeBin.svg', 'kdiba_4_figure4_summary_four_bar-PBEs.vectorcraft']
 
@@ -5577,12 +5577,12 @@ class FigureS8:
     plotly_helpers: PlotlyHelpers = None
     # Presets keyed by layout width: inches for Illustrator page; css_px for Plotly layout (same aspect).
     PUB_FIG_SIZE_PRESETS: ClassVar[Dict[str, Dict[str, Dict[str, float]]]] = {
-        'reduced_width': {'inches': dict(width=5.3956, height=2.18), 'css_px': dict(width=792, height=320)},  # Figure 4
-        'full_width': {'inches': dict(width=6.4377, height=2.5227), 'css_px': dict(width=945, height=370)},  # Figure S3 / S8 / S9
+        'reduced_width': {'inches': dict(width=5.3956, height=2.18), 'css_px': dict(width=792, height=320)},  # Figure 4 / S9
+        'full_width': {'inches': dict(width=6.4377, height=2.5227), 'css_px': dict(width=945, height=370)},  # Figure S3 / S8
     }
     # Aliases kept for older call sites / configs
-    _PUB_FIG_SIZE_KEY_ALIASES: ClassVar[Dict[str, str]] = {'fig4': 'reduced_width', 's8': 'full_width', 's9': 'full_width'}
-    FULL_WIDTH_FIGURE_NAMES: ClassVar[Tuple[str, ...]] = ('Figure S3', 'Figure S8', 'Figure S9')
+    _PUB_FIG_SIZE_KEY_ALIASES: ClassVar[Dict[str, str]] = {'fig4': 'reduced_width', 's9': 'reduced_width', 's8': 'full_width'}
+    FULL_WIDTH_FIGURE_NAMES: ClassVar[Tuple[str, ...]] = ('Figure S3', 'Figure S8')
     PUB_FIG_SIZE_INCHES: Dict = dict(width=5.3956, height=2.18)  # active final SVG/PDF page size (default reduced_width)
     PUB_FIG_SIZE: Dict = dict(width=792, height=320)  # active Plotly CSS px (default reduced_width)
     figures_parent_folder: Path = None
@@ -5601,8 +5601,8 @@ class FigureS8:
     }
     # Fixed summary-bar page sizes (matplotlib figsize inches) — same reduced/full layout rule as scatter presets.
     SUMMARY_BAR_FIGSIZE_PRESETS: ClassVar[Dict[str, Tuple[float, float]]] = {
-        'reduced_width': (1.35, 2.18),  # Figure 4
-        'full_width': (3.843, 2.9482),  # Figure S3 / S8 / S9
+        'reduced_width': (1.35, 2.18),  # Figure 4 / S9
+        'full_width': (3.843, 2.9482),  # Figure S3 / S8
     }
     # Optional scatter/legend tweaks passed into plot_fig2_style_summary_four_bar (figsize comes from SUMMARY_BAR_FIGSIZE_PRESETS).
     SUMMARY_BAR_STYLE: Dict[str, Any] = dict(
@@ -5647,8 +5647,8 @@ class FigureS8:
     def resolve_pub_fig_size_key(cls, pub_fig_size_key: Optional[str] = None, fig_name: Optional[str] = None) -> str:
         """Map config / figure name → ``'reduced_width'`` or ``'full_width'``.
 
-        Full-width figures (separate combined summary): Figure S3, S8, S9.
-        Reduced-width (summary side-by-side with each scatter): Figure 4.
+        Full-width figures (separate combined summary): Figure S3, S8.
+        Reduced-width (summary side-by-side with each scatter): Figure 4, S9.
         """
         if pub_fig_size_key is not None:
             key: str = str(pub_fig_size_key)
@@ -6216,7 +6216,7 @@ class FigureS8:
             Each panel uses grey-background overlay style with the named `additional_filter_predicates` key.
             When unset, `enable_heuristic_filtered_outputs=True` still does a single `is_heuristic_passing` overlay.
             `enable_main_figures=False`: skip Plotly scatter build/SVG export (stats still run for summary figs).
-            `pub_fig_size_key`: ``'reduced_width'``/``'fig4'`` (5.3956×2.18 in) or ``'full_width'``/``'s8'``/``'s9'`` (6.4377×2.5227 in).
+            `pub_fig_size_key`: ``'reduced_width'``/``'fig4'``/``'s9'`` (5.3956×2.18 in) or ``'full_width'``/``'s8'`` (6.4377×2.5227 in).
             `scatter_title_style`: kept for API compat; hist-scatter-hist titles always use the long ``Short-track Decoded Likelihood…`` form. Summary-bar titles use ``laps_panel_title`` / ``pbe_panel_title``.
 
 
@@ -6629,6 +6629,7 @@ class FigureS8:
                     'enable_heuristic_filtered_outputs': True, 'split_by_column': 'animal',
                     'enabled_granularities': ('_perTimeBin',),
                     'enabled_epoch_kinds': ('PBEs',),
+                    'pub_fig_size_key': 'reduced_width',  # compact; summary stats side-by-side
                 },
             }
         _figures_config_dict = deepcopy(figures_config_dict)
@@ -6655,7 +6656,7 @@ class FigureS8:
                     if _k in fig_config_dict:
                         fig_summary_bar_kwargs[_k] = fig_config_dict.pop(_k)
                 ## END for _k in _summary_panel_title_keys...
-                # full_width: S3/S8/S9 (separate combined summary); reduced_width: Figure 4 (summary side-by-side).
+                # full_width: S3/S8 (separate combined summary); reduced_width: Figure 4 / S9 (summary side-by-side).
                 fig_pub_fig_size_key: str = cls.resolve_pub_fig_size_key(fig_config_dict.pop('pub_fig_size_key', None), fig_name=fig_name)
                 fig_include_laps: bool = (fig_enabled_epoch_kinds is None) or ('Laps' in fig_enabled_epoch_kinds)
                 fig_include_pbes: bool = (fig_enabled_epoch_kinds is None) or ('PBEs' in fig_enabled_epoch_kinds)
@@ -14986,3 +14987,268 @@ class Figure2Extended:
 
         # ## False: not 'is_clear_LONG', True: 'is_clear_LONG'
         # {'LdCs': {False: ..., True: ...}, 'SdCs': {False: ..., True: ...}, 'non_LdCs': {False: ..., True: ...}}
+
+
+# ==================================================================================================================================================================================================================================================================================== #
+# 2026-11-18 - figS2 Map-Based Context Decoder Walkthrough (Pseudo2D → track_identity marginal)                                                                                                                        #
+# ==================================================================================================================================================================================================================================================================================== #
+
+
+def _walkthru_extract_p_x_given_n(pseudo2D_posterior, context_names=None):
+    """Normalize SingleEpochDecodedResult or NDArray into (n_x, n_contexts, n_t) + context_names."""
+    from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import SingleEpochDecodedResult
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalPseudo2DDecodersResult
+
+    if isinstance(pseudo2D_posterior, SingleEpochDecodedResult):
+        p_x_given_n = np.asarray(pseudo2D_posterior.p_x_given_n, dtype=float)
+    else:
+        p_x_given_n = np.asarray(pseudo2D_posterior, dtype=float)
+
+    if p_x_given_n.ndim == 4:
+        # (n_x, n_y, n_contexts, n_t) → sum over spatial y so left panel stays 1D position × context
+        p_x_given_n = np.nansum(p_x_given_n, axis=1)
+    ## END if p_x_given_n.ndim == 4...
+
+    assert p_x_given_n.ndim == 3, f"expected (n_x, n_contexts, n_t), got shape={p_x_given_n.shape}"
+    n_contexts: int = int(p_x_given_n.shape[1])
+    resolved_context_names: List[str] = DirectionalPseudo2DDecodersResult._resolve_context_names(p_x_given_n, n_contexts, context_names=context_names)
+    return p_x_given_n, resolved_context_names
+
+
+def _walkthru_build_long_short_display_posterior(p_x_given_n, context_names):
+    """Collapse directional contexts to Long/Short position posteriors and track-identity marginals.
+
+    Returns
+    -------
+    display_p_x_given_n : (n_x, 2, n_t) Long then Short position posteriors
+    row_sums : (2, n_t) unnormalized ∑_x mass per track per time bin
+    track_identity_marginal : (2, n_t) row_sums renormalized across Long/Short per time bin
+    """
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalPseudo2DDecodersResult
+
+    n_x, n_contexts, n_t = p_x_given_n.shape
+    track_identity_group_indices = DirectionalPseudo2DDecodersResult._infer_track_identity_group_indices(list(context_names), n_contexts)
+    assert track_identity_group_indices is not None, f"Cannot infer Long/Short groups from context_names={context_names} (n_contexts={n_contexts})"
+    long_idxs, short_idxs = track_identity_group_indices
+
+    # Sum LR+RL (or whatever is in each track group) in position space → (n_x, 2, n_t)
+    display_p_x_given_n = np.stack([
+        np.nansum(p_x_given_n[:, long_idxs, :], axis=1),
+        np.nansum(p_x_given_n[:, short_idxs, :], axis=1),
+    ], axis=1)
+
+    row_sums = np.nansum(display_p_x_given_n, axis=0)  # (2, n_t)
+    track_identity_marginal = DirectionalPseudo2DDecodersResult._normalize_per_timebin_context_marginal(row_sums)
+    return display_p_x_given_n, row_sums, track_identity_marginal
+
+
+@function_attributes(short_name='plot_map_based_context_decoder_walkthru', tags=['figure', 'figS2', 'pseudo2D', 'marginal', 'walkthru', 'pdf', 'publication'], input_requires=[], output_provides=[], uses=['DirectionalPseudo2DDecodersResult', 'LongShortDisplayConfigManager'], used_by=[], creation_date='2026-11-18 09:20', related_items=['figS2_Map-BasedContextDecoderWalkthru.pdf'])
+def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArray], save_path: Union[str, Path], context_names: Optional[List[str]] = None, max_time_bins: Optional[int] = None, cmap: str = 'viridis', show_epoch_sum: bool = True, title: Optional[str] = None, also_save_png: bool = True, figsize: Optional[Tuple[float, float]] = None) -> Tuple[Any, Dict[str, Any]]:
+    """Reproduce the figS2 Map-Based Context Decoder walkthrough PDF for one epoch Pseudo2D posterior.
+
+    Left: raw Long/Short position heatmaps per time bin (directional contexts collapsed when n_contexts==4).
+    Mid: row ∑ over position, then + across Long/Short.
+    Right: track_identity marginal (2 × T), with a grey trapezoid callout from the mid column.
+
+    Parameters
+    ----------
+    pseudo2D_posterior : SingleEpochDecodedResult or NDArray
+        Shape (n_x, n_contexts, n_t) or (n_x, n_y, n_contexts, n_t).
+    save_path : path-like
+        Output PDF path (parent dirs created as needed).
+    max_time_bins : optional
+        If set, only the first `max_time_bins` time bins are drawn (for readability on long epochs).
+
+    Returns
+    -------
+    fig, extras
+        extras includes display_p_x_given_n, row_sums, track_identity_marginal, save_path, png_path.
+    """
+    from matplotlib.gridspec import GridSpec, GridSpecFromSubplotSpec
+    from matplotlib.patches import Polygon
+    from matplotlib.colors import Normalize
+    from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import long_short_display_config_manager
+
+    save_path = Path(save_path).resolve()
+    save_path.parent.mkdir(parents=True, exist_ok=True)
+
+    p_x_given_n, resolved_context_names = _walkthru_extract_p_x_given_n(pseudo2D_posterior, context_names=context_names)
+    display_p_x_given_n, row_sums, track_identity_marginal = _walkthru_build_long_short_display_posterior(p_x_given_n, resolved_context_names)
+
+    n_x, n_tracks, n_t_full = display_p_x_given_n.shape
+    assert n_tracks == 2
+    if max_time_bins is not None and n_t_full > int(max_time_bins):
+        n_t = int(max_time_bins)
+        display_p_x_given_n = display_p_x_given_n[:, :, :n_t]
+        row_sums = row_sums[:, :n_t]
+        track_identity_marginal = track_identity_marginal[:, :n_t]
+    else:
+        n_t = n_t_full
+    ## END if max_time_bins is not None...
+
+    epoch_sum = np.nansum(track_identity_marginal, axis=1)
+    epoch_sum = epoch_sum / np.nansum(epoch_sum) if np.nansum(epoch_sum) > 0 else epoch_sum
+
+    long_color = '#0099ff'
+    short_color = '#f51616'
+    try:
+        long_color = long_short_display_config_manager.long_epoch_config.as_matplotlib_kwargs().get('facecolor', long_color)
+        short_color = long_short_display_config_manager.short_epoch_config.as_matplotlib_kwargs().get('facecolor', short_color)
+    except Exception:
+        pass
+
+    track_labels = ('Long', 'Short')
+    track_colors = (long_color, short_color)
+    bg = '#1a1028'
+    fg = '#e8e0f0'
+    mid_fg = '#b0a8c0'
+
+    if figsize is None:
+        # Scale height with number of time bins (≈ figS2 proportions for ~10 bins)
+        figsize = (6.6, max(4.5, 0.55 * n_t + 1.8))
+    ## END if figsize is None...
+
+    fig = plt.figure(figsize=figsize, facecolor=bg, constrained_layout=False)
+    # Columns: t-label | raw (Long above Short per t) | row-sum | + | spacer/flow | track_identity marginal | epoch sum
+    # Height ratios: per time bin → Long strip, Short strip (2 rows), matching figS2 vertical stack
+    n_strip_rows: int = n_t * 2
+    outer = GridSpec(1, 7, figure=fig, width_ratios=[0.45, 4.2, 0.28, 0.28, 0.55, 1.5, 0.45 if show_epoch_sum else 0.05], left=0.07, right=0.98, top=0.90, bottom=0.06, wspace=0.10)
+
+    raw_gs = GridSpecFromSubplotSpec(n_strip_rows, 1, subplot_spec=outer[0, 1], hspace=0.15)
+    rowsum_gs = GridSpecFromSubplotSpec(n_strip_rows, 1, subplot_spec=outer[0, 2], hspace=0.15)
+    plus_gs = GridSpecFromSubplotSpec(n_t, 1, subplot_spec=outer[0, 3], hspace=0.45)
+    tlabel_gs = GridSpecFromSubplotSpec(n_t, 1, subplot_spec=outer[0, 0], hspace=0.45)
+
+    vmax_raw = float(np.nanmax(display_p_x_given_n)) if np.any(np.isfinite(display_p_x_given_n)) else 1.0
+    if not np.isfinite(vmax_raw) or vmax_raw <= 0:
+        vmax_raw = 1.0
+    ## END if not np.isfinite(vmax_raw)...
+    norm_raw = Normalize(vmin=0.0, vmax=vmax_raw)
+    vmax_row = float(np.nanmax(row_sums)) if np.any(np.isfinite(row_sums)) else 1.0
+    if not np.isfinite(vmax_row) or vmax_row <= 0:
+        vmax_row = 1.0
+    ## END if not np.isfinite(vmax_row)...
+
+    raw_axes = []
+    rowsum_axes = []
+    for t_i in range(n_t):
+        ax_t = fig.add_subplot(tlabel_gs[t_i, 0])
+        ax_t.set_facecolor(bg)
+        ax_t.set_xticks([]); ax_t.set_yticks([])
+        for spine in ax_t.spines.values():
+            spine.set_visible(False)
+        ## END for spine in ax_t.spines.values()...
+        ax_t.text(0.95, 0.5, f't={t_i}', transform=ax_t.transAxes, ha='right', va='center', color=fg, fontsize=8, fontweight='bold')
+
+        ax_plus = fig.add_subplot(plus_gs[t_i, 0])
+        ax_plus.set_facecolor(bg)
+        ax_plus.set_xticks([]); ax_plus.set_yticks([])
+        for spine in ax_plus.spines.values():
+            spine.set_visible(False)
+        ## END for spine in ax_plus.spines.values()...
+        ax_plus.text(0.5, 0.5, '+', transform=ax_plus.transAxes, ha='center', va='center', color=fg, fontsize=14, fontweight='bold')
+
+        for c_i, (lab, col) in enumerate(zip(track_labels, track_colors)):
+            strip_row: int = (t_i * 2) + c_i
+            ax = fig.add_subplot(raw_gs[strip_row, 0])
+            ax.set_facecolor(bg)
+            img = display_p_x_given_n[:, c_i, t_i][np.newaxis, :]
+            ax.imshow(img, aspect='auto', cmap=cmap, norm=norm_raw, interpolation='nearest', origin='lower')
+            ax.set_xticks([]); ax.set_yticks([])
+            for spine in ax.spines.values():
+                spine.set_color(mid_fg); spine.set_linewidth(0.6)
+            ## END for spine in ax.spines.values()...
+            # Inline Long/Short label on the left of each strip (figS2 style)
+            ax.text(-0.02, 0.5, lab, transform=ax.transAxes, ha='right', va='center', color=col, fontsize=7, clip_on=False)
+            raw_axes.append(ax)
+
+            ax_rs = fig.add_subplot(rowsum_gs[strip_row, 0])
+            ax_rs.set_facecolor(bg)
+            ax_rs.imshow(np.array([[row_sums[c_i, t_i]]]), aspect='auto', cmap=cmap, vmin=0.0, vmax=vmax_row, interpolation='nearest')
+            ax_rs.set_xticks([]); ax_rs.set_yticks([])
+            for spine in ax_rs.spines.values():
+                spine.set_color(mid_fg); spine.set_linewidth(0.6)
+            ## END for spine in ax_rs.spines.values()...
+            if (t_i == 0) and (c_i == 0):
+                ax_rs.set_title('row ∑', color=mid_fg, fontsize=7, pad=2)
+            ## END if (t_i == 0) and (c_i == 0)...
+            rowsum_axes.append(ax_rs)
+        ## END for c_i, (lab, col) in enumerate(zip(track_labels, track_colors))...
+    ## END for t_i in range(n_t)...
+
+    # Right: track_identity marginal
+    ax_marg = fig.add_subplot(outer[0, 5])
+    ax_marg.set_facecolor(bg)
+    ax_marg.imshow(track_identity_marginal, aspect='auto', cmap=cmap, vmin=0.0, vmax=1.0, interpolation='nearest', origin='upper')
+    ax_marg.set_xticks(np.arange(n_t))
+    ax_marg.set_xticklabels([str(i) if (i % max(1, n_t // 10) == 0 or i == n_t - 1) else '' for i in range(n_t)], color=fg, fontsize=7)
+    ax_marg.set_yticks([0, 1])
+    ax_marg.set_yticklabels(list(track_labels), fontsize=8)
+    for tick_label, col in zip(ax_marg.get_yticklabels(), track_colors):
+        tick_label.set_color(col)
+    ## END for tick_label, col in zip(ax_marg.get_yticklabels(), track_colors)...
+    for spine in ax_marg.spines.values():
+        spine.set_color(mid_fg); spine.set_linewidth(0.8)
+    ## END for spine in ax_marg.spines.values()...
+    ax_marg.set_title('track_identity marginal', color=fg, fontsize=9, pad=6)
+    ax_marg.tick_params(colors=fg, length=2)
+
+    # Grey trapezoid / callout from mid column into the marginal (figure coordinates)
+    fig.canvas.draw()  # needed for accurate transforms before first save
+    try:
+        rs_top = rowsum_axes[0]
+        rs_bot = rowsum_axes[-1]
+        bb0 = rs_top.get_position()
+        bb1 = rs_bot.get_position()
+        bm = ax_marg.get_position()
+        # Mid-column right edge → marginal left edge (full vertical span of row-sums → full height of marginal)
+        trap = Polygon([
+            (bb0.x1, bb0.y1),
+            (bm.x0, bm.y1),
+            (bm.x0, bm.y0),
+            (bb1.x1, bb1.y0),
+        ], closed=True, transform=fig.transFigure, facecolor=(0.55, 0.55, 0.60, 0.18), edgecolor=(0.75, 0.72, 0.78, 0.55), linewidth=0.8, zorder=0, clip_on=False)
+        fig.add_artist(trap)
+    except Exception:
+        pass
+
+    if show_epoch_sum:
+        ax_ep = fig.add_subplot(outer[0, 6])
+        ax_ep.set_facecolor(bg)
+        ax_ep.imshow(epoch_sum.reshape(2, 1), aspect='auto', cmap=cmap, vmin=0.0, vmax=1.0, interpolation='nearest', origin='upper')
+        ax_ep.set_xticks([]); ax_ep.set_yticks([])
+        for spine in ax_ep.spines.values():
+            spine.set_color(mid_fg); spine.set_linewidth(0.8)
+        ## END for spine in ax_ep.spines.values()...
+        ax_ep.set_title('∑ₜ\nepoch', color=mid_fg, fontsize=7, pad=4)
+        ax_ep.text(-0.35, 0.5, '∑ₜ', transform=ax_ep.transAxes, ha='right', va='center', color=fg, fontsize=11)
+    else:
+        ax_ep = None
+    ## END if show_epoch_sum...
+
+    header = title if title is not None else 'raw (non-marginalized) pseudo2D decoder for each time bin'
+    fig.suptitle(header, color=fg, fontsize=10, y=0.97)
+
+    fig.savefig(save_path, format='pdf', facecolor=fig.get_facecolor(), edgecolor='none', bbox_inches='tight')
+    png_path = None
+    if also_save_png:
+        png_path = save_path.with_suffix('.png')
+        fig.savefig(png_path, format='png', dpi=200, facecolor=fig.get_facecolor(), edgecolor='none', bbox_inches='tight')
+    ## END if also_save_png...
+
+    extras: Dict[str, Any] = dict(
+        display_p_x_given_n=display_p_x_given_n,
+        row_sums=row_sums,
+        track_identity_marginal=track_identity_marginal,
+        epoch_sum=epoch_sum,
+        context_names=resolved_context_names,
+        save_path=save_path,
+        png_path=png_path,
+        n_time_bins_drawn=n_t,
+        n_time_bins_full=n_t_full,
+        ax_marginal=ax_marg,
+        ax_epoch_sum=ax_ep,
+        raw_axes=raw_axes,
+        rowsum_axes=rowsum_axes,
+    )
+    return fig, extras
