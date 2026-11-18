@@ -4621,8 +4621,8 @@ class PrePostDeltaDistributionComparison:
                     continue
                 bracket_y = y_max if bi == 0 else (y_max + (0.10 * bi * max(abs(y_max), 1e-12)))
                 # _signifiance_bar_offset_kwargs = dict(y_offset_frac=0.04, text_additional_y_offset=0.002)
-                _signifiance_bar_offset_kwargs = dict(y_offset_frac=0.04, text_additional_y_offset=0.000)
-                # _signifiance_bar_offset_kwargs = dict()
+                # _signifiance_bar_offset_kwargs = dict(y_offset_frac=0.04, text_additional_y_offset=0.000)
+                _signifiance_bar_offset_kwargs = dict()
                 add_significance_bars(ax, bracket_p, x1=x1, x2=x2, y=bracket_y, color=bracket_color, **_signifiance_bar_offset_kwargs)
             ## END for bi, (x1, x2, bracket_p, bracket_color) in enumerate(panel_sig_brackets)...
             animal_legend = None
@@ -9396,7 +9396,7 @@ def add_significance_bars(ax, p_value, x1, x2, y, significance_level:float=0.05,
         y_offset = y_offset_frac * y_scale
     # Default 0: place label on the bracket line. `va='center'` makes *** overlap the bar; nudge with text_additional_y_offset in data units.
     if text_additional_y_offset is None:
-        text_additional_y_offset = 0.005 * y_scale #TODO 2026-11-17 19:33: - [ ] This has no effect on the '***' locations
+        text_additional_y_offset = 0.02 * y_scale #TODO 2026-11-17 19:33: - [ ] This has no effect on the '***' locations
     _out_ann = {}
     _out_ann['bar'] = ax.plot([x1, x1, x2, x2], [y, (y + y_offset), (y + y_offset), y], color=color)
     
@@ -10246,8 +10246,8 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
 
                 # Add significance bars between groups
                 # _signifiance_bar_offset_kwargs = dict(y_offset_frac=0.04, text_additional_y_offset=0.002)
-                _signifiance_bar_offset_kwargs = dict(y_offset_frac=0.04, text_additional_y_offset=0.0)
-                # _signifiance_bar_offset_kwargs = dict()
+                # _signifiance_bar_offset_kwargs = dict(y_offset_frac=0.04, text_additional_y_offset=0.0)
+                _signifiance_bar_offset_kwargs = dict()
 
                 ax = _fig_2_theta_out.ax
                 _out_ann_AB = add_significance_bars(ax, LxC_Laps_T_result.pvalue, x1=0, x2=1, y=max_laps_y, **_signifiance_bar_offset_kwargs)
