@@ -4462,7 +4462,7 @@ class PrePostDeltaDistributionComparison:
         dpi = kwargs.pop('dpi', 220)
         laps_fig_file_name: Optional[str] = kwargs.pop('laps_fig_file_name', None)
         pbe_fig_file_name: Optional[str] = kwargs.pop('pbe_fig_file_name', None)
-        # Optional per-panel title overrides (Figure 4a: title='Laps short-bias', metric_name='', title_subtitle='')
+        # Optional per-panel title overrides (Figure 4a: title=r'Laps $P_{Short}$', metric_name='', title_subtitle='')
         laps_panel_title: Optional[str] = kwargs.pop('laps_panel_title', None)
         laps_panel_metric_name: Optional[str] = kwargs.pop('laps_panel_metric_name', None)
         laps_panel_title_subtitle: Optional[str] = kwargs.pop('laps_panel_title_subtitle', None)
@@ -5952,7 +5952,7 @@ class FigureS8:
         (looked up in `additional_filter_predicates`). `should_overlay_heuristic_filter=True` is a compat shim for
         `overlay_filter_predicate_key='is_heuristic_passing'`.
 
-        `scatter_title_style`: ``'default'`` → long center title; ``'short_bias_two_line'`` → Plotly ``{Laps|PBEs}<br>Short-bias`` (Figure 4).
+        `scatter_title_style`: ``'default'`` → long center title; ``'short_bias_two_line'`` → Plotly ``{Laps|PBEs}<br>$P_{Short}$`` (Figure 4).
         """
         if (overlay_filter_predicate_key is None) and should_overlay_heuristic_filter:
             overlay_filter_predicate_key = 'is_heuristic_passing'
@@ -5963,8 +5963,8 @@ class FigureS8:
         predicates = {k: additional_filter_predicates[k] for k in constraint_keys}
         plot_kind: str = 'PBEs' if ('PBEs' in export_suffix) else 'Laps'
         if str(scatter_title_style) == 'short_bias_two_line':
-            # Figure 4: two-line center subplot title (Plotly annotation HTML)
-            main_title: str = f"{plot_kind}<br>Short-bias{title_suffix}"
+            # Figure 4: two-line center subplot title (Plotly MathJax / LaTeX)
+            main_title: str = f"{plot_kind}<br>$P_{{Short}}${title_suffix}"
         else:
             main_title = f"Short-track Decoded Likelihood during {plot_kind}{title_suffix}"  # keep short enough to avoid Pre-Δ / Post-Δ collision
         should_compute_or_annotate_stats: bool = bool(should_compute_stats or enable_add_stats_to_figures)
@@ -6197,7 +6197,7 @@ class FigureS8:
             `enable_main_figures=False`: skip Plotly scatter build/SVG export (stats still run for summary figs).
             `pub_fig_size_key`: ``'reduced_width'``/``'fig4'`` (5.3956×2.18 in) or ``'full_width'``/``'s8'``/``'s9'`` (6.4377×2.5227 in).
             `scatter_title_style`: ``None`` → ``'short_bias_two_line'`` for reduced_width (Figure 4), else ``'default'``.
-            Pass ``'short_bias_two_line'`` for ``{Laps|PBEs}<br>Short-bias`` center titles.
+            Pass ``'short_bias_two_line'`` for ``{Laps|PBEs}<br>$P_{Short}$`` center titles.
 
 
             from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import FigureS8
@@ -6249,7 +6249,7 @@ class FigureS8:
         _resolved_size_key: str = cls.set_pub_fig_size(pub_fig_size_key)
         print(f'pub_fig_size_key: {_resolved_size_key}, PUB_FIG_SIZE: {cls.PUB_FIG_SIZE}, PUB_FIG_SIZE_INCHES: {cls.PUB_FIG_SIZE_INCHES}')
         # PUB_FIG_SIZE = dict() ## NO OVERRIDES
-        # Figure 4 (reduced_width): two-line "{Laps|PBEs}<br>Short-bias"; S3/S8/S9 keep the long default title.
+        # Figure 4 (reduced_width): two-line "{Laps|PBEs}<br>$P_{Short}$"; S3/S8/S9 keep the long default title.
         _scatter_title_style: str = scatter_title_style if (scatter_title_style is not None) else ('short_bias_two_line' if (_resolved_size_key == 'reduced_width') else 'default')
         print(f'scatter_title_style: {_scatter_title_style}')
 
@@ -6818,11 +6818,11 @@ class FigureS8:
                             if fig_summary_bar_kwargs:
                                 plot_kwargs.update(fig_summary_bar_kwargs)
                             elif fig_name == 'Figure 4':
-                                # Default Fig 4a/b titles when config omits them
-                                plot_kwargs.setdefault('laps_panel_title', 'Laps short-bias')
+                                # Default Fig 4a/b titles when config omits them (mathtext $P_{Short}$)
+                                plot_kwargs.setdefault('laps_panel_title', r'Laps $P_{Short}$')
                                 plot_kwargs.setdefault('laps_panel_metric_name', '')
                                 plot_kwargs.setdefault('laps_panel_title_subtitle', '')
-                                plot_kwargs.setdefault('pbe_panel_title', 'PBEs short-bias')
+                                plot_kwargs.setdefault('pbe_panel_title', r'PBEs $P_{Short}$')
                                 plot_kwargs.setdefault('pbe_panel_metric_name', '')
                                 plot_kwargs.setdefault('pbe_panel_title_subtitle', '')
                             if group_name is not None:
