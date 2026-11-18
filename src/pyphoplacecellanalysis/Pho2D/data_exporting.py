@@ -885,14 +885,15 @@ class PosteriorExporting:
                 if not _curr_key.startswith('/'):
                     _curr_key = "/" + _curr_key
                 # active_captured_single_epoch_result.to_hdf(save_path, key=_curr_key, debug_print=True, enable_hdf_testing_mode=True)
-                active_captured_single_epoch_result.to_hdf(f, key=_curr_key, debug_print=debug_print, enable_hdf_testing_mode=False, required_zero_padding=num_required_zero_padding)
+                active_captured_single_epoch_result.to_hdf(f, key=_curr_key, debug_print=debug_print, enable_hdf_testing_mode=False, required_zero_padding=num_required_zero_padding, save_full_object=True)
         
         return save_path
     
 
     @classmethod
     @function_attributes(short_name=None, tags=['MAIN', 'save', 'export', 'HDF5', 'h5'], input_requires=[], output_provides=[], uses=['save_decoded_posteriors_to_HDF5'], used_by=[], creation_date='2024-08-28 08:36', related_items=['LoadedPosteriorContainer.load_batch_hdf5_exports'])
-    def perform_save_all_decoded_posteriors_to_HDF5(cls, decoder_laps_filter_epochs_decoder_result_dict: Dict[types.DecoderName, DecodedFilterEpochsResult], decoder_ripple_filter_epochs_decoder_result_dict: Dict[types.DecoderName, DecodedFilterEpochsResult], _save_context: IdentifyingContext, save_path: Path, should_overwrite_extant_file:bool=True):
+    def perform_save_all_decoded_posteriors_to_HDF5(cls, decoder_laps_filter_epochs_decoder_result_dict: Dict[types.DecoderName, DecodedFilterEpochsResult], decoder_ripple_filter_epochs_decoder_result_dict: Dict[types.DecoderName, DecodedFilterEpochsResult], _save_context: IdentifyingContext, save_path: Path, should_overwrite_extant_file:bool=True,
+                                                     pseudo2D_laps_filter_epochs_decoder_result: Optional[DecodedFilterEpochsResult] = None, pseudo2D_ripple_filter_epochs_decoder_result: Optional[DecodedFilterEpochsResult] = None, pseudo2D_decoder_key: str = 'pseudo2D'):
         """
         
         Usage:
@@ -904,9 +905,29 @@ class PosteriorExporting:
 
         History:
             Refactored from `ComputerVisionComputations` on 2024-09-30
+            2026-11-18: optional `pseudo2D_*` kwargs inject true merged Pseudo2D under `pseudo2D_decoder_key` alongside the 1D decoders
         """
         _flat_all_out_paths = []
-        
+
+        def _subfn_inject_pseudo2D(active_dict: Optional[Dict[types.DecoderName, DecodedFilterEpochsResult]], pseudo2D_result: Optional[DecodedFilterEpochsResult], epochs_name: str) -> Optional[Dict[types.DecoderName, DecodedFilterEpochsResult]]:
+            """Insert true Pseudo2D into a decoder-result dict under `pseudo2D_decoder_key` when provided."""
+            if active_dict is None:
+                if pseudo2D_result is None:
+                    return None
+                active_dict = {}
+            ## END if active_dict is None...
+            if pseudo2D_result is None:
+                return active_dict
+            ## END if pseudo2D_result is None...
+            if pseudo2D_decoder_key in active_dict:
+                print(f'WARN: perform_save_all_decoded_posteriors_to_HDF5: key "{pseudo2D_decoder_key}" already present in {epochs_name} dict; skipping Pseudo2D inject.')
+                return active_dict
+            ## END if pseudo2D_decoder_key in active_dict...
+            active_dict[pseudo2D_decoder_key] = pseudo2D_result
+            print(f'\t injected Pseudo2D under decoder key "{pseudo2D_decoder_key}" for epochs_name="{epochs_name}"')
+            return active_dict
+
+
         def _subfn_perform_save_single_epochs(_active_filter_epochs_decoder_result_dict, a_save_context: IdentifyingContext, epochs_name: str, save_path: Path) -> Dict[types.DecoderName, IdentifyingContext]:
             """ saves a single set of named epochs, like 'laps' or 'ripple' 
             Captures/Updates: _flat_all_out_paths,
@@ -923,23 +944,31 @@ class PosteriorExporting:
                 else:
                     print(f'\tsave_path exists, so allow_append = True')
                     allow_append = True
+                ## END if not save_path.exists()...
                 an_out_path = cls.save_decoded_posteriors_to_HDF5(a_decoder_decoded_epochs_result=a_decoder_decoded_epochs_result, out_context=_specific_save_context, save_path=save_path, allow_append=allow_append)
                 _sub_out_contexts[a_decoder_name] = _specific_save_context
                 _flat_all_out_paths.append(an_out_path)
-                
+            ## END for a_decoder_name, a_decoder_decoded_epochs_result in _active_filter_epochs_decoder_result_dict.items()...
+
             return _sub_out_contexts
 
+
+        decoder_laps_filter_epochs_decoder_result_dict = _subfn_inject_pseudo2D(decoder_laps_filter_epochs_decoder_result_dict, pseudo2D_laps_filter_epochs_decoder_result, epochs_name='laps')
+        decoder_ripple_filter_epochs_decoder_result_dict = _subfn_inject_pseudo2D(decoder_ripple_filter_epochs_decoder_result_dict, pseudo2D_ripple_filter_epochs_decoder_result, epochs_name='ripple')
 
         if save_path.exists() and should_overwrite_extant_file:
             print(f'\tsave_path "{save_path}" exists and should_overwrite_extant_file==True, so removing file...')
             save_path.unlink(missing_ok=False)
             print(f'\t successfully removed.')
-            
+        ## END if save_path.exists() and should_overwrite_extant_file...
+
         out_contexts = {'laps': None, 'ripple': None}
         if decoder_laps_filter_epochs_decoder_result_dict is not None:
             out_contexts['laps'] = _subfn_perform_save_single_epochs(decoder_laps_filter_epochs_decoder_result_dict, a_save_context=_save_context, epochs_name='laps', save_path=save_path)
+        ## END if decoder_laps_filter_epochs_decoder_result_dict is not None...
         if decoder_ripple_filter_epochs_decoder_result_dict is not None:
             out_contexts['ripple'] = _subfn_perform_save_single_epochs(decoder_ripple_filter_epochs_decoder_result_dict, a_save_context=_save_context, epochs_name='ripple', save_path=save_path)
+        ## END if decoder_ripple_filter_epochs_decoder_result_dict is not None...
         return out_contexts, _flat_all_out_paths
 
 
