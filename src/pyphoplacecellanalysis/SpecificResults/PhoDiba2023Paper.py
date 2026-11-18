@@ -4621,7 +4621,7 @@ class PrePostDeltaDistributionComparison:
                     continue
                 bracket_y = y_max if bi == 0 else (y_max + (0.10 * bi * max(abs(y_max), 1e-12)))
                 # _signifiance_bar_offset_kwargs = dict(y_offset_frac=0.04, text_additional_y_offset=0.002)
-                _signifiance_bar_offset_kwargs = dict(y_offset_frac=-0.02, text_additional_y_offset=0.000)
+                _signifiance_bar_offset_kwargs = dict(y_offset_frac=0.04, text_additional_y_offset=0.000)
                 # _signifiance_bar_offset_kwargs = dict()
                 add_significance_bars(ax, bracket_p, x1=x1, x2=x2, y=bracket_y, color=bracket_color, **_signifiance_bar_offset_kwargs)
             ## END for bi, (x1, x2, bracket_p, bracket_color) in enumerate(panel_sig_brackets)...
@@ -10246,7 +10246,8 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
 
                 # Add significance bars between groups
                 # _signifiance_bar_offset_kwargs = dict(y_offset_frac=0.04, text_additional_y_offset=0.002)
-                _signifiance_bar_offset_kwargs = dict()
+                _signifiance_bar_offset_kwargs = dict(y_offset_frac=0.04, text_additional_y_offset=0.0)
+                # _signifiance_bar_offset_kwargs = dict()
 
                 ax = _fig_2_theta_out.ax
                 _out_ann_AB = add_significance_bars(ax, LxC_Laps_T_result.pvalue, x1=0, x2=1, y=max_laps_y, **_signifiance_bar_offset_kwargs)
