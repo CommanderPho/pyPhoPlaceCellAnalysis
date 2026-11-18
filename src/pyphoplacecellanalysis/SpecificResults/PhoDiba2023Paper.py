@@ -5626,6 +5626,14 @@ class FigureS8:
 
 
     @classmethod
+    def overlay_filter_passing_color(cls, predicate_key: Optional[str]) -> str:
+        """Foreground color for overlay hist-scatter / summary bars — green for heuristic, Tab10 blue otherwise (e.g. sig_spearman_z)."""
+        if (predicate_key is not None) and (str(predicate_key) == 'is_heuristic_passing'):
+            return cls.HEURISTIC_PASSING_COLOR
+        return cls.ADDITIONAL_FILTER_PASSING_COLOR
+
+
+    @classmethod
     def resolve_pub_fig_size_key(cls, pub_fig_size_key: Optional[str] = None, fig_name: Optional[str] = None) -> str:
         """Map config / figure name → ``'reduced_width'`` or ``'full_width'``.
 
@@ -5887,15 +5895,16 @@ class FigureS8:
 
 
     @classmethod
-    def _add_pre_post_delta_stats_annotation(cls, fig: go.Figure, stats_by_label: Dict[str, Dict]) -> go.Figure:
-        """Add one scatter-panel inset. Empty label = pooled; False/True = heuristic overlay."""
+    def _add_pre_post_delta_stats_annotation(cls, fig: go.Figure, stats_by_label: Dict[str, Dict], label_colors: Optional[Dict[str, str]] = None) -> go.Figure:
+        """Add one scatter-panel inset. Empty label = pooled; False/True = overlay filter series."""
+        _label_colors: Dict[str, str] = dict(cls._STATS_ANNOTATION_LABEL_COLOR) if (label_colors is None) else dict(label_colors)
         lines = []
         for label, stats in stats_by_label.items():
             if stats is None:
                 continue
             body: str = cls._format_pre_post_delta_stats_text(stats)
             if label:
-                color: str = cls._STATS_ANNOTATION_LABEL_COLOR.get(label, 'black')
+                color: str = _label_colors.get(label, 'black')
                 body_lines = body.split('<br>')
                 body_lines[0] = f'{label}: {body_lines[0]}'
                 inner: str = '<br>'.join(body_lines)
@@ -5948,9 +5957,10 @@ class FigureS8:
         Scatter legend is hidden by default for Figure S3 (`show_scatter_legend=None` → off when `color_by_time_bin_size`).
         When `store_debug_values` is True, the 4th return is a dict of the processed DFs actually plotted (`final_df`, `plot_df`, optional `groups`) plus row counts.
 
-        Overlay: grey background = full constrained df; green foreground = rows passing `overlay_filter_predicate_key`
-        (looked up in `additional_filter_predicates`). `should_overlay_heuristic_filter=True` is a compat shim for
-        `overlay_filter_predicate_key='is_heuristic_passing'`.
+        Overlay: grey background = full constrained df; colored foreground = rows passing `overlay_filter_predicate_key`
+        (looked up in `additional_filter_predicates`). Color matches summary bars via `overlay_filter_passing_color`
+        (blue for e.g. `sig_spearman_z`, green for `is_heuristic_passing`). `should_overlay_heuristic_filter=True` is a
+        compat shim for `overlay_filter_predicate_key='is_heuristic_passing'`.
 
         `scatter_title_style`: ``'default'`` → ``Short-track Decoded Likelihood during {Laps|PBEs}`` (Figure 4 / S3 / S8 / S9).
         """
@@ -6023,7 +6033,7 @@ class FigureS8:
                     passing_mask = additional_filter_predicates[overlay_filter_predicate_key](group_df).astype(bool)
                     plot_df = cls._copy_df_preserving_context(group_df[passing_mask])
                     active_plot_kwargs['background_data_results_df'] = group_df
-                    _fg = dict(color_discrete_sequence=[cls.HEURISTIC_PASSING_COLOR])
+                    _fg = dict(color_discrete_sequence=[cls.overlay_filter_passing_color(overlay_filter_predicate_key)])
                     active_plot_kwargs['px_scatter_kwargs'] = {**(active_plot_kwargs.get('px_scatter_kwargs') or {}), **_fg}
                     active_plot_kwargs['hist_kwargs'] = {**(active_plot_kwargs.get('hist_kwargs') or {}), **_fg}
                 else:
@@ -6077,7 +6087,11 @@ class FigureS8:
                                 stats_by_label['True'] = results_pass
                         _out_stats_dict.setdefault(k, {})[group_key] = group_stats
                         if enable_add_stats_to_figures and stats_by_label and (new_fig is not None):
-                            new_fig = cls._add_pre_post_delta_stats_annotation(new_fig, stats_by_label)
+                            # Match inset "True" color to overlay series (blue for spearman, green for heuristic)
+                            _stats_label_colors = dict(cls._STATS_ANNOTATION_LABEL_COLOR)
+                            if should_overlay_filter:
+                                _stats_label_colors['True'] = cls.overlay_filter_passing_color(overlay_filter_predicate_key)
+                            new_fig = cls._add_pre_post_delta_stats_annotation(new_fig, stats_by_label, label_colors=_stats_label_colors)
                 fig_key = group_key if group_key is not None else k
                 group_figs[fig_key] = new_fig
                 if should_save and (new_fig is not None):
