@@ -15073,6 +15073,7 @@ def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArr
     from matplotlib.gridspec import GridSpec, GridSpecFromSubplotSpec
     from matplotlib.patches import Polygon
     from matplotlib.colors import Normalize
+    from matplotlib.cm import ScalarMappable
     from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import DecoderIdentityColors, long_short_display_config_manager
 
     def _subfn_add_xy_unit_grid(ax, n_x: int, n_y: int, grid_color: str = '#b0a8c0', linewidth: float = 0.35, alpha: float = 0.45):
@@ -15181,15 +15182,34 @@ def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArr
         col_w: float = bb_marg.width / float(n_t)
         col_x0: float = bb_marg.x0 + t_i * col_w
         col_x1: float = col_x0 + col_w
-        band = Polygon([
+        band_facecolor = (0.85, 0.85, 0.88, 0.92)
+        band_edgecolor = (0.45, 0.45, 0.50, 0.9)
+        # Horizontal arm: right from the 2-vec to this column's right edge (full 2-vec height) — fill only, no shared-edge seam
+        h_arm = Polygon([
             (bb_tid.x1, bb_tid.y1),
+            (col_x1, bb_tid.y1),
+            (col_x1, bb_tid.y0),
+            (bb_tid.x1, bb_tid.y0),
+        ], closed=True, transform=fig.transFigure, facecolor=band_facecolor, edgecolor='none', zorder=0, clip_on=False)
+        fig.add_artist(h_arm)
+        # Vertical arm: rises from the horizontal arm's TOP edge up into the marginal column — fill only
+        v_arm = Polygon([
+            (col_x0, bb_tid.y1),
             (col_x1, bb_tid.y1),
             (col_x1, bb_marg.y0),
             (col_x0, bb_marg.y0),
-            (col_x0, bb_tid.y0),
+        ], closed=True, transform=fig.transFigure, facecolor=band_facecolor, edgecolor='none', zorder=0, clip_on=False)
+        fig.add_artist(v_arm)
+        # Outline only the OUTER L boundary so no line separates the horizontal and vertical arms
+        outline = Polygon([
+            (bb_tid.x1, bb_tid.y1),
+            (col_x0, bb_tid.y1),
+            (col_x0, bb_marg.y0),
+            (col_x1, bb_marg.y0),
+            (col_x1, bb_tid.y0),
             (bb_tid.x1, bb_tid.y0),
-        ], closed=True, transform=fig.transFigure, facecolor=(0.85, 0.85, 0.88, 0.92), edgecolor=(0.45, 0.45, 0.50, 0.9), linewidth=0.6, zorder=0, clip_on=False)
-        fig.add_artist(band)
+        ], closed=True, transform=fig.transFigure, facecolor='none', edgecolor=band_edgecolor, linewidth=0.6, zorder=0.5, clip_on=False)
+        fig.add_artist(outline)
         # Long/Short labels at the right edge of the 2-vec, aligned with its two elements
         for lab_i, (lab, col) in enumerate(zip(track_labels, track_colors)):
             y_frac: float = 0.75 if lab_i == 0 else 0.25
@@ -15300,6 +15320,21 @@ def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArr
 
     fig.canvas.draw()  # needed for accurate transforms before first save
 
+    # Probability colorbar in the empty left area just above the t=0 row (gap between the header row and the per-t stack), left-aligned with the raw matrices
+    bb_raw_top = raw_axes[0].get_position()
+    bb_raw_bottom = raw_axes[1].get_position() if n_t > 1 else bb_raw_top
+    row_pitch = bb_raw_top.y1 - bb_raw_bottom.y1  # vertical pitch between t-rows (includes hspace)
+    cbar_h = float(np.clip(0.12 * row_pitch, 0.008, 0.02))
+    cbar_y0 = bb_raw_top.y1 + 0.45 * row_pitch
+    cbar_w = 0.6 * bb_raw_top.width
+    cax_prob = fig.add_axes([bb_raw_top.x0, cbar_y0, cbar_w, cbar_h])
+    cbar_prob = fig.colorbar(ScalarMappable(norm=Normalize(vmin=0.0, vmax=1.0), cmap=cmap), cax=cax_prob, orientation='horizontal')
+    cbar_prob.set_ticks(np.linspace(0.0, 1.0, 6))
+    cbar_prob.ax.tick_params(labelsize=6, colors=fg, length=2, width=0.5, pad=1)
+    cbar_prob.outline.set_edgecolor(mid_fg)
+    cbar_prob.outline.set_linewidth(0.6)
+    cbar_prob.set_label('probability', color=fg, fontsize=7, labelpad=1)
+
     if show_epoch_sum:
         ax_ep = fig.add_subplot(outer[0, 7])
         ax_ep.set_facecolor(bg)
@@ -15339,6 +15374,7 @@ def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArr
         n_time_bins_full=n_t_full,
         ax_marginal=ax_marg,
         ax_epoch_sum=ax_ep,
+        ax_probability_colorbar=cbar_prob.ax,
         raw_axes=raw_axes,
         rowsum_axes=rowsum_axes,
         trackid_axes=trackid_axes,
