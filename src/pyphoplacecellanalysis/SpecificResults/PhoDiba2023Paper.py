@@ -15019,16 +15019,6 @@ def _walkthru_extract_p_x_given_n(pseudo2D_posterior, context_names=None):
     return p_x_given_n, resolved_context_names
 
 
-def _walkthru_add_xy_unit_grid(ax, n_x: int, n_y: int, grid_color: str = '#b0a8c0', linewidth: float = 0.35, alpha: float = 0.45):
-    """Overlay integer x/y bin-edge grid lines on a raw posterior axes (unit-index grid)."""
-    ax.set_xticks(np.arange(n_x + 1, dtype=float), minor=True)
-    ax.set_yticks(np.arange(n_y + 1, dtype=float), minor=True)
-    ax.grid(True, which='minor', color=grid_color, linestyle='-', linewidth=linewidth, alpha=alpha, zorder=10)
-    ax.tick_params(axis='both', which='both', bottom=False, top=False, left=False, right=False, labelbottom=False, labelleft=False)
-    ax.set_xlim(0, n_x)
-    ax.set_ylim(0, n_y)
-
-
 def _walkthru_build_long_short_display_posterior(p_x_given_n, context_names):
     """Keep all context x/y posteriors for the left panel; collapse only for track_identity.
 
@@ -15084,6 +15074,99 @@ def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArr
     from matplotlib.patches import Polygon
     from matplotlib.colors import Normalize
     from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import DecoderIdentityColors, long_short_display_config_manager
+
+    def _subfn_add_xy_unit_grid(ax, n_x: int, n_y: int, grid_color: str = '#b0a8c0', linewidth: float = 0.35, alpha: float = 0.45):
+        """Overlay integer x/y bin-edge grid lines on a raw posterior axes (unit-index grid)."""
+        ax.set_xticks(np.arange(n_x + 1, dtype=float), minor=True)
+        ax.set_yticks(np.arange(n_y + 1, dtype=float), minor=True)
+        ax.grid(True, which='minor', color=grid_color, linestyle='-', linewidth=linewidth, alpha=alpha, zorder=10)
+        ax.tick_params(axis='both', which='both', bottom=False, top=False, left=False, right=False, labelbottom=False, labelleft=False)
+        ax.set_xlim(0, n_x)
+        ax.set_ylim(0, n_y)
+
+    def _subfn_draw_t_label(t_i: int):
+        """Left-hand 't=i' label axes for one time-bin row."""
+        ax_t = fig.add_subplot(tlabel_gs[t_i, 0])
+        ax_t.set_facecolor(bg)
+        ax_t.set_xticks([]); ax_t.set_yticks([])
+        for spine in ax_t.spines.values():
+            spine.set_visible(False)
+        ## END for spine in ax_t.spines.values()...
+        ax_t.text(0.95, 0.5, f't={t_i}', transform=ax_t.transAxes, ha='right', va='center', color=fg, fontsize=8, fontweight='bold')
+        return ax_t
+
+    def _subfn_draw_raw_posterior_matrix(t_i: int):
+        """One (n_contexts × n_pos) raw posterior matrix per time bin: each decoder is one row, position bins run left→right."""
+        ax = fig.add_subplot(raw_gs[t_i, 0])
+        ax.set_facecolor(bg)
+        img = np.asarray(display_p_x_given_n[:, :, :, t_i], dtype=float).reshape(n_pos, n_contexts).T  # (n_contexts, n_pos)
+        ax.imshow(img, aspect='auto', cmap=cmap, norm=norm_raw, interpolation='nearest', origin='upper', extent=[0, n_pos, 0, n_contexts])
+        ax.set_xticks([]); ax.set_yticks([])
+        _subfn_add_xy_unit_grid(ax, n_x=n_pos, n_y=n_contexts, grid_color=mid_fg)
+        for spine in ax.spines.values():
+            spine.set_color(mid_fg); spine.set_linewidth(0.6)
+        ## END for spine in ax.spines.values()...
+        # Decoder labels on the left, vertically centered on each matrix row
+        for c_i, (lab, col) in enumerate(zip(context_labels, context_colors)):
+            ax.text(-0.02, (c_i + 0.5) / n_contexts, lab, transform=ax.transAxes, ha='right', va='center', color=col, fontsize=6, clip_on=False)
+        ## END for c_i, (lab, col) in enumerate(zip(context_labels, context_colors))...
+        return ax
+
+    def _subfn_draw_row_sum_vector(t_i: int):
+        """Beside the matrix: (n_contexts × 1) ∑ over position — same GridSpec row/hspace so it is row-aligned."""
+        ax_rs = fig.add_subplot(rowsum_gs[t_i, 0])
+        ax_rs.set_facecolor(bg)
+        ax_rs.imshow(row_sums[:, t_i].reshape(n_contexts, 1), aspect='auto', cmap=cmap, vmin=0.0, vmax=vmax_row, interpolation='nearest', origin='upper')
+        ax_rs.set_xticks([]); ax_rs.set_yticks([])
+        for spine in ax_rs.spines.values():
+            spine.set_color(mid_fg); spine.set_linewidth(0.6)
+        ## END for spine in ax_rs.spines.values()...
+        if t_i == 0:
+            ax_rs.set_title('row ∑', color=mid_fg, fontsize=7, pad=2)
+        ## END if t_i == 0...
+        return ax_rs
+
+    def _subfn_draw_track_id_vector(t_i: int, ax_mat):
+        """To the right of the row-∑: (2 × 1) track_ID marginal for this t, vertically centered on the matrix row."""
+        ax_tid = fig.add_subplot(trackid_gs[t_i, 0])
+        ax_tid.set_facecolor(bg)
+        ax_tid.imshow(track_identity_marginal[:, t_i].reshape(2, 1), aspect='auto', cmap=cmap, vmin=0.0, vmax=1.0, interpolation='nearest', origin='upper')
+        ax_tid.set_xticks([]); ax_tid.set_yticks([])
+        for spine in ax_tid.spines.values():
+            spine.set_color(mid_fg); spine.set_linewidth(0.6)
+        ## END for spine in ax_tid.spines.values()...
+        if t_i == 0:
+            ax_tid.set_title('track_ID', color=mid_fg, fontsize=7, pad=2)
+        ## END if t_i == 0...
+        # v-align center: shrink the 2-row column to half the matrix height, centered on the same vertical midpoint
+        bb_mat = ax_mat.get_position()
+        bb_tid = ax_tid.get_position()
+        half_h: float = bb_mat.height * (2.0 / float(n_contexts)) / 2.0
+        center_y: float = (bb_mat.y0 + bb_mat.y1) / 2.0
+        ax_tid.set_position([bb_tid.x0, center_y - half_h, bb_tid.width, 2.0 * half_h])
+        return ax_tid
+
+    def _subfn_draw_trapezoid_sums(ax_rs, ax_tid):
+        """Two trapezoid sum indicators per t-row: top contexts → Long element, bottom contexts → Short element, with a large bold + inside each."""
+        bb_rs = ax_rs.get_position()
+        bb_tid = ax_tid.get_position()
+        n_top: int = n_contexts // 2
+        for g_i, (rs_y_hi, rs_y_lo, tid_y_hi, tid_y_lo) in enumerate([
+            (bb_rs.y1, bb_rs.y1 - bb_rs.height * (n_top / float(n_contexts)), bb_tid.y1, (bb_tid.y0 + bb_tid.y1) / 2.0),
+            ((bb_rs.y0 + bb_rs.y1) / 2.0, bb_rs.y0, (bb_tid.y0 + bb_tid.y1) / 2.0, bb_tid.y0),
+        ]):
+            trap = Polygon([
+                (bb_rs.x1, rs_y_hi),
+                (bb_tid.x0, tid_y_hi),
+                (bb_tid.x0, tid_y_lo),
+                (bb_rs.x1, rs_y_lo),
+            ], closed=True, transform=fig.transFigure, facecolor=(0.85, 0.85, 0.88, 0.92), edgecolor=(0.45, 0.45, 0.50, 0.9), linewidth=0.6, zorder=1, clip_on=False)
+            fig.add_artist(trap)
+            # Large bold + sized to the trapezoid's height at its horizontal midpoint (screenshot style)
+            trap_mid_h: float = ((rs_y_hi - rs_y_lo) + (tid_y_hi - tid_y_lo)) / 2.0
+            plus_fontsize: float = float(np.clip(trap_mid_h * fig.get_size_inches()[1] * fig.dpi * 0.9, 12, 30))
+            fig.text((bb_rs.x1 + bb_tid.x0) / 2.0, (tid_y_hi + tid_y_lo) / 2.0, '+', ha='center', va='center', color='#808088', fontsize=plus_fontsize, fontweight='bold', zorder=2)
+        ## END for g_i, (rs_y_hi, rs_y_lo, tid_y_hi, tid_y_lo) in enumerate([...])...
 
     save_path = Path(save_path).resolve()
     save_path.parent.mkdir(parents=True, exist_ok=True)
@@ -15157,79 +15240,12 @@ def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArr
     rowsum_axes = []
     trackid_axes = []
     for t_i in range(n_t):
-        ax_t = fig.add_subplot(tlabel_gs[t_i, 0])
-        ax_t.set_facecolor(bg)
-        ax_t.set_xticks([]); ax_t.set_yticks([])
-        for spine in ax_t.spines.values():
-            spine.set_visible(False)
-        ## END for spine in ax_t.spines.values()...
-        ax_t.text(0.95, 0.5, f't={t_i}', transform=ax_t.transAxes, ha='right', va='center', color=fg, fontsize=8, fontweight='bold')
-
-        # One (n_contexts × n_pos) matrix per time bin: each decoder is one row, position bins run left→right
-        ax = fig.add_subplot(raw_gs[t_i, 0])
-        ax.set_facecolor(bg)
-        img = np.asarray(display_p_x_given_n[:, :, :, t_i], dtype=float).reshape(n_pos, n_contexts).T  # (n_contexts, n_pos)
-        ax.imshow(img, aspect='auto', cmap=cmap, norm=norm_raw, interpolation='nearest', origin='upper', extent=[0, n_pos, 0, n_contexts])
-        ax.set_xticks([]); ax.set_yticks([])
-        _walkthru_add_xy_unit_grid(ax, n_x=n_pos, n_y=n_contexts, grid_color=mid_fg)
-        for spine in ax.spines.values():
-            spine.set_color(mid_fg); spine.set_linewidth(0.6)
-        ## END for spine in ax.spines.values()...
-        # Decoder labels on the left, vertically centered on each matrix row
-        for c_i, (lab, col) in enumerate(zip(context_labels, context_colors)):
-            ax.text(-0.02, (c_i + 0.5) / n_contexts, lab, transform=ax.transAxes, ha='right', va='center', color=col, fontsize=6, clip_on=False)
-        ## END for c_i, (lab, col) in enumerate(zip(context_labels, context_colors))...
-        raw_axes.append(ax)
-
-        # Beside the matrix: (n_contexts × 1) ∑ over position — same GridSpec row/hspace so it is row-aligned
-        ax_rs = fig.add_subplot(rowsum_gs[t_i, 0])
-        ax_rs.set_facecolor(bg)
-        ax_rs.imshow(row_sums[:, t_i].reshape(n_contexts, 1), aspect='auto', cmap=cmap, vmin=0.0, vmax=vmax_row, interpolation='nearest', origin='upper')
-        ax_rs.set_xticks([]); ax_rs.set_yticks([])
-        for spine in ax_rs.spines.values():
-            spine.set_color(mid_fg); spine.set_linewidth(0.6)
-        ## END for spine in ax_rs.spines.values()...
-        if t_i == 0:
-            ax_rs.set_title('row ∑', color=mid_fg, fontsize=7, pad=2)
-        ## END if t_i == 0...
-        rowsum_axes.append(ax_rs)
-
-        # To the right of the row-∑: (2 × 1) track_ID marginal for this t, vertically centered on the matrix row
-        ax_tid = fig.add_subplot(trackid_gs[t_i, 0])
-        ax_tid.set_facecolor(bg)
-        ax_tid.imshow(track_identity_marginal[:, t_i].reshape(2, 1), aspect='auto', cmap=cmap, vmin=0.0, vmax=1.0, interpolation='nearest', origin='upper')
-        ax_tid.set_xticks([]); ax_tid.set_yticks([])
-        for spine in ax_tid.spines.values():
-            spine.set_color(mid_fg); spine.set_linewidth(0.6)
-        ## END for spine in ax_tid.spines.values()...
-        if t_i == 0:
-            ax_tid.set_title('track_ID', color=mid_fg, fontsize=7, pad=2)
-        ## END if t_i == 0...
-        # v-align center: shrink the 2-row column to half the matrix height, centered on the same vertical midpoint
-        bb_mat = ax.get_position()
-        bb_tid = ax_tid.get_position()
-        half_h: float = bb_mat.height * (2.0 / float(n_contexts)) / 2.0
-        center_y: float = (bb_mat.y0 + bb_mat.y1) / 2.0
-        ax_tid.set_position([bb_tid.x0, center_y - half_h, bb_tid.width, 2.0 * half_h])
-        trackid_axes.append(ax_tid)
-
-        # Two trapezoid sum indicators per t-row: top contexts → Long element, bottom contexts → Short element
-        bb_rs = ax_rs.get_position()
-        bb_tid = ax_tid.get_position()
-        n_top: int = n_contexts // 2
-        for g_i, (rs_y_hi, rs_y_lo, tid_y_hi, tid_y_lo) in enumerate([
-            (bb_rs.y1, bb_rs.y1 - bb_rs.height * (n_top / float(n_contexts)), bb_tid.y1, (bb_tid.y0 + bb_tid.y1) / 2.0),
-            ((bb_rs.y0 + bb_rs.y1) / 2.0, bb_rs.y0, (bb_tid.y0 + bb_tid.y1) / 2.0, bb_tid.y0),
-        ]):
-            trap = Polygon([
-                (bb_rs.x1, rs_y_hi),
-                (bb_tid.x0, tid_y_hi),
-                (bb_tid.x0, tid_y_lo),
-                (bb_rs.x1, rs_y_lo),
-            ], closed=True, transform=fig.transFigure, facecolor=(0.85, 0.85, 0.88, 0.92), edgecolor=(0.45, 0.45, 0.50, 0.9), linewidth=0.6, zorder=1, clip_on=False)
-            fig.add_artist(trap)
-            fig.text((bb_rs.x1 + bb_tid.x0) / 2.0, (tid_y_hi + tid_y_lo) / 2.0, '+', ha='center', va='center', color='#555560', fontsize=11, fontweight='bold', zorder=2)
-        ## END for g_i, (rs_y_hi, rs_y_lo, tid_y_hi, tid_y_lo) in enumerate([...])...
+        _subfn_draw_t_label(t_i)
+        ax = _subfn_draw_raw_posterior_matrix(t_i)
+        ax_rs = _subfn_draw_row_sum_vector(t_i)
+        ax_tid = _subfn_draw_track_id_vector(t_i, ax_mat=ax)
+        _subfn_draw_trapezoid_sums(ax_rs=ax_rs, ax_tid=ax_tid)
+        raw_axes.append(ax); rowsum_axes.append(ax_rs); trackid_axes.append(ax_tid)
     ## END for t_i in range(n_t)...
 
     # Header row (above first t-row): track_identity marginal (Long/Short only — contexts collapsed here)
