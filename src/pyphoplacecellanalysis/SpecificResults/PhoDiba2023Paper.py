@@ -15301,7 +15301,9 @@ def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArr
     ax_marg.set_facecolor(bg)
     ax_marg.imshow(track_identity_marginal, aspect='auto', cmap=cmap, vmin=0.0, vmax=1.0, interpolation='nearest', origin='upper')
     ax_marg.set_xticks(np.arange(n_t))
-    ax_marg.set_xticklabels([str(i) if (i % max(1, n_t // 10) == 0 or i == n_t - 1) else '' for i in range(n_t)], color=fg, fontsize=7)
+    ax_marg.set_xticklabels([f't={i}' if (i % max(1, n_t // 10) == 0 or i == n_t - 1) else '' for i in range(n_t)], color=fg, fontsize=7)
+    ax_marg.xaxis.tick_top()  # t= labels ABOVE the marginal matrix
+    ax_marg.xaxis.set_label_position('top')
     ax_marg.set_yticks([0, 1])
     ax_marg.set_yticklabels(list(track_labels), fontsize=8)
     for tick_label, col in zip(ax_marg.get_yticklabels(), track_colors):
@@ -15324,16 +15326,16 @@ def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArr
     bb_raw_top = raw_axes[0].get_position()
     bb_raw_bottom = raw_axes[1].get_position() if n_t > 1 else bb_raw_top
     row_pitch = bb_raw_top.y1 - bb_raw_bottom.y1  # vertical pitch between t-rows (includes hspace)
-    cbar_h = float(np.clip(0.12 * row_pitch, 0.008, 0.02))
-    cbar_y0 = bb_raw_top.y1 + 0.45 * row_pitch
-    cbar_w = 0.6 * bb_raw_top.width
+    cbar_h = float(np.clip(0.30 * row_pitch, 0.018, 0.045))
+    cbar_y0 = bb_raw_top.y1 + 0.35 * row_pitch
+    cbar_w = 0.9 * bb_raw_top.width
     cax_prob = fig.add_axes([bb_raw_top.x0, cbar_y0, cbar_w, cbar_h])
     cbar_prob = fig.colorbar(ScalarMappable(norm=Normalize(vmin=0.0, vmax=1.0), cmap=cmap), cax=cax_prob, orientation='horizontal')
     cbar_prob.set_ticks(np.linspace(0.0, 1.0, 6))
-    cbar_prob.ax.tick_params(labelsize=6, colors=fg, length=2, width=0.5, pad=1)
+    cbar_prob.ax.tick_params(labelsize=8, colors=fg, length=3, width=0.6, pad=2)
     cbar_prob.outline.set_edgecolor(mid_fg)
     cbar_prob.outline.set_linewidth(0.6)
-    cbar_prob.set_label('probability', color=fg, fontsize=7, labelpad=1)
+    cbar_prob.set_label('probability', color=fg, fontsize=9, labelpad=2)
 
     if show_epoch_sum:
         ax_ep = fig.add_subplot(outer[0, 7])
