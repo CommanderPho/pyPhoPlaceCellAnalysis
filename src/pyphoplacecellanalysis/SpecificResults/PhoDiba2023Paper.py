@@ -15435,7 +15435,7 @@ def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArr
     # Gap tuning: each inter-column gap = wspace × mean subplot width (fixed by GridSpec).
     # Insert spacer columns to control gaps independently: col 3 = row-∑ connector gap (~1.5x), col 5 = trapezoid gap (~0.5x).
     # Columns: t-label | raw matrix | row-∑ conn gap | row-sum 4-vec | trapezoid gap | track-ID 2-vec | spacer | marginal | epoch sum
-    outer = GridSpec(2, 9, figure=fig, width_ratios=[0.30, 4.2, 0.24, 0.28, 0.01, 0.28, 0.14, 1.5, 0.45 if show_epoch_sum else 0.05], height_ratios=[3.0, float(n_t * n_contexts)], left=0.005, right=0.98, top=0.90, bottom=0.06, wspace=0.30, hspace=0.35)
+    outer = GridSpec(2, 9, figure=fig, width_ratios=[0.30, 4.2, 0.24, 0.28, 0.01, 0.28, 0.14, 1.5, 0.45 if show_epoch_sum else 0.05], height_ratios=[1.6, float(n_t * n_contexts)], left=0.005, right=0.98, top=0.90, bottom=0.06, wspace=0.30, hspace=0.35)
 
     raw_gs = GridSpecFromSubplotSpec(n_t, 1, subplot_spec=outer[1, 1], hspace=0.25)
     rowsum_gs = GridSpecFromSubplotSpec(n_t, 1, subplot_spec=outer[1, 3], hspace=0.25)
@@ -15489,10 +15489,12 @@ def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArr
     ax_marg.set_title('track_identity marginal', color=fg, fontsize=_title_fs, pad=6)
     ax_marg.tick_params(axis='both', which='both', colors=fg, bottom=False, top=False, left=False, right=False, length=0)  # NO tick marks anywhere (labels only)
 
-    # Shorten the header marginal to ~the per-t 2-vec height (2 matrix rows tall), vertically centered in the header slot
+    # Shorten the header marginal to ~the per-t 2-vec height (2 matrix rows tall), BOTTOM-anchored just above the t-stack
+    # (centering it in the header slot left a big dead gap below; anchor to the first t-row's top instead)
     _bb_marg0 = ax_marg.get_position()
     _tid_h: float = trackid_axes[0].get_position().height  # per-t track_ID 2-vec height (already v-centered/shrunk)
-    ax_marg.set_position([_bb_marg0.x0, (_bb_marg0.y0 + _bb_marg0.y1) / 2.0 - _tid_h / 2.0, _bb_marg0.width, _tid_h])
+    _marg_y0: float = raw_axes[0].get_position().y1 + 0.045  # small fixed gap above t=0 (clears the 'track_ID' title zone)
+    ax_marg.set_position([_bb_marg0.x0, _marg_y0, _bb_marg0.width, _tid_h])
 
     # 'Insert' indicator bands: each row's 2-vec → its column in the header marginal (drawn under the axes)
     for t_i, ax_tid in enumerate(trackid_axes):
