@@ -15156,25 +15156,27 @@ def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArr
         bb_mat = ax_mat.get_position()
         bb_rs = ax_rs.get_position()
         row_h: float = bb_mat.height / float(n_contexts)
+        gap_w: float = bb_rs.x0 - bb_mat.x1
+        arrow_w: float = min(0.008, gap_w * 0.30)  # triangle lives BETWEEN connector end and box, not overlapping the box
+        conn_x1: float = bb_rs.x0 - arrow_w
         for c_i in range(n_contexts):
             y_hi: float = bb_mat.y1 - c_i * row_h
             y_lo: float = y_hi - row_h
             conn = Polygon([
                 (bb_mat.x1, y_hi),
-                (bb_rs.x0, y_hi),
-                (bb_rs.x0, y_lo),
+                (conn_x1, y_hi),
+                (conn_x1, y_lo),
                 (bb_mat.x1, y_lo),
             ], closed=True, transform=fig.transFigure, facecolor=(0.85, 0.85, 0.88, 0.92), edgecolor=(0.45, 0.45, 0.50, 0.9), linewidth=0.6, zorder=0.5, clip_on=False)
             fig.add_artist(conn)
-            # Small grey triangular '>' arrowhead on the connector's right edge, pointing into the 4-vec element
-            arrow_w: float = min(0.006, (bb_rs.x0 - bb_mat.x1) * 0.25)
+            # Small grey triangular '>' arrowhead between the connector's right edge and the 4-vec box
             arrow = Polygon([
-                (bb_rs.x0, y_hi),
-                (bb_rs.x0 + arrow_w, (y_hi + y_lo) / 2.0),
-                (bb_rs.x0, y_lo),
+                (conn_x1, y_hi),
+                (bb_rs.x0, (y_hi + y_lo) / 2.0),
+                (conn_x1, y_lo),
             ], closed=True, transform=fig.transFigure, facecolor=(0.55, 0.55, 0.60, 0.95), edgecolor='none', zorder=1.5, clip_on=False)
             fig.add_artist(arrow)
-            fig.text((bb_mat.x1 + bb_rs.x0) / 2.0, (y_hi + y_lo) / 2.0, 'row ∑', ha='center', va='center', color='#808088', fontsize=6, zorder=2)
+            fig.text((bb_mat.x1 + conn_x1) / 2.0, (y_hi + y_lo) / 2.0, 'row ∑', ha='center', va='center', color='#808088', fontsize=6, zorder=2)
         ## END for c_i in range(n_contexts)...
         if t_i == 0:
             # Large ∑ with x subscript above the connector stack (mathtext, like the schematic)
@@ -15380,8 +15382,34 @@ def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArr
         for spine in ax_ep.spines.values():
             spine.set_color(mid_fg); spine.set_linewidth(0.8)
         ## END for spine in ax_ep.spines.values()...
-        ax_ep.set_title('∑ₜ\nepoch', color=mid_fg, fontsize=7, pad=4)
-        ax_ep.text(-0.35, 0.5, '∑ₜ', transform=ax_ep.transAxes, ha='right', va='center', color=fg, fontsize=11)
+        ax_ep.set_title('epoch', color=mid_fg, fontsize=7, pad=26)
+        # Same 'row ∑' horizontal connectors (with '>' arrowheads) between the marginal and the final epoch 2-vec, one per track row
+        bb_marg = ax_marg.get_position()
+        bb_ep = ax_ep.get_position()
+        ep_row_h: float = bb_ep.height / 2.0
+        gap_w: float = bb_ep.x0 - bb_marg.x1
+        arrow_w: float = min(0.008, gap_w * 0.30)  # triangle lives BETWEEN connector end and box, not overlapping the box
+        conn_x1: float = bb_ep.x0 - arrow_w
+        for r_i in range(2):
+            y_hi: float = bb_ep.y1 - r_i * ep_row_h
+            y_lo: float = y_hi - ep_row_h
+            conn = Polygon([
+                (bb_marg.x1, y_hi),
+                (conn_x1, y_hi),
+                (conn_x1, y_lo),
+                (bb_marg.x1, y_lo),
+            ], closed=True, transform=fig.transFigure, facecolor=(0.85, 0.85, 0.88, 0.92), edgecolor=(0.45, 0.45, 0.50, 0.9), linewidth=0.6, zorder=0.5, clip_on=False)
+            fig.add_artist(conn)
+            arrow = Polygon([
+                (conn_x1, y_hi),
+                (bb_ep.x0, (y_hi + y_lo) / 2.0),
+                (conn_x1, y_lo),
+            ], closed=True, transform=fig.transFigure, facecolor=(0.55, 0.55, 0.60, 0.95), edgecolor='none', zorder=1.5, clip_on=False)
+            fig.add_artist(arrow)
+            fig.text((bb_marg.x1 + conn_x1) / 2.0, (y_hi + y_lo) / 2.0, 'row ∑', ha='center', va='center', color='#808088', fontsize=6, zorder=2)
+        ## END for r_i in range(2)...
+        # Large ∑ with t subscript above the connectors, 'epoch' title above that (screenshot style)
+        fig.text((bb_marg.x1 + bb_ep.x0) / 2.0, bb_ep.y1 + 0.008, r'$\sum_{t}$', ha='center', va='bottom', color=mid_fg, fontsize=16, zorder=2)
     else:
         ax_ep = None
     ## END if show_epoch_sum...
