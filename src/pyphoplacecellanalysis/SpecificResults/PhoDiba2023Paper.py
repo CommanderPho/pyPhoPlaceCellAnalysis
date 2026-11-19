@@ -15048,7 +15048,8 @@ def _walkthru_build_long_short_display_posterior(p_x_given_n, context_names):
 
 
 @function_attributes(short_name='plot_map_based_context_decoder_walkthru', tags=['figure', 'figS2', 'pseudo2D', 'marginal', 'walkthru', 'pdf', 'publication'], input_requires=[], output_provides=[], uses=['DirectionalPseudo2DDecodersResult', 'LongShortDisplayConfigManager'], used_by=[], creation_date='2026-11-18 09:20', related_items=['figS2_Map-BasedContextDecoderWalkthru.pdf'])
-def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArray], save_path: Union[str, Path], context_names: Optional[List[str]] = None, max_time_bins: Optional[int] = None, cmap: str = 'viridis', show_epoch_sum: bool = True, title: Optional[str] = None, also_save_png: bool = True, figsize: Optional[Tuple[float, float]] = None) -> Tuple[Any, Dict[str, Any]]:
+def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArray], save_path: Union[str, Path], context_names: Optional[List[str]] = None, max_time_bins: Optional[int] = None, cmap: str = 'viridis', show_epoch_sum: bool = True, title: Optional[str] = None, 
+    also_save_png: bool = False, also_save_svg: bool = True, svg_save_path: Optional[Union[str, Path]] = None, figsize: Optional[Tuple[float, float]] = None) -> Tuple[Any, Dict[str, Any]]:
     """Reproduce the figS2 Map-Based Context Decoder walkthrough PDF for one epoch Pseudo2D posterior.
 
     Left: vertical stack of n_t raw (non-marginalized) posterior matrices, each (n_contexts × n_pos) — e.g. 4 decoder rows × position bins.
@@ -15064,17 +15065,22 @@ def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArr
         Output PDF path (parent dirs created as needed).
     max_time_bins : optional
         If set, only the first `max_time_bins` time bins are drawn (for readability on long epochs).
+    also_save_svg : bool
+        If True (default), also write an Illustrator-friendly semantic SVG (like the other publication figures).
+    svg_save_path : optional path-like
+        SVG destination. Defaults to the Figure S2 UneditedSources INPUT folder (dated 2026-11-19) with `save_path`'s stem.
 
     Returns
     -------
     fig, extras
-        extras includes display_p_x_given_n, row_sums, track_identity_marginal, save_path, png_path.
+        extras includes display_p_x_given_n, row_sums, track_identity_marginal, save_path, png_path, svg_path.
     """
     from matplotlib.gridspec import GridSpec, GridSpecFromSubplotSpec
     from matplotlib.patches import Polygon
     from matplotlib.colors import Normalize
     from matplotlib.cm import ScalarMappable
     from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import DecoderIdentityColors, long_short_display_config_manager
+    from pyphoplacecellanalysis.General.Mixins.ExportHelpers import savefig_svg_semantic
 
     def _subfn_add_xy_unit_grid(ax, n_x: int, n_y: int, grid_color: str = '#b0a8c0', linewidth: float = 0.35, alpha: float = 0.45):
         """Overlay integer x/y bin-edge grid lines on a raw posterior axes (unit-index grid)."""
@@ -15316,7 +15322,7 @@ def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArr
     # Gap tuning: each inter-column gap = wspace × mean subplot width (fixed by GridSpec).
     # Insert spacer columns to control gaps independently: col 3 = row-∑ connector gap (~1.5x), col 5 = trapezoid gap (~0.5x).
     # Columns: t-label | raw matrix | row-∑ conn gap | row-sum 4-vec | trapezoid gap | track-ID 2-vec | spacer | marginal | epoch sum
-    outer = GridSpec(2, 9, figure=fig, width_ratios=[0.55, 4.2, 0.42, 0.28, 0.01, 0.28, 0.14, 1.5, 0.45 if show_epoch_sum else 0.05], height_ratios=[3.0, float(n_t * n_contexts)], left=0.08, right=0.98, top=0.90, bottom=0.06, wspace=0.30, hspace=0.35)
+    outer = GridSpec(2, 9, figure=fig, width_ratios=[0.55, 4.2, 0.42, 0.28, 0.01, 0.28, 0.14, 1.5, 0.45 if show_epoch_sum else 0.05], height_ratios=[3.0, float(n_t * n_contexts)], left=0.02, right=0.98, top=0.90, bottom=0.06, wspace=0.30, hspace=0.35)
 
     raw_gs = GridSpecFromSubplotSpec(n_t, 1, subplot_spec=outer[1, 1], hspace=0.25)
     rowsum_gs = GridSpecFromSubplotSpec(n_t, 1, subplot_spec=outer[1, 3], hspace=0.25)
@@ -15444,6 +15450,14 @@ def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArr
         fig.savefig(png_path, format='png', dpi=200, facecolor=fig.get_facecolor(), edgecolor='none', bbox_inches='tight')
     ## END if also_save_png...
 
+    svg_path = None
+    if also_save_svg:
+        if svg_save_path is None:
+            svg_save_path = Path(r'E:/Dropbox (Personal)/Active/Kamran Diba Lab/Pho-Kamran-Meetings/Pho Diba Paper 2023/Figures/UneditedSources/Figure S2 - Map-Based Context Decoder Walkthru/INPUT/2026-11-19') / f'{save_path.stem}.svg'
+        ## END if svg_save_path is None...
+        svg_path = savefig_svg_semantic(fig, svg_save_path, transparent=False, bbox_inches='tight', pad_inches=0.02)
+    ## END if also_save_svg...
+
     mpl.rcParams.update(_prev_rc)  # restore caller's rcParams after publication-styled rendering/saving
 
     extras: Dict[str, Any] = dict(
@@ -15454,6 +15468,7 @@ def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArr
         context_names=resolved_context_names,
         save_path=save_path,
         png_path=png_path,
+        svg_path=svg_path,
         n_x=n_x,
         n_y=n_y,
         n_contexts=n_contexts,
