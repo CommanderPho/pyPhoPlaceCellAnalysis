@@ -14995,7 +14995,11 @@ class Figure2Extended:
 
 
 def _walkthru_extract_p_x_given_n(pseudo2D_posterior, context_names=None):
-    """Normalize SingleEpochDecodedResult or NDArray into (n_x, n_contexts, n_t) + context_names."""
+    """Normalize SingleEpochDecodedResult or NDArray into (n_x, n_y, n_contexts, n_t) + context_names.
+
+    3D Pseudo2D `(n_x, n_contexts, n_t)` is promoted with a singleton y axis so the left panel
+    always draws an x/y unit grid (height 1 when no true y bins exist).
+    """
     from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import SingleEpochDecodedResult
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalPseudo2DDecodersResult
 
@@ -15004,40 +15008,50 @@ def _walkthru_extract_p_x_given_n(pseudo2D_posterior, context_names=None):
     else:
         p_x_given_n = np.asarray(pseudo2D_posterior, dtype=float)
 
-    if p_x_given_n.ndim == 4:
-        # (n_x, n_y, n_contexts, n_t) → sum over spatial y so left panel stays 1D position × context
-        p_x_given_n = np.nansum(p_x_given_n, axis=1)
-    ## END if p_x_given_n.ndim == 4...
+    if p_x_given_n.ndim == 3:
+        # (n_x, n_contexts, n_t) → singleton y so callers always get an x/y map
+        p_x_given_n = p_x_given_n[:, np.newaxis, :, :]
+    ## END if p_x_given_n.ndim == 3...
 
-    assert p_x_given_n.ndim == 3, f"expected (n_x, n_contexts, n_t), got shape={p_x_given_n.shape}"
-    n_contexts: int = int(p_x_given_n.shape[1])
+    assert p_x_given_n.ndim == 4, f"expected (n_x, n_y, n_contexts, n_t), got shape={p_x_given_n.shape}"
+    n_contexts: int = int(p_x_given_n.shape[2])
     resolved_context_names: List[str] = DirectionalPseudo2DDecodersResult._resolve_context_names(p_x_given_n, n_contexts, context_names=context_names)
     return p_x_given_n, resolved_context_names
 
 
+def _walkthru_add_xy_unit_grid(ax, n_x: int, n_y: int, grid_color: str = '#b0a8c0', linewidth: float = 0.35, alpha: float = 0.45):
+    """Overlay integer x/y bin-edge grid lines on a raw posterior axes (unit-index grid)."""
+    ax.set_xticks(np.arange(n_x + 1, dtype=float), minor=True)
+    ax.set_yticks(np.arange(n_y + 1, dtype=float), minor=True)
+    ax.grid(True, which='minor', color=grid_color, linestyle='-', linewidth=linewidth, alpha=alpha, zorder=10)
+    ax.tick_params(axis='both', which='both', bottom=False, top=False, left=False, right=False, labelbottom=False, labelleft=False)
+    ax.set_xlim(0, n_x)
+    ax.set_ylim(0, n_y)
+
+
 def _walkthru_build_long_short_display_posterior(p_x_given_n, context_names):
-    """Collapse directional contexts to Long/Short position posteriors and track-identity marginals.
+    """Collapse directional contexts to Long/Short x/y position posteriors and track-identity marginals.
 
     Returns
     -------
-    display_p_x_given_n : (n_x, 2, n_t) Long then Short position posteriors
-    row_sums : (2, n_t) unnormalized ∑_x mass per track per time bin
+    display_p_x_given_n : (n_x, n_y, 2, n_t) Long then Short position posteriors
+    row_sums : (2, n_t) unnormalized ∑_{x,y} mass per track per time bin
     track_identity_marginal : (2, n_t) row_sums renormalized across Long/Short per time bin
     """
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalPseudo2DDecodersResult
 
-    n_x, n_contexts, n_t = p_x_given_n.shape
+    n_x, n_y, n_contexts, n_t = p_x_given_n.shape
     track_identity_group_indices = DirectionalPseudo2DDecodersResult._infer_track_identity_group_indices(list(context_names), n_contexts)
     assert track_identity_group_indices is not None, f"Cannot infer Long/Short groups from context_names={context_names} (n_contexts={n_contexts})"
     long_idxs, short_idxs = track_identity_group_indices
 
-    # Sum LR+RL (or whatever is in each track group) in position space → (n_x, 2, n_t)
+    # Sum LR+RL (or whatever is in each track group) in position space → (n_x, n_y, 2, n_t)
     display_p_x_given_n = np.stack([
-        np.nansum(p_x_given_n[:, long_idxs, :], axis=1),
-        np.nansum(p_x_given_n[:, short_idxs, :], axis=1),
-    ], axis=1)
+        np.nansum(p_x_given_n[:, :, long_idxs, :], axis=2),
+        np.nansum(p_x_given_n[:, :, short_idxs, :], axis=2),
+    ], axis=2)
 
-    row_sums = np.nansum(display_p_x_given_n, axis=0)  # (2, n_t)
+    row_sums = np.nansum(display_p_x_given_n, axis=(0, 1))  # (2, n_t)
     track_identity_marginal = DirectionalPseudo2DDecodersResult._normalize_per_timebin_context_marginal(row_sums)
     return display_p_x_given_n, row_sums, track_identity_marginal
 
@@ -15046,14 +15060,15 @@ def _walkthru_build_long_short_display_posterior(p_x_given_n, context_names):
 def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArray], save_path: Union[str, Path], context_names: Optional[List[str]] = None, max_time_bins: Optional[int] = None, cmap: str = 'viridis', show_epoch_sum: bool = True, title: Optional[str] = None, also_save_png: bool = True, figsize: Optional[Tuple[float, float]] = None) -> Tuple[Any, Dict[str, Any]]:
     """Reproduce the figS2 Map-Based Context Decoder walkthrough PDF for one epoch Pseudo2D posterior.
 
-    Left: raw Long/Short position heatmaps per time bin (directional contexts collapsed when n_contexts==4).
-    Mid: row ∑ over position, then + across Long/Short.
+    Left: raw Long/Short x/y unit-grid heatmaps per time bin (directional contexts collapsed when n_contexts==4).
+    Mid: row ∑ over position (∑_{x,y}), then + across Long/Short.
     Right: track_identity marginal (2 × T), with a grey trapezoid callout from the mid column.
 
     Parameters
     ----------
     pseudo2D_posterior : SingleEpochDecodedResult or NDArray
         Shape (n_x, n_contexts, n_t) or (n_x, n_y, n_contexts, n_t).
+        3D inputs get a singleton y axis so each panel is still drawn as an x/y unit grid.
     save_path : path-like
         Output PDF path (parent dirs created as needed).
     max_time_bins : optional
@@ -15075,11 +15090,11 @@ def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArr
     p_x_given_n, resolved_context_names = _walkthru_extract_p_x_given_n(pseudo2D_posterior, context_names=context_names)
     display_p_x_given_n, row_sums, track_identity_marginal = _walkthru_build_long_short_display_posterior(p_x_given_n, resolved_context_names)
 
-    n_x, n_tracks, n_t_full = display_p_x_given_n.shape
+    n_x, n_y, n_tracks, n_t_full = display_p_x_given_n.shape
     assert n_tracks == 2
     if max_time_bins is not None and n_t_full > int(max_time_bins):
         n_t = int(max_time_bins)
-        display_p_x_given_n = display_p_x_given_n[:, :, :n_t]
+        display_p_x_given_n = display_p_x_given_n[:, :, :, :n_t]
         row_sums = row_sums[:, :n_t]
         track_identity_marginal = track_identity_marginal[:, :n_t]
     else:
@@ -15104,8 +15119,9 @@ def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArr
     mid_fg = '#b0a8c0'
 
     if figsize is None:
-        # Scale height with number of time bins (≈ figS2 proportions for ~10 bins)
-        figsize = (6.6, max(4.5, 0.55 * n_t + 1.8))
+        # Scale height with time bins and y-bin count (true 2D maps need taller strips)
+        y_height_scale: float = max(1.0, float(n_y) / 4.0)
+        figsize = (6.6, max(4.5, 0.55 * n_t * y_height_scale + 1.8))
     ## END if figsize is None...
 
     fig = plt.figure(figsize=figsize, facecolor=bg, constrained_layout=False)
@@ -15152,9 +15168,11 @@ def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArr
             strip_row: int = (t_i * 2) + c_i
             ax = fig.add_subplot(raw_gs[strip_row, 0])
             ax.set_facecolor(bg)
-            img = display_p_x_given_n[:, c_i, t_i][np.newaxis, :]
-            ax.imshow(img, aspect='auto', cmap=cmap, norm=norm_raw, interpolation='nearest', origin='lower')
+            # (n_x, n_y) → imshow expects (n_y, n_x); extent keeps integer unit-bin edges
+            img = np.asarray(display_p_x_given_n[:, :, c_i, t_i], dtype=float).T
+            ax.imshow(img, aspect='auto', cmap=cmap, norm=norm_raw, interpolation='nearest', origin='lower', extent=[0, n_x, 0, n_y])
             ax.set_xticks([]); ax.set_yticks([])
+            _walkthru_add_xy_unit_grid(ax, n_x=n_x, n_y=n_y, grid_color=mid_fg)
             for spine in ax.spines.values():
                 spine.set_color(mid_fg); spine.set_linewidth(0.6)
             ## END for spine in ax.spines.values()...
@@ -15244,6 +15262,8 @@ def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArr
         context_names=resolved_context_names,
         save_path=save_path,
         png_path=png_path,
+        n_x=n_x,
+        n_y=n_y,
         n_time_bins_drawn=n_t,
         n_time_bins_full=n_t_full,
         ax_marginal=ax_marg,
