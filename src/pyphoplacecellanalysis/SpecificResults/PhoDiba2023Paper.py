@@ -15245,7 +15245,8 @@ def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArr
             spine.set_color(mid_fg); spine.set_linewidth(_axes_lw)
         ## END for spine in ax_tid.spines.values()...
         if t_i == 0:
-            ax_tid.set_title('track_ID', color=mid_fg, fontsize=_label_fs, pad=2)
+            _title_tid = ax_tid.set_title('track_ID', color=mid_fg, fontsize=_label_fs, pad=2)
+            _title_tid.set_zorder(30)  # top z-pos: draw above the trapezoid/insert connector bands
         ## END if t_i == 0...
         # v-align center: shrink the 2-row column to half the matrix height, centered on the same vertical midpoint
         bb_mat = ax_mat.get_position()
@@ -15434,7 +15435,7 @@ def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArr
     # Gap tuning: each inter-column gap = wspace × mean subplot width (fixed by GridSpec).
     # Insert spacer columns to control gaps independently: col 3 = row-∑ connector gap (~1.5x), col 5 = trapezoid gap (~0.5x).
     # Columns: t-label | raw matrix | row-∑ conn gap | row-sum 4-vec | trapezoid gap | track-ID 2-vec | spacer | marginal | epoch sum
-    outer = GridSpec(2, 9, figure=fig, width_ratios=[0.30, 4.2, 0.34, 0.28, 0.01, 0.28, 0.14, 1.5, 0.45 if show_epoch_sum else 0.05], height_ratios=[3.0, float(n_t * n_contexts)], left=0.005, right=0.98, top=0.90, bottom=0.06, wspace=0.30, hspace=0.35)
+    outer = GridSpec(2, 9, figure=fig, width_ratios=[0.30, 4.2, 0.24, 0.28, 0.01, 0.28, 0.14, 1.5, 0.45 if show_epoch_sum else 0.05], height_ratios=[3.0, float(n_t * n_contexts)], left=0.005, right=0.98, top=0.90, bottom=0.06, wspace=0.30, hspace=0.35)
 
     raw_gs = GridSpecFromSubplotSpec(n_t, 1, subplot_spec=outer[1, 1], hspace=0.25)
     rowsum_gs = GridSpecFromSubplotSpec(n_t, 1, subplot_spec=outer[1, 3], hspace=0.25)
@@ -15466,7 +15467,7 @@ def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArr
 
     # x-centered 'position \vec{x}' label under the bottom posterior matrix
     bb_bottom_mat = raw_axes[-1].get_position()
-    fig.text((bb_bottom_mat.x0 + bb_bottom_mat.x1) / 2.0, bb_bottom_mat.y0 - 0.012, r'position $\vec{x}$', ha='center', va='top', color=fg, fontsize=_label_fs)
+    fig.text((bb_bottom_mat.x0 + bb_bottom_mat.x1) / 2.0, bb_bottom_mat.y0 - 0.003, r'position $\vec{x}$', ha='center', va='top', color=fg, fontsize=_label_fs)
 
     # Header row (above first t-row): track_identity marginal (Long/Short only — contexts collapsed here)
     ax_marg = fig.add_subplot(outer[0, 7])
@@ -15487,6 +15488,11 @@ def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArr
     ## END for spine in ax_marg.spines.values()...
     ax_marg.set_title('track_identity marginal', color=fg, fontsize=_title_fs, pad=6)
     ax_marg.tick_params(axis='both', which='both', colors=fg, bottom=False, top=False, left=False, right=False, length=0)  # NO tick marks anywhere (labels only)
+
+    # Shorten the header marginal to ~the per-t 2-vec height (2 matrix rows tall), vertically centered in the header slot
+    _bb_marg0 = ax_marg.get_position()
+    _tid_h: float = trackid_axes[0].get_position().height  # per-t track_ID 2-vec height (already v-centered/shrunk)
+    ax_marg.set_position([_bb_marg0.x0, (_bb_marg0.y0 + _bb_marg0.y1) / 2.0 - _tid_h / 2.0, _bb_marg0.width, _tid_h])
 
     # 'Insert' indicator bands: each row's 2-vec → its column in the header marginal (drawn under the axes)
     for t_i, ax_tid in enumerate(trackid_axes):
@@ -15524,6 +15530,10 @@ def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArr
         for spine in ax_ep.spines.values():
             spine.set_color(mid_fg); spine.set_linewidth(_axes_lw)
         ## END for spine in ax_ep.spines.values()...
+        # Match the (shortened) header marginal's height and vertical center so the transfer connectors line up
+        _bb_ep0 = ax_ep.get_position()
+        _bb_marg_shrunk = ax_marg.get_position()
+        ax_ep.set_position([_bb_ep0.x0, _bb_marg_shrunk.y0, _bb_ep0.width, _bb_marg_shrunk.height])
         # 'epoch' label above the 2-vec in InnerDarkGrey (per Sketch epoch-header SVG: text fill #8F8F8F)
         ax_ep.set_title('epoch', color=inner_dark_grey, fontsize=_label_fs, pad=4)
         # Same 'row ∑' horizontal connectors (with '>' arrowheads) between the marginal and the final epoch 2-vec, one per track row
