@@ -15132,7 +15132,7 @@ def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArr
         for spine in ax_t.spines.values():
             spine.set_visible(False)
         ## END for spine in ax_t.spines.values()...
-        ax_t.text(0.95, 0.5, f't={t_i}', transform=ax_t.transAxes, ha='right', va='center', color=fg, fontsize=1.5 * _label_fs, fontweight='bold')
+        ax_t.text(1.0, 0.5, f't={t_i}', transform=ax_t.transAxes, ha='right', va='center', color=fg, fontsize=10.0, fontweight='normal')
         return ax_t
 
     def _subfn_draw_raw_posterior_matrix(t_i: int):
@@ -15324,7 +15324,7 @@ def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArr
         # Long/Short labels at the right edge of the 2-vec, aligned with its two elements
         for lab_i, (lab, col) in enumerate(zip(track_labels, track_colors)):
             y_frac: float = 0.75 if lab_i == 0 else 0.25
-            fig.text(bb_tid.x1 + 0.004, bb_tid.y0 + bb_tid.height * y_frac, lab, ha='left', va='center', color=col, fontsize=_label_fs, zorder=2)
+            fig.text(bb_tid.x1 + 0.004, bb_tid.y0 + bb_tid.height * y_frac, lab, ha='left', va='center', color=col, fontsize=_label_fs, fontweight='bold', zorder=2)
         ## END for lab_i, (lab, col) in enumerate(zip(track_labels, track_colors))...
 
     # KDiba publication typography/strokes (Artboard-3): Arial, ~8.077pt labels, ~9.087pt titles, 0.75pt lines, Type-42 vector fonts
@@ -15361,8 +15361,10 @@ def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArr
     long_color = '#0099ff'
     short_color = '#f51616'
     try:
-        long_color = long_short_display_config_manager.long_epoch_config.as_matplotlib_kwargs().get('facecolor', long_color)
-        short_color = long_short_display_config_manager.short_epoch_config.as_matplotlib_kwargs().get('facecolor', short_color)
+        # Strip brush alpha: epoch-config brushes are translucent fill colors ('#0099ff42' / '#f5161659', alpha ≈ 0.26/0.35)
+        # meant for epoch spans — as 8-digit hex they render Long/Short TEXT washed-out. Labels want the fully opaque color.
+        long_color = str(long_short_display_config_manager.long_epoch_config.as_matplotlib_kwargs().get('facecolor', long_color))[:7]
+        short_color = str(long_short_display_config_manager.short_epoch_config.as_matplotlib_kwargs().get('facecolor', short_color))[:7]
     except Exception:
         pass
 
@@ -15397,7 +15399,7 @@ def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArr
     # Gap tuning: each inter-column gap = wspace × mean subplot width (fixed by GridSpec).
     # Insert spacer columns to control gaps independently: col 3 = row-∑ connector gap (~1.5x), col 5 = trapezoid gap (~0.5x).
     # Columns: t-label | raw matrix | row-∑ conn gap | row-sum 4-vec | trapezoid gap | track-ID 2-vec | spacer | marginal | epoch sum
-    outer = GridSpec(2, 9, figure=fig, width_ratios=[0.55, 4.2, 0.42, 0.28, 0.01, 0.28, 0.14, 1.5, 0.45 if show_epoch_sum else 0.05], height_ratios=[3.0, float(n_t * n_contexts)], left=0.02, right=0.98, top=0.90, bottom=0.06, wspace=0.30, hspace=0.35)
+    outer = GridSpec(2, 9, figure=fig, width_ratios=[0.30, 4.2, 0.34, 0.28, 0.01, 0.28, 0.14, 1.5, 0.45 if show_epoch_sum else 0.05], height_ratios=[3.0, float(n_t * n_contexts)], left=0.005, right=0.98, top=0.90, bottom=0.06, wspace=0.30, hspace=0.35)
 
     raw_gs = GridSpecFromSubplotSpec(n_t, 1, subplot_spec=outer[1, 1], hspace=0.25)
     rowsum_gs = GridSpecFromSubplotSpec(n_t, 1, subplot_spec=outer[1, 3], hspace=0.25)
@@ -15440,11 +15442,8 @@ def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArr
     ax_marg.set_xticklabels([str(i) if (i % max(1, n_t // 10) == 0 or i == n_t - 1) else '' for i in range(n_t)], color=fg, fontsize=_label_fs)
     ax_marg.xaxis.tick_top()  # bin-number labels ABOVE the marginal matrix
     ax_marg.xaxis.set_label_position('top')
-    # Single 't=' prefix to the left of the 0 label (space constraints: no per-tick 't=')
-    bb_marg_top = ax_marg.get_position()
-    fig.text(bb_marg_top.x0 - 0.006, bb_marg_top.y1 + 0.014, 't=', ha='right', va='bottom', color=fg, fontsize=_label_fs)
     ax_marg.set_yticks([0, 1])
-    ax_marg.set_yticklabels(list(track_labels), fontsize=_label_fs)
+    ax_marg.set_yticklabels(list(track_labels), fontsize=_label_fs, fontweight='bold')
     for tick_label, col in zip(ax_marg.get_yticklabels(), track_colors):
         tick_label.set_color(col)
     ## END for tick_label, col in zip(ax_marg.get_yticklabels(), track_colors)...
@@ -15460,6 +15459,11 @@ def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArr
     ## END for t_i, ax_tid in enumerate(trackid_axes)...
 
     fig.canvas.draw()  # needed for accurate transforms before first save
+
+    # Single 't=' prefix to the left of the 0 bin-number label, baseline-aligned with the tick labels
+    # (anchored to the actual '0' Text artist's rendered extent, not hardcoded figure offsets)
+    _bb_zero_tick = ax_marg.get_xticklabels()[0].get_window_extent().transformed(fig.transFigure.inverted())
+    fig.text(_bb_zero_tick.x0 - 0.004, _bb_zero_tick.y0, 't=', ha='right', va='bottom', color=fg, fontsize=_label_fs)
 
     # Probability colorbar in the empty left area just above the t=0 row (gap between the header row and the per-t stack), left-aligned with the raw matrices
     bb_raw_top = raw_axes[0].get_position()
