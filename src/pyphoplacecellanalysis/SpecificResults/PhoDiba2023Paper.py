@@ -15346,14 +15346,21 @@ def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArr
         raw_axes.append(ax); rowsum_axes.append(ax_rs); trackid_axes.append(ax_tid)
     ## END for t_i in range(n_t)...
 
+    # x-centered 'position \vec{x}' label under the bottom posterior matrix
+    bb_bottom_mat = raw_axes[-1].get_position()
+    fig.text((bb_bottom_mat.x0 + bb_bottom_mat.x1) / 2.0, bb_bottom_mat.y0 - 0.012, r'position $\vec{x}$', ha='center', va='top', color=fg, fontsize=_label_fs)
+
     # Header row (above first t-row): track_identity marginal (Long/Short only — contexts collapsed here)
     ax_marg = fig.add_subplot(outer[0, 7])
     ax_marg.set_facecolor(bg)
     ax_marg.imshow(track_identity_marginal, aspect='auto', cmap=cmap, vmin=0.0, vmax=1.0, interpolation='nearest', origin='upper')
     ax_marg.set_xticks(np.arange(n_t))
-    ax_marg.set_xticklabels([f't={i}' if (i % max(1, n_t // 10) == 0 or i == n_t - 1) else '' for i in range(n_t)], color=fg, fontsize=_label_fs)
-    ax_marg.xaxis.tick_top()  # t= labels ABOVE the marginal matrix
+    ax_marg.set_xticklabels([str(i) if (i % max(1, n_t // 10) == 0 or i == n_t - 1) else '' for i in range(n_t)], color=fg, fontsize=_label_fs)
+    ax_marg.xaxis.tick_top()  # bin-number labels ABOVE the marginal matrix
     ax_marg.xaxis.set_label_position('top')
+    # Single 't=' prefix to the left of the 0 label (space constraints: no per-tick 't=')
+    bb_marg_top = ax_marg.get_position()
+    fig.text(bb_marg_top.x0 - 0.006, bb_marg_top.y1 + 0.014, 't=', ha='right', va='bottom', color=fg, fontsize=_label_fs)
     ax_marg.set_yticks([0, 1])
     ax_marg.set_yticklabels(list(track_labels), fontsize=_label_fs)
     for tick_label, col in zip(ax_marg.get_yticklabels(), track_colors):
