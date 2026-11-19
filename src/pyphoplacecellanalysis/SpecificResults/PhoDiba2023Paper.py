@@ -15117,7 +15117,7 @@ def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArr
         for spine in ax_t.spines.values():
             spine.set_visible(False)
         ## END for spine in ax_t.spines.values()...
-        ax_t.text(0.95, 0.5, f't={t_i}', transform=ax_t.transAxes, ha='right', va='center', color=fg, fontsize=_label_fs, fontweight='bold')
+        ax_t.text(0.95, 0.5, f't={t_i}', transform=ax_t.transAxes, ha='right', va='center', color=fg, fontsize=1.5 * _label_fs, fontweight='bold')
         return ax_t
 
     def _subfn_draw_raw_posterior_matrix(t_i: int):
@@ -15131,9 +15131,9 @@ def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArr
         for spine in ax.spines.values():
             spine.set_color(mid_fg); spine.set_linewidth(_axes_lw)
         ## END for spine in ax.spines.values()...
-        # Decoder labels on the left, vertically centered on each matrix row
+        # Decoder labels INSIDE the matrix, left-aligned near the left edge, vertically centered on each matrix row
         for c_i, (lab, col) in enumerate(zip(context_labels, context_colors)):
-            ax.text(-0.02, (c_i + 0.5) / n_contexts, lab, transform=ax.transAxes, ha='right', va='center', color=col, fontsize=_small_fs, clip_on=False)
+            ax.text(0.02, (c_i + 0.5) / n_contexts, lab, transform=ax.transAxes, ha='left', va='center', color=col, fontsize=_small_fs, clip_on=False)
         ## END for c_i, (lab, col) in enumerate(zip(context_labels, context_colors))...
         return ax
 
