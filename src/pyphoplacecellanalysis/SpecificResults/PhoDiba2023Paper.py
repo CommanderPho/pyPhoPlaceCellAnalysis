@@ -15165,8 +15165,36 @@ def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArr
             # Large bold + sized to the trapezoid's height at its horizontal midpoint (screenshot style)
             trap_mid_h: float = ((rs_y_hi - rs_y_lo) + (tid_y_hi - tid_y_lo)) / 2.0
             plus_fontsize: float = float(np.clip(trap_mid_h * fig.get_size_inches()[1] * fig.dpi * 0.9, 12, 30))
-            fig.text((bb_rs.x1 + bb_tid.x0) / 2.0, (tid_y_hi + tid_y_lo) / 2.0, '+', ha='center', va='center', color='#808088', fontsize=plus_fontsize, fontweight='bold', zorder=2)
+            # Center each + in its trapezoid's vertical span at the midpoint x: top + sits up, bottom + sits clearly down (screenshot style)
+            mid_y_hi: float = (rs_y_hi + tid_y_hi) / 2.0
+            mid_y_lo: float = (rs_y_lo + tid_y_lo) / 2.0
+            fig.text((bb_rs.x1 + bb_tid.x0) / 2.0, (mid_y_hi + mid_y_lo) / 2.0, '+', ha='center', va='center', color='#808088', fontsize=plus_fontsize, fontweight='bold', zorder=2)
         ## END for g_i, (rs_y_hi, rs_y_lo, tid_y_hi, tid_y_lo) in enumerate([...])...
+
+    def _subfn_draw_insert_connectors(ax_tid, t_i: int):
+        """'Insert' indicator: L-shaped band from this row's (2×1) track_ID vector to column t_i of the header marginal matrix.
+
+        Runs right from the 2-vec, then turns up into the bottom of the marginal's t_i column (nested L's, inner rows turn first).
+        """
+        bb_tid = ax_tid.get_position()
+        bb_marg = ax_marg.get_position()
+        col_w: float = bb_marg.width / float(n_t)
+        col_x0: float = bb_marg.x0 + t_i * col_w
+        col_x1: float = col_x0 + col_w
+        band = Polygon([
+            (bb_tid.x1, bb_tid.y1),
+            (col_x1, bb_tid.y1),
+            (col_x1, bb_marg.y0),
+            (col_x0, bb_marg.y0),
+            (col_x0, bb_tid.y0),
+            (bb_tid.x1, bb_tid.y0),
+        ], closed=True, transform=fig.transFigure, facecolor=(0.85, 0.85, 0.88, 0.92), edgecolor=(0.45, 0.45, 0.50, 0.9), linewidth=0.6, zorder=0, clip_on=False)
+        fig.add_artist(band)
+        # Long/Short labels at the right edge of the 2-vec, aligned with its two elements
+        for lab_i, (lab, col) in enumerate(zip(track_labels, track_colors)):
+            y_frac: float = 0.75 if lab_i == 0 else 0.25
+            fig.text(bb_tid.x1 + 0.004, bb_tid.y0 + bb_tid.height * y_frac, lab, ha='left', va='center', color=col, fontsize=7, zorder=2)
+        ## END for lab_i, (lab, col) in enumerate(zip(track_labels, track_colors))...
 
     save_path = Path(save_path).resolve()
     save_path.parent.mkdir(parents=True, exist_ok=True)
@@ -15264,6 +15292,11 @@ def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArr
     ## END for spine in ax_marg.spines.values()...
     ax_marg.set_title('track_identity marginal', color=fg, fontsize=9, pad=6)
     ax_marg.tick_params(colors=fg, length=2)
+
+    # 'Insert' indicator bands: each row's 2-vec → its column in the header marginal (drawn under the axes)
+    for t_i, ax_tid in enumerate(trackid_axes):
+        _subfn_draw_insert_connectors(ax_tid=ax_tid, t_i=t_i)
+    ## END for t_i, ax_tid in enumerate(trackid_axes)...
 
     fig.canvas.draw()  # needed for accurate transforms before first save
 
