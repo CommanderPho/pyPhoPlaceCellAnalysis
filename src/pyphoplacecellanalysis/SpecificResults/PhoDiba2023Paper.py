@@ -15151,8 +15151,10 @@ def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArr
             x_text: float = bb.x1 - 0.004 - tri_w_fig - 0.003  # right-aligned text block just left of the triangle
             for c_i, (lab, col) in enumerate(zip(context_labels, context_colors)):
                 y_center: float = bb.y1 - (c_i + 0.5) * row_h_fig
-                txt = fig.text(x_text, y_center, lab, ha='right', va='center', color=col, fontsize=overlay_fs, zorder=12, clip_on=False)
-                txt.set_path_effects([pe.withStroke(linewidth=max(1.0, 0.16 * overlay_fs), foreground='white')])
+                # Text fill per the overlay SVG itself: both Long rows #0091FF, both Short rows #E20000 (NOT the 4 unique decoder colors)
+                overlay_col: str = '#0091FF' if lab.startswith('long') else '#E20000'
+                txt = fig.text(x_text, y_center, lab, ha='right', va='center', color=overlay_col, fontsize=overlay_fs, zorder=12, clip_on=False)
+                txt.set_path_effects([pe.withStroke(linewidth=max(0.4, 0.05 * overlay_fs), foreground='white')])
                 # Direction triangle: LR runs left→right (points right), RL runs right→left (points left)
                 wants_right: bool = lab.endswith('LR')
                 tri_facecolor: str = '#AADD21' if wants_right else '#5522DE'
