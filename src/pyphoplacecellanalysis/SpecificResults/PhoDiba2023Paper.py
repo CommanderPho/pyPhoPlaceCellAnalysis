@@ -15124,6 +15124,43 @@ def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArr
             ax.tick_params(axis='both', which='major', bottom=False, top=False, left=False, right=False, labelbottom=False, labelleft=False)
         ## END if not keep_major_ticks...
 
+    def _subfn_draw_sketch_sigma(x_center: float, y_top: float, height_in: float, subscript: str = 't', color: str = '#979797', zorder: float = 2):
+        """Draw the Sketch 'Sigma Symbol' (Untitled-1:26-27) as a vector polygon instead of mathtext ∑.
+
+        Exact SVG outline vertices (viewBox 63 × 97.878, y-down): big ∑ glyph + small italic subscript centered below.
+        The SVG's few tiny cubic corner-rounding segments are dropped (sub-pixel at publication size).
+        x_center/y_top are figure-fraction coords of the ∑'s top-center; height_in is the ∑ glyph height in inches.
+        Returns the figure-fraction y of the subscript's bottom.
+        """
+        fig_w_in, fig_h_in = fig.get_size_inches()
+        s: float = height_in / 47.123  # inches per SVG unit (∑ outline spans y 0..47.123)
+
+        def _to_fig(vx: float, vy: float, cx_svg: float, y0_svg: float):
+            """SVG-local (y-down) → figure fraction; cx_svg is the horizontal centering offset in SVG units."""
+            return (x_center + (vx - cx_svg) * s / fig_w_in, y_top - (y0_svg + vy) * s / fig_h_in)
+        ## END def _to_fig...
+
+        ## Big ∑ outline, SVG local coords (original translate(5.234, 27.378) dropped; centered on x=22.4)
+        sigma_verts = [(40.731, 47.123), (44.801, 36.356), (43.962, 36.356), (35.211, 43.154), (24.744, 44.199), (4.444, 44.199), (21.577, 24.1), (21.878, 23.562), (21.646, 23.06), (5.959, 1.615), (24.406, 1.615), (32.281, 2.153), (39.686, 4.677), (43.962, 9.458), (44.801, 9.458), (40.731, 0.0), (0.945, 0.0), (0.037, 0.237), (0.0, 1.346), (17.808, 25.715), (0.369, 46.147), (0.037, 46.754), (0.945, 47.123), (40.731, 47.123)]
+        sigma_fig = [_to_fig(vx, vy, 22.4, 0.0) for vx, vy in sigma_verts]
+        fig.add_artist(Polygon(sigma_fig, closed=True, transform=fig.transFigure, facecolor=color, edgecolor='none', zorder=zorder, clip_on=False))
+        ## Small italic subscript centered below the ∑ (SVG: ∑ bottom 74.501, subscript top 82.919 → 8.418-unit gap)
+        sub_y0: float = 47.123 + 8.418
+        sub_scale: float = 1.5 * s  # subscript ~1.5x bigger than the SVG's original proportion
+        sub_h_svg: float = 14.958
+        if subscript == 't':
+            # Exact italic 't' outline from the SVG (local coords, width 7.965)
+            t_verts = [(4.808, 5.415), (7.21, 5.415), (7.965, 4.898), (7.257, 4.566), (5.02, 4.566), (5.89, 1.082), (5.964, 0.749), (5.162, 0.0), (4.054, 1.008), (3.162, 4.566), (0.755, 4.566), (0.0, 5.088), (0.707, 5.415), (2.945, 5.415), (1.557, 10.973), (1.203, 12.72), (3.726, 14.958), (7.822, 11.353), (7.447, 11.047), (6.951, 11.496), (3.795, 14.298), (2.972, 13.143), (3.114, 12.177), (4.808, 5.415)]
+            t_fig = [(x_center + (vx - 7.965 / 2.0) * sub_scale / fig_w_in, y_top - (sub_y0 * s + vy * sub_scale) / fig_h_in) for vx, vy in t_verts]
+            fig.add_artist(Polygon(t_fig, closed=True, transform=fig.transFigure, facecolor=color, edgecolor='none', zorder=zorder, clip_on=False))
+        else:
+            # 'x' subscript rendered as mathtext $\vec{x}$ — same glyph as the 'position \vec{x}' xlabel
+            sub_fs: float = sub_h_svg * sub_scale * 72.0  # match the (1.5x-enlarged) subscript height in points
+            sub_y_bottom: float = y_top - (sub_y0 * s + sub_h_svg * sub_scale) / fig_h_in
+            fig.text(x_center, sub_y_bottom, r'$\vec{x}$', ha='center', va='bottom', color=color, fontsize=sub_fs, zorder=zorder)
+        ## END if subscript == 't'...
+        return y_top - (sub_y0 * s + sub_h_svg * sub_scale) / fig_h_in
+
     def _subfn_draw_t_label(t_i: int):
         """Left-hand 't=i' label axes for one time-bin row."""
         ax_t = fig.add_subplot(tlabel_gs[t_i, 0])
@@ -15161,7 +15198,8 @@ def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArr
                 y_center: float = bb.y1 - (c_i + 0.5) * row_h_fig
                 # Text fill per the overlay SVG itself: both Long rows #0091FF, both Short rows #E20000 (NOT the 4 unique decoder colors)
                 overlay_col: str = '#0091FF' if lab.startswith('long') else '#E20000'
-                txt = fig.text(x_text, y_center, lab, ha='right', va='center', color=overlay_col, fontsize=overlay_fs, zorder=12, clip_on=False)
+                display_lab: str = lab.split('_')[0].capitalize()  # 'Long'/'Short' only — direction is conveyed by the triangle, drop the _LR/_RL suffix
+                txt = fig.text(x_text, y_center, display_lab, ha='right', va='center', color=overlay_col, fontsize=overlay_fs, zorder=12, clip_on=False)
                 txt.set_path_effects([pe.withStroke(linewidth=max(0.4, 0.05 * overlay_fs), foreground='white')])
                 # Direction triangle: LR runs left→right (points right), RL runs right→left (points left)
                 wants_right: bool = lab.endswith('LR')
@@ -15194,9 +15232,6 @@ def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArr
         for spine in ax_rs.spines.values():
             spine.set_color(mid_fg); spine.set_linewidth(_axes_lw)
         ## END for spine in ax_rs.spines.values()...
-        if t_i == 0:
-            ax_rs.set_title('row ∑', color=mid_fg, fontsize=_label_fs, pad=2)
-        ## END if t_i == 0...
         return ax_rs
 
     def _subfn_draw_track_id_vector(t_i: int, ax_mat):
@@ -15252,8 +15287,8 @@ def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArr
             fig.text((bb_mat.x1 + conn_x1) / 2.0, (y_hi + y_lo) / 2.0, 'row ∑', ha='center', va='center', color=inner_dark_grey, fontsize=_small_fs, zorder=2)
         ## END for c_i in range(n_contexts)...
         if t_i == 0:
-            # Large ∑ with x subscript above the connector stack (mathtext, like the schematic)
-            fig.text((bb_mat.x1 + bb_rs.x0) / 2.0, bb_mat.y1 + 0.012, r'$\sum_{x}$', ha='center', va='bottom', color=mid_fg, fontsize=2.0 * _title_fs, zorder=2)
+            # Large Sketch-style ∑ with x subscript above the connector stack (vector glyph, like the schematic)
+            _subfn_draw_sketch_sigma((bb_mat.x1 + bb_rs.x0) / 2.0, bb_mat.y1 + 0.012 + (2.0 * _title_fs / 72.0) / fig.get_size_inches()[1], height_in=1.9 * _title_fs / 72.0, subscript=r'\vec{x}', color=darkest_grey)
         ## END if t_i == 0...
 
     def _subfn_draw_trapezoid_sums(ax_rs, ax_tid):
@@ -15324,7 +15359,7 @@ def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArr
         # Long/Short labels at the right edge of the 2-vec, aligned with its two elements
         for lab_i, (lab, col) in enumerate(zip(track_labels, track_colors)):
             y_frac: float = 0.75 if lab_i == 0 else 0.25
-            fig.text(bb_tid.x1 + 0.004, bb_tid.y0 + bb_tid.height * y_frac, lab, ha='left', va='center', color=col, fontsize=_label_fs, fontweight='bold', zorder=2)
+            fig.text(bb_tid.x1 + 0.004, bb_tid.y0 + bb_tid.height * y_frac, lab, ha='left', va='center', color=col, fontsize=_label_fs, zorder=2) # , fontweight='bold'
         ## END for lab_i, (lab, col) in enumerate(zip(track_labels, track_colors))...
 
     # KDiba publication typography/strokes (Artboard-3): Arial, ~8.077pt labels, ~9.087pt titles, 0.75pt lines, Type-42 vector fonts
@@ -15489,7 +15524,8 @@ def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArr
         for spine in ax_ep.spines.values():
             spine.set_color(mid_fg); spine.set_linewidth(_axes_lw)
         ## END for spine in ax_ep.spines.values()...
-        ax_ep.set_title('epoch', color=mid_fg, fontsize=_label_fs, pad=26)
+        # 'epoch' label above the 2-vec in InnerDarkGrey (per Sketch epoch-header SVG: text fill #8F8F8F)
+        ax_ep.set_title('epoch', color=inner_dark_grey, fontsize=_label_fs, pad=4)
         # Same 'row ∑' horizontal connectors (with '>' arrowheads) between the marginal and the final epoch 2-vec, one per track row
         bb_marg = ax_marg.get_position()
         bb_ep = ax_ep.get_position()
@@ -15513,10 +15549,11 @@ def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArr
                 (conn_x1, y_lo),
             ], closed=True, transform=fig.transFigure, facecolor=(0.55, 0.55, 0.60, 0.95), edgecolor='none', zorder=1.5, clip_on=False)
             fig.add_artist(arrow)
-            fig.text((bb_marg.x1 + conn_x1) / 2.0, (y_hi + y_lo) / 2.0, 'row ∑', ha='center', va='center', color=inner_dark_grey, fontsize=_small_fs, zorder=2)
+            fig.text((bb_marg.x1 + conn_x1) / 2.0, (y_hi + y_lo) / 2.0, '∑', ha='center', va='center', color=inner_dark_grey, fontsize=_small_fs, zorder=2)
         ## END for r_i in range(2)...
-        # Large ∑ with t subscript above the connectors, 'epoch' title above that (screenshot style)
-        fig.text((bb_marg.x1 + bb_ep.x0) / 2.0, bb_ep.y1 + 0.008, r'$\sum_{t}$', ha='center', va='bottom', color=mid_fg, fontsize=2.0 * _title_fs, zorder=2)
+        # Large Sketch-style ∑ with t subscript BELOW the transfer rows (vector glyph per Untitled-1:26-27, both #979797)
+        _sum_t_x: float = (bb_marg.x1 + bb_ep.x0) / 2.0
+        _subfn_draw_sketch_sigma(_sum_t_x, bb_ep.y0 - 0.008, height_in=1.9 * _title_fs / 72.0, subscript='t', color=darkest_grey)
     else:
         ax_ep = None
     ## END if show_epoch_sum...
