@@ -15166,6 +15166,14 @@ def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArr
                 (bb_mat.x1, y_lo),
             ], closed=True, transform=fig.transFigure, facecolor=(0.85, 0.85, 0.88, 0.92), edgecolor=(0.45, 0.45, 0.50, 0.9), linewidth=0.6, zorder=0.5, clip_on=False)
             fig.add_artist(conn)
+            # Small grey triangular '>' arrowhead on the connector's right edge, pointing into the 4-vec element
+            arrow_w: float = min(0.006, (bb_rs.x0 - bb_mat.x1) * 0.25)
+            arrow = Polygon([
+                (bb_rs.x0, y_hi),
+                (bb_rs.x0 + arrow_w, (y_hi + y_lo) / 2.0),
+                (bb_rs.x0, y_lo),
+            ], closed=True, transform=fig.transFigure, facecolor=(0.55, 0.55, 0.60, 0.95), edgecolor='none', zorder=1.5, clip_on=False)
+            fig.add_artist(arrow)
             fig.text((bb_mat.x1 + bb_rs.x0) / 2.0, (y_hi + y_lo) / 2.0, 'row ∑', ha='center', va='center', color='#808088', fontsize=6, zorder=2)
         ## END for c_i in range(n_contexts)...
         if t_i == 0:
