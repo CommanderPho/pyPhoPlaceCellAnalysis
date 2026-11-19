@@ -15133,15 +15133,14 @@ def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArr
     ## END if figsize is None...
 
     fig = plt.figure(figsize=figsize, facecolor=bg, constrained_layout=False)
-    # Columns: t-label | raw (n_contexts × n_pos per t) | row-sum (n_contexts × 1, row-aligned) | track-ID (2 × 1, v-center) | + | spacer/flow | track_identity marginal | epoch sum
+    # Columns: t-label | raw (n_contexts × n_pos per t) | row-sum (n_contexts × 1, row-aligned) | trapezoid-sum gap | track-ID (2 × 1, v-center) | spacer | track_identity marginal | epoch sum
     # Rows: header row (row 0) holds the right two panels ABOVE the first t-row; main row (row 1) holds the per-t stack
     # raw + row-sum share the same n_t-row GridSpec (same hspace) so the small column lines up with each matrix
-    outer = GridSpec(2, 8, figure=fig, width_ratios=[0.55, 4.2, 0.28, 0.28, 0.28, 0.55, 1.5, 0.45 if show_epoch_sum else 0.05], height_ratios=[3.0, float(n_t * n_contexts)], left=0.08, right=0.98, top=0.90, bottom=0.06, wspace=0.30, hspace=0.35)
+    outer = GridSpec(2, 8, figure=fig, width_ratios=[0.55, 4.2, 0.28, 0.55, 0.28, 0.28, 1.5, 0.45 if show_epoch_sum else 0.05], height_ratios=[3.0, float(n_t * n_contexts)], left=0.08, right=0.98, top=0.90, bottom=0.06, wspace=0.30, hspace=0.35)
 
     raw_gs = GridSpecFromSubplotSpec(n_t, 1, subplot_spec=outer[1, 1], hspace=0.25)
     rowsum_gs = GridSpecFromSubplotSpec(n_t, 1, subplot_spec=outer[1, 2], hspace=0.25)
-    trackid_gs = GridSpecFromSubplotSpec(n_t, 1, subplot_spec=outer[1, 3], hspace=0.25)
-    plus_gs = GridSpecFromSubplotSpec(n_t, 1, subplot_spec=outer[1, 4], hspace=0.45)
+    trackid_gs = GridSpecFromSubplotSpec(n_t, 1, subplot_spec=outer[1, 4], hspace=0.25)
     tlabel_gs = GridSpecFromSubplotSpec(n_t, 1, subplot_spec=outer[1, 0], hspace=0.45)
 
     vmax_raw = float(np.nanmax(display_p_x_given_n)) if np.any(np.isfinite(display_p_x_given_n)) else 1.0
@@ -15165,14 +15164,6 @@ def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArr
             spine.set_visible(False)
         ## END for spine in ax_t.spines.values()...
         ax_t.text(0.95, 0.5, f't={t_i}', transform=ax_t.transAxes, ha='right', va='center', color=fg, fontsize=8, fontweight='bold')
-
-        ax_plus = fig.add_subplot(plus_gs[t_i, 0])
-        ax_plus.set_facecolor(bg)
-        ax_plus.set_xticks([]); ax_plus.set_yticks([])
-        for spine in ax_plus.spines.values():
-            spine.set_visible(False)
-        ## END for spine in ax_plus.spines.values()...
-        ax_plus.text(0.5, 0.5, '+', transform=ax_plus.transAxes, ha='center', va='center', color=fg, fontsize=14, fontweight='bold')
 
         # One (n_contexts × n_pos) matrix per time bin: each decoder is one row, position bins run left→right
         ax = fig.add_subplot(raw_gs[t_i, 0])
@@ -15221,6 +15212,24 @@ def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArr
         center_y: float = (bb_mat.y0 + bb_mat.y1) / 2.0
         ax_tid.set_position([bb_tid.x0, center_y - half_h, bb_tid.width, 2.0 * half_h])
         trackid_axes.append(ax_tid)
+
+        # Two trapezoid sum indicators per t-row: top contexts → Long element, bottom contexts → Short element
+        bb_rs = ax_rs.get_position()
+        bb_tid = ax_tid.get_position()
+        n_top: int = n_contexts // 2
+        for g_i, (rs_y_hi, rs_y_lo, tid_y_hi, tid_y_lo) in enumerate([
+            (bb_rs.y1, bb_rs.y1 - bb_rs.height * (n_top / float(n_contexts)), bb_tid.y1, (bb_tid.y0 + bb_tid.y1) / 2.0),
+            ((bb_rs.y0 + bb_rs.y1) / 2.0, bb_rs.y0, (bb_tid.y0 + bb_tid.y1) / 2.0, bb_tid.y0),
+        ]):
+            trap = Polygon([
+                (bb_rs.x1, rs_y_hi),
+                (bb_tid.x0, tid_y_hi),
+                (bb_tid.x0, tid_y_lo),
+                (bb_rs.x1, rs_y_lo),
+            ], closed=True, transform=fig.transFigure, facecolor=(0.85, 0.85, 0.88, 0.92), edgecolor=(0.45, 0.45, 0.50, 0.9), linewidth=0.6, zorder=1, clip_on=False)
+            fig.add_artist(trap)
+            fig.text((bb_rs.x1 + bb_tid.x0) / 2.0, (tid_y_hi + tid_y_lo) / 2.0, '+', ha='center', va='center', color='#555560', fontsize=11, fontweight='bold', zorder=2)
+        ## END for g_i, (rs_y_hi, rs_y_lo, tid_y_hi, tid_y_lo) in enumerate([...])...
     ## END for t_i in range(n_t)...
 
     # Header row (above first t-row): track_identity marginal (Long/Short only — contexts collapsed here)
@@ -15240,24 +15249,7 @@ def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArr
     ax_marg.set_title('track_identity marginal', color=fg, fontsize=9, pad=6)
     ax_marg.tick_params(colors=fg, length=2)
 
-    # Grey trapezoid / callout from mid column into the marginal (figure coordinates)
     fig.canvas.draw()  # needed for accurate transforms before first save
-    try:
-        rs_top = rowsum_axes[0]
-        rs_bot = rowsum_axes[-1]
-        bb0 = rs_top.get_position()
-        bb1 = rs_bot.get_position()
-        bm = ax_marg.get_position()
-        # Mid-column right edge → marginal left edge (full vertical span of row-sums → full height of marginal)
-        trap = Polygon([
-            (bb0.x1, bb0.y1),
-            (bm.x0, bm.y1),
-            (bm.x0, bm.y0),
-            (bb1.x1, bb1.y0),
-        ], closed=True, transform=fig.transFigure, facecolor=(0.55, 0.55, 0.60, 0.18), edgecolor=(0.75, 0.72, 0.78, 0.55), linewidth=0.8, zorder=0, clip_on=False)
-        fig.add_artist(trap)
-    except Exception:
-        pass
 
     if show_epoch_sum:
         ax_ep = fig.add_subplot(outer[0, 7])
