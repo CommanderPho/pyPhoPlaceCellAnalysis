@@ -15147,6 +15147,32 @@ def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArr
         ax_tid.set_position([bb_tid.x0, center_y - half_h, bb_tid.width, 2.0 * half_h])
         return ax_tid
 
+    def _subfn_draw_row_sum_connectors(ax_mat, ax_rs, t_i: int):
+        """One horizontal 'row ∑' connector per decoder row, bridging the (n_contexts × n_pos) matrix to its 4-vec element.
+
+        Each connector spans one matrix-row's height, light fill + thin grey outline + centered 'row ∑' text.
+        A large ∑ₓ header sits above the first t-row's connectors.
+        """
+        bb_mat = ax_mat.get_position()
+        bb_rs = ax_rs.get_position()
+        row_h: float = bb_mat.height / float(n_contexts)
+        for c_i in range(n_contexts):
+            y_hi: float = bb_mat.y1 - c_i * row_h
+            y_lo: float = y_hi - row_h
+            conn = Polygon([
+                (bb_mat.x1, y_hi),
+                (bb_rs.x0, y_hi),
+                (bb_rs.x0, y_lo),
+                (bb_mat.x1, y_lo),
+            ], closed=True, transform=fig.transFigure, facecolor=(0.85, 0.85, 0.88, 0.92), edgecolor=(0.45, 0.45, 0.50, 0.9), linewidth=0.6, zorder=0.5, clip_on=False)
+            fig.add_artist(conn)
+            fig.text((bb_mat.x1 + bb_rs.x0) / 2.0, (y_hi + y_lo) / 2.0, 'row ∑', ha='center', va='center', color='#808088', fontsize=6, zorder=2)
+        ## END for c_i in range(n_contexts)...
+        if t_i == 0:
+            # Large ∑ with x subscript above the connector stack (mathtext, like the schematic)
+            fig.text((bb_mat.x1 + bb_rs.x0) / 2.0, bb_mat.y1 + 0.012, r'$\sum_{x}$', ha='center', va='bottom', color=mid_fg, fontsize=16, zorder=2)
+        ## END if t_i == 0...
+
     def _subfn_draw_trapezoid_sums(ax_rs, ax_tid):
         """Two trapezoid sum indicators per t-row: top contexts → Long element, bottom contexts → Short element, with a large bold + inside each."""
         bb_rs = ax_rs.get_position()
@@ -15292,6 +15318,7 @@ def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArr
         ax = _subfn_draw_raw_posterior_matrix(t_i)
         ax_rs = _subfn_draw_row_sum_vector(t_i)
         ax_tid = _subfn_draw_track_id_vector(t_i, ax_mat=ax)
+        _subfn_draw_row_sum_connectors(ax_mat=ax, ax_rs=ax_rs, t_i=t_i)
         _subfn_draw_trapezoid_sums(ax_rs=ax_rs, ax_tid=ax_tid)
         raw_axes.append(ax); rowsum_axes.append(ax_rs); trackid_axes.append(ax_tid)
     ## END for t_i in range(n_t)...
