@@ -1154,7 +1154,8 @@ class PosteriorExporting:
                 epoch_id_identifier_str='ripple'
 
         """
-        
+        from neuropy.core.epoch import ensure_dataframe
+
         # root_export_path = Path(r"E:\Dropbox (Personal)\Active\Kamran Diba Lab\Pho-Kamran-Meetings\2024-05-01 - Pseudo2D Again\array_as_image").resolve() # Apogee
         # # root_export_path = Path('/media/halechr/MAX/cloud/University of Michigan Dropbox/Pho Hale/Pho Diba Paper 2023/array_as_image').resolve() # Lab
         
@@ -1219,7 +1220,7 @@ class PosteriorExporting:
         # {k:an_active_filter_epochs_decoder_result.filter_epochs.epochs.find_data_indicies_from_epoch_times(np.atleast_1d(clicked_epoch[0])) for k, an_active_filter_epochs_decoder_result in filtered_decoder_filter_epochs_decoder_result_dict.items()}
         # active_epoch_id: int = int(epoch_data_IDXs[0])
         active_epoch_data_IDX: int = int(epoch_data_IDXs[0])
-        active_epoch_id: int = int(active_filter_epochs_decoder_result.filter_epochs['label'][active_epoch_data_IDX])
+        active_epoch_id: int = int(ensure_dataframe(active_filter_epochs_decoder_result.filter_epochs)['label'][active_epoch_data_IDX])
 
         # active_epoch_id: int = int(epoch_data_IDXs[0]) # assume a single epoch idx
         if debug_print:
@@ -1282,7 +1283,7 @@ class PosteriorExporting:
 
 
 
-    @function_attributes(short_name=None, tags=['marginal', 'export'], input_requires=[], output_provides=[], uses=['cls._test_export_marginals_for_figure'], used_by=[], creation_date='2024-09-06 00:00', related_items=[])
+    @function_attributes(short_name=None, tags=['marginal', 'export', 'figure-S2'], input_requires=[], output_provides=[], uses=['cls._test_export_marginals_for_figure'], used_by=[], creation_date='2024-09-06 00:00', related_items=[])
     @classmethod
     def _perform_export_current_epoch_marginal_and_raster_images(cls, _out_ripple_rasters: "RankOrderRastersDebugger", directional_merged_decoders_result, filtered_decoder_filter_epochs_decoder_result_dict, active_session_context, root_export_path: Path, epoch_id_identifier_str='lap',
                                                                  desired_width = 2048, desired_height = 720, debug_print=False, **kwargs,
