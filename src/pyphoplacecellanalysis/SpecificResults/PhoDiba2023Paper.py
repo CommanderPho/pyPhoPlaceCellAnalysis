@@ -15100,7 +15100,7 @@ def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArr
     _save_bbox_kwargs.setdefault('bbox_inches', 'tight')
     _save_bbox_kwargs.setdefault('pad_inches', 0.02)
 
-    def _subfn_add_xy_unit_grid(ax, n_x: int, n_y: int, grid_color: str = '#b0a8c0', linewidth: float = 0.35, alpha: float = 0.45):
+    def _subfn_add_xy_unit_grid(ax, n_x: int, n_y: int, grid_color: str = '#979797', linewidth: float = 0.35, alpha: float = 0.45):
         """Overlay integer x/y bin-edge grid lines on a raw posterior axes (unit-index grid)."""
         ax.set_xticks(np.arange(n_x + 1, dtype=float), minor=True)
         ax.set_yticks(np.arange(n_y + 1, dtype=float), minor=True)
@@ -15200,7 +15200,7 @@ def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArr
                 (conn_x1, y_lo),
             ], closed=True, transform=fig.transFigure, facecolor=(0.55, 0.55, 0.60, 0.95), edgecolor='none', zorder=1.5, clip_on=False)
             fig.add_artist(arrow)
-            fig.text((bb_mat.x1 + conn_x1) / 2.0, (y_hi + y_lo) / 2.0, 'row ∑', ha='center', va='center', color='#808088', fontsize=_small_fs, zorder=2)
+            fig.text((bb_mat.x1 + conn_x1) / 2.0, (y_hi + y_lo) / 2.0, 'row ∑', ha='center', va='center', color=inner_dark_grey, fontsize=_small_fs, zorder=2)
         ## END for c_i in range(n_contexts)...
         if t_i == 0:
             # Large ∑ with x subscript above the connector stack (mathtext, like the schematic)
@@ -15229,7 +15229,7 @@ def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArr
             # Center each + in its trapezoid's vertical span at the midpoint x: top + sits up, bottom + sits clearly down (screenshot style)
             mid_y_hi: float = (rs_y_hi + tid_y_hi) / 2.0
             mid_y_lo: float = (rs_y_lo + tid_y_lo) / 2.0
-            fig.text((bb_rs.x1 + bb_tid.x0) / 2.0, (mid_y_hi + mid_y_lo) / 2.0, '+', ha='center', va='center', color='#808088', fontsize=plus_fontsize, fontweight='bold', zorder=2)
+            fig.text((bb_rs.x1 + bb_tid.x0) / 2.0, (mid_y_hi + mid_y_lo) / 2.0, '+', ha='center', va='center', color=inner_dark_grey, fontsize=plus_fontsize, fontweight='bold', zorder=2)
         ## END for g_i, (rs_y_hi, rs_y_lo, tid_y_hi, tid_y_lo) in enumerate([...])...
 
     def _subfn_draw_insert_connectors(ax_tid, t_i: int):
@@ -15317,9 +15317,13 @@ def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArr
 
     track_labels = ('Long', 'Short')
     track_colors = (long_color, short_color)
-    bg = '#1a1028'
-    fg = '#e8e0f0'
-    mid_fg = '#b0a8c0'
+    bg = 'white'  # Sketch artboard is white: DarkestGrey text rule applies to everything rendered on the background
+    ## Sketch label palette (Untitled-1 / figS2_DecoderWalkthru.sketch):
+    neutral_gray = '#979797'  # neutralgray — 'raw (non-marginalized)...' title text
+    darkest_grey = '#2E2E2E'  # DarkestGrey — everything rendered on white ('t=0' labels, etc.)
+    inner_dark_grey = '#8F8F8F'  # InnerDarkGrey — everything overlaying light grey elements (row ∑ / + connector text)
+    fg = darkest_grey
+    mid_fg = darkest_grey
     decoder_color_dict: Dict[str, str] = {'long_LR': '#0099ff', 'long_RL': '#1b115a', 'short_LR': '#f51616', 'short_RL': '#891111', 'long': long_color, 'short': short_color}
     try:
         decoder_color_dict.update(DecoderIdentityColors.build_decoder_color_dict(wants_hex_str=True))
@@ -15452,7 +15456,7 @@ def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArr
                 (conn_x1, y_lo),
             ], closed=True, transform=fig.transFigure, facecolor=(0.55, 0.55, 0.60, 0.95), edgecolor='none', zorder=1.5, clip_on=False)
             fig.add_artist(arrow)
-            fig.text((bb_marg.x1 + conn_x1) / 2.0, (y_hi + y_lo) / 2.0, 'row ∑', ha='center', va='center', color='#808088', fontsize=_small_fs, zorder=2)
+            fig.text((bb_marg.x1 + conn_x1) / 2.0, (y_hi + y_lo) / 2.0, 'row ∑', ha='center', va='center', color=inner_dark_grey, fontsize=_small_fs, zorder=2)
         ## END for r_i in range(2)...
         # Large ∑ with t subscript above the connectors, 'epoch' title above that (screenshot style)
         fig.text((bb_marg.x1 + bb_ep.x0) / 2.0, bb_ep.y1 + 0.008, r'$\sum_{t}$', ha='center', va='bottom', color=mid_fg, fontsize=2.0 * _title_fs, zorder=2)
@@ -15461,7 +15465,7 @@ def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArr
     ## END if show_epoch_sum...
 
     header = title if title is not None else 'raw (non-marginalized) pseudo2D decoder for each time bin'
-    fig.suptitle(header, color=fg, fontsize=_title_fs, y=0.97)
+    fig.suptitle(header, color=neutral_gray, fontsize=_title_fs, y=0.97)
 
     # SVG-only by default (no PDF/PNG), consistent with the other publication figure functions.
     # `write_vector_format=True` was remapped to SVG-only above, so no matplotlib PDF is written.
