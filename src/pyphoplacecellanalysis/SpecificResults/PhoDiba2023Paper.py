@@ -15049,7 +15049,7 @@ def _walkthru_build_long_short_display_posterior(p_x_given_n, context_names):
 
 @function_attributes(short_name='plot_map_based_context_decoder_walkthru', tags=['figure', 'figS2', 'pseudo2D', 'marginal', 'walkthru', 'svg', 'publication'], input_requires=[], output_provides=[], uses=['DirectionalPseudo2DDecodersResult', 'LongShortDisplayConfigManager'], used_by=[], creation_date='2026-11-18 09:20', related_items=['figS2_Map-BasedContextDecoderWalkthru.pdf'])
 def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArray], save_path: Optional[Union[str, Path]] = None, context_names: Optional[List[str]] = None, max_time_bins: Optional[int] = None, cmap: str = 'viridis', show_epoch_sum: bool = True, title: Optional[str] = None,
-    write_vector_format: bool = False, write_png: bool = False, write_svg: bool = True, svg_save_path: Optional[Union[str, Path]] = None, figsize: Optional[Tuple[float, float]] = None, **kwargs) -> Tuple[Any, Dict[str, Any]]:
+    write_vector_format: bool = False, write_png: bool = False, write_svg: bool = True, svg_save_path: Optional[Union[str, Path]] = None, figsize: Optional[Tuple[float, float]] = None, use_label_overlays: bool = True, **kwargs) -> Tuple[Any, Dict[str, Any]]:
     """Reproduce the figS2 Map-Based Context Decoder walkthrough figure for one epoch Pseudo2D posterior.
 
     Left: vertical stack of n_t raw (non-marginalized) posterior matrices, each (n_contexts × n_pos) — e.g. 4 decoder rows × position bins.
@@ -15074,6 +15074,12 @@ def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArr
     svg_save_path : optional path-like
         SVG destination. Defaults to `save_path` with a `.svg` suffix; when `save_path` is omitted, defaults
         to the Figure S2 UneditedSources INPUT folder (dated 2026-11-19).
+    use_label_overlays : bool
+        If True, decoder labels are drawn INSIDE each matrix as Sketch-style overlays (Untitled-1 4-row overlay SVG):
+        right-aligned near the right edge, identity-colored fill with a white outline halo, and a small direction
+        triangle (LR → right-pointing #AADD21, RL → left-pointing #5522DE, both with #E7E7E7 stroke).
+        Font size is derived from the matrix row height so each label + triangle is centered in its row.
+        If False, plain small left-aligned text labels inside the left edge (previous behavior).
 
     Returns
     -------
@@ -15082,6 +15088,7 @@ def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArr
     """
     from matplotlib.gridspec import GridSpec, GridSpecFromSubplotSpec
     from matplotlib.patches import Polygon
+    import matplotlib.patheffects as pe
     from matplotlib.colors import Normalize
     from matplotlib.cm import ScalarMappable
     from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import DecoderIdentityColors, long_short_display_config_manager
@@ -15131,10 +15138,40 @@ def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArr
         for spine in ax.spines.values():
             spine.set_color(mid_fg); spine.set_linewidth(_axes_lw)
         ## END for spine in ax.spines.values()...
-        # Decoder labels INSIDE the matrix, left-aligned near the left edge, vertically centered on each matrix row
-        for c_i, (lab, col) in enumerate(zip(context_labels, context_colors)):
-            ax.text(0.02, (c_i + 0.5) / n_contexts, lab, transform=ax.transAxes, ha='left', va='center', color=col, fontsize=_small_fs, clip_on=False)
-        ## END for c_i, (lab, col) in enumerate(zip(context_labels, context_colors))...
+        # Decoder labels INSIDE the matrix, vertically centered on each matrix row
+        if use_label_overlays:
+            # Sketch-style overlays (Untitled-1 4-row overlay): right-aligned label + direction triangle,
+            # white outline halo on text, triangle fill/stroke per SVG (#AADD21 right / #5522DE left, #E7E7E7 stroke).
+            # Size from the row height so the glyph block is centered in each row (SVG text cap-height ≈ 0.54 × row pitch).
+            bb = ax.get_position()
+            row_h_fig: float = bb.height / float(n_contexts)
+            overlay_fs: float = float(np.clip(0.54 * row_h_fig * fig.get_size_inches()[1] * 72.0, 4.0, 2.0 * _label_fs))
+            tri_h_fig: float = overlay_fs / 72.0 / fig.get_size_inches()[1]  # triangle height ≈ font size (in figure fraction)
+            tri_w_fig: float = tri_h_fig * (12.231 / 10.867)  # SVG triangle aspect ratio
+            x_text: float = bb.x1 - 0.004 - tri_w_fig - 0.003  # right-aligned text block just left of the triangle
+            for c_i, (lab, col) in enumerate(zip(context_labels, context_colors)):
+                y_center: float = bb.y1 - (c_i + 0.5) * row_h_fig
+                txt = fig.text(x_text, y_center, lab, ha='right', va='center', color=col, fontsize=overlay_fs, zorder=12, clip_on=False)
+                txt.set_path_effects([pe.withStroke(linewidth=max(1.0, 0.16 * overlay_fs), foreground='white')])
+                # Direction triangle: LR runs left→right (points right), RL runs right→left (points left)
+                wants_right: bool = lab.endswith('LR')
+                tri_facecolor: str = '#AADD21' if wants_right else '#5522DE'
+                tri_x0: float = bb.x1 - 0.004 - tri_w_fig
+                tri_x1: float = bb.x1 - 0.004
+                if wants_right:
+                    tri_verts = [(tri_x0, y_center + tri_h_fig / 2.0), (tri_x0, y_center - tri_h_fig / 2.0), (tri_x1, y_center)]
+                else:
+                    tri_verts = [(tri_x1, y_center + tri_h_fig / 2.0), (tri_x1, y_center - tri_h_fig / 2.0), (tri_x0, y_center)]
+                ## END if wants_right...
+                tri = Polygon(tri_verts, closed=True, transform=fig.transFigure, facecolor=tri_facecolor, edgecolor='#E7E7E7', linewidth=0.5, zorder=12, clip_on=False)
+                fig.add_artist(tri)
+            ## END for c_i, (lab, col) in enumerate(zip(context_labels, context_colors))...
+        else:
+            # Plain small labels, left-aligned near the left edge
+            for c_i, (lab, col) in enumerate(zip(context_labels, context_colors)):
+                ax.text(0.02, (c_i + 0.5) / n_contexts, lab, transform=ax.transAxes, ha='left', va='center', color=col, fontsize=_small_fs, clip_on=False)
+            ## END for c_i, (lab, col) in enumerate(zip(context_labels, context_colors))...
+        ## END if use_label_overlays...
         return ax
 
     def _subfn_draw_row_sum_vector(t_i: int):
