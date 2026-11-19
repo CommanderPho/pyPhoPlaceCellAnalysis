@@ -15047,10 +15047,10 @@ def _walkthru_build_long_short_display_posterior(p_x_given_n, context_names):
     return display_p_x_given_n, row_sums, track_identity_marginal
 
 
-@function_attributes(short_name='plot_map_based_context_decoder_walkthru', tags=['figure', 'figS2', 'pseudo2D', 'marginal', 'walkthru', 'pdf', 'publication'], input_requires=[], output_provides=[], uses=['DirectionalPseudo2DDecodersResult', 'LongShortDisplayConfigManager'], used_by=[], creation_date='2026-11-18 09:20', related_items=['figS2_Map-BasedContextDecoderWalkthru.pdf'])
-def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArray], save_path: Union[str, Path], context_names: Optional[List[str]] = None, max_time_bins: Optional[int] = None, cmap: str = 'viridis', show_epoch_sum: bool = True, title: Optional[str] = None, 
-    also_save_png: bool = False, also_save_svg: bool = True, svg_save_path: Optional[Union[str, Path]] = None, figsize: Optional[Tuple[float, float]] = None) -> Tuple[Any, Dict[str, Any]]:
-    """Reproduce the figS2 Map-Based Context Decoder walkthrough PDF for one epoch Pseudo2D posterior.
+@function_attributes(short_name='plot_map_based_context_decoder_walkthru', tags=['figure', 'figS2', 'pseudo2D', 'marginal', 'walkthru', 'svg', 'publication'], input_requires=[], output_provides=[], uses=['DirectionalPseudo2DDecodersResult', 'LongShortDisplayConfigManager'], used_by=[], creation_date='2026-11-18 09:20', related_items=['figS2_Map-BasedContextDecoderWalkthru.pdf'])
+def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArray], save_path: Optional[Union[str, Path]] = None, context_names: Optional[List[str]] = None, max_time_bins: Optional[int] = None, cmap: str = 'viridis', show_epoch_sum: bool = True, title: Optional[str] = None,
+    write_vector_format: bool = False, write_png: bool = False, write_svg: bool = True, svg_save_path: Optional[Union[str, Path]] = None, figsize: Optional[Tuple[float, float]] = None, **kwargs) -> Tuple[Any, Dict[str, Any]]:
+    """Reproduce the figS2 Map-Based Context Decoder walkthrough figure for one epoch Pseudo2D posterior.
 
     Left: vertical stack of n_t raw (non-marginalized) posterior matrices, each (n_contexts × n_pos) — e.g. 4 decoder rows × position bins.
     Mid: beside each matrix (small margin, row-aligned): the (n_contexts × 1) row ∑ over position, then + across contexts into track identity.
@@ -15061,14 +15061,19 @@ def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArr
     pseudo2D_posterior : SingleEpochDecodedResult or NDArray
         Shape (n_x, n_contexts, n_t) or (n_x, n_y, n_contexts, n_t).
         3D inputs get a singleton y axis so each panel is still drawn as an x/y unit grid.
-    save_path : path-like
-        Output PDF path (parent dirs created as needed).
+    save_path : optional path-like
+        Output base path (parent dirs created as needed); its suffix is replaced per enabled format.
+        Optional when `svg_save_path` is given.
     max_time_bins : optional
         If set, only the first `max_time_bins` time bins are drawn (for readability on long epochs).
-    also_save_svg : bool
-        If True (default), also write an Illustrator-friendly semantic SVG (like the other publication figures).
+    write_vector_format, write_png, write_svg : bool
+        Default save formats are SVG-only (`write_svg=True`, `write_png=False`, `write_vector_format=False`),
+        consistent with the other publication figure functions. `write_vector_format=True` is accepted for
+        back-compat (notebook/publication callers) and remapped to SVG-only for this figure (no matplotlib PDF).
+        Legacy `also_save_svg` / `also_save_png` kwargs are honored for back-compat.
     svg_save_path : optional path-like
-        SVG destination. Defaults to the Figure S2 UneditedSources INPUT folder (dated 2026-11-19) with `save_path`'s stem.
+        SVG destination. Defaults to `save_path` with a `.svg` suffix; when `save_path` is omitted, defaults
+        to the Figure S2 UneditedSources INPUT folder (dated 2026-11-19).
 
     Returns
     -------
@@ -15081,6 +15086,19 @@ def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArr
     from matplotlib.cm import ScalarMappable
     from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import DecoderIdentityColors, long_short_display_config_manager
     from pyphoplacecellanalysis.General.Mixins.ExportHelpers import savefig_svg_semantic
+
+    # Standardized save kwargs (like the other publication figure functions): SVG-only by default, no PDF/PNG.
+    # Notebook/publication callers pass write_vector_format=True for "vector export"; for this figure that means SVG, not matplotlib PDF.
+    if write_vector_format:
+        write_svg = True
+        write_vector_format = False
+    ## END if write_vector_format...
+    # Back-compat: legacy also_save_svg / also_save_png kwargs still honored when passed
+    write_svg = bool(kwargs.pop('also_save_svg', write_svg))
+    write_png = bool(kwargs.pop('also_save_png', write_png))
+    _save_bbox_kwargs = pop_dict_subset(kwargs, ['bbox_inches', 'pad_inches'])
+    _save_bbox_kwargs.setdefault('bbox_inches', 'tight')
+    _save_bbox_kwargs.setdefault('pad_inches', 0.02)
 
     def _subfn_add_xy_unit_grid(ax, n_x: int, n_y: int, grid_color: str = '#b0a8c0', linewidth: float = 0.35, alpha: float = 0.45):
         """Overlay integer x/y bin-edge grid lines on a raw posterior axes (unit-index grid)."""
@@ -15268,8 +15286,10 @@ def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArr
     mpl.rcParams.update(pub_style.mpl_rc)
     mpl.rcParams.update({'font.family': 'Arial', 'savefig.transparent': False})
 
-    save_path = Path(save_path).resolve()
-    save_path.parent.mkdir(parents=True, exist_ok=True)
+    if save_path is not None:
+        save_path = Path(save_path).resolve()
+        save_path.parent.mkdir(parents=True, exist_ok=True)
+    ## END if save_path is not None...
 
     p_x_given_n, resolved_context_names = _walkthru_extract_p_x_given_n(pseudo2D_posterior, context_names=context_names)
     display_p_x_given_n, row_sums, track_identity_marginal = _walkthru_build_long_short_display_posterior(p_x_given_n, resolved_context_names)
@@ -15443,20 +15463,26 @@ def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArr
     header = title if title is not None else 'raw (non-marginalized) pseudo2D decoder for each time bin'
     fig.suptitle(header, color=fg, fontsize=_title_fs, y=0.97)
 
-    fig.savefig(save_path, format='pdf', facecolor=fig.get_facecolor(), edgecolor='none', bbox_inches='tight')
+    # SVG-only by default (no PDF/PNG), consistent with the other publication figure functions.
+    # `write_vector_format=True` was remapped to SVG-only above, so no matplotlib PDF is written.
     png_path = None
-    if also_save_png:
+    if write_png:
+        assert save_path is not None, 'save_path is required for PNG export.'
         png_path = save_path.with_suffix('.png')
-        fig.savefig(png_path, format='png', dpi=200, facecolor=fig.get_facecolor(), edgecolor='none', bbox_inches='tight')
-    ## END if also_save_png...
+        fig.savefig(png_path, format='png', dpi=200, facecolor=fig.get_facecolor(), edgecolor='none', bbox_inches=_save_bbox_kwargs.get('bbox_inches'))
+    ## END if write_png...
 
     svg_path = None
-    if also_save_svg:
+    if write_svg:
         if svg_save_path is None:
-            svg_save_path = Path(r'E:/Dropbox (Personal)/Active/Kamran Diba Lab/Pho-Kamran-Meetings/Pho Diba Paper 2023/Figures/UneditedSources/Figure S2 - Map-Based Context Decoder Walkthru/INPUT/2026-11-19') / f'{save_path.stem}.svg'
+            if save_path is not None:
+                svg_save_path = save_path.with_suffix('.svg')
+            else:
+                svg_save_path = Path(r'E:/Dropbox (Personal)/Active/Kamran Diba Lab/Pho-Kamran-Meetings/Pho Diba Paper 2023/Figures/UneditedSources/Figure S2 - Map-Based Context Decoder Walkthru/INPUT/2026-11-19') / 'figS2_Map-BasedContextDecoderWalkthru.svg'
+            ## END if save_path is not None...
         ## END if svg_save_path is None...
-        svg_path = savefig_svg_semantic(fig, svg_save_path, transparent=False, bbox_inches='tight', pad_inches=0.02)
-    ## END if also_save_svg...
+        svg_path = savefig_svg_semantic(fig, svg_save_path, transparent=False, bbox_inches=_save_bbox_kwargs.get('bbox_inches'), pad_inches=_save_bbox_kwargs.get('pad_inches'))
+    ## END if write_svg...
 
     mpl.rcParams.update(_prev_rc)  # restore caller's rcParams after publication-styled rendering/saving
 
