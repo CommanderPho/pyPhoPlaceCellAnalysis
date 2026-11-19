@@ -15030,29 +15030,30 @@ def _walkthru_add_xy_unit_grid(ax, n_x: int, n_y: int, grid_color: str = '#b0a8c
 
 
 def _walkthru_build_long_short_display_posterior(p_x_given_n, context_names):
-    """Collapse directional contexts to Long/Short x/y position posteriors and track-identity marginals.
+    """Keep all context x/y posteriors for the left panel; collapse only for track_identity.
 
     Returns
     -------
-    display_p_x_given_n : (n_x, n_y, 2, n_t) Long then Short position posteriors
-    row_sums : (2, n_t) unnormalized ∑_{x,y} mass per track per time bin
-    track_identity_marginal : (2, n_t) row_sums renormalized across Long/Short per time bin
+    display_p_x_given_n : (n_x, n_y, n_contexts, n_t) raw (non-marginalized) context posteriors
+    row_sums : (n_contexts, n_t) unnormalized ∑_{x,y} mass per context per time bin
+    track_identity_marginal : (2, n_t) Long/Short masses (∑ of each track's contexts) renormalized per t
     """
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalPseudo2DDecodersResult
 
     n_x, n_y, n_contexts, n_t = p_x_given_n.shape
+    display_p_x_given_n = np.asarray(p_x_given_n, dtype=float)  # keep all contexts (e.g. 4 decoders)
+    row_sums = np.nansum(display_p_x_given_n, axis=(0, 1))  # (n_contexts, n_t)
+
     track_identity_group_indices = DirectionalPseudo2DDecodersResult._infer_track_identity_group_indices(list(context_names), n_contexts)
     assert track_identity_group_indices is not None, f"Cannot infer Long/Short groups from context_names={context_names} (n_contexts={n_contexts})"
     long_idxs, short_idxs = track_identity_group_indices
 
-    # Sum LR+RL (or whatever is in each track group) in position space → (n_x, n_y, 2, n_t)
-    display_p_x_given_n = np.stack([
-        np.nansum(p_x_given_n[:, :, long_idxs, :], axis=2),
-        np.nansum(p_x_given_n[:, :, short_idxs, :], axis=2),
-    ], axis=2)
-
-    row_sums = np.nansum(display_p_x_given_n, axis=(0, 1))  # (2, n_t)
-    track_identity_marginal = DirectionalPseudo2DDecodersResult._normalize_per_timebin_context_marginal(row_sums)
+    # Collapse contexts → Long/Short only for the right-hand track_identity marginal
+    track_row_sums = np.stack([
+        np.nansum(row_sums[long_idxs, :], axis=0),
+        np.nansum(row_sums[short_idxs, :], axis=0),
+    ], axis=0)  # (2, n_t)
+    track_identity_marginal = DirectionalPseudo2DDecodersResult._normalize_per_timebin_context_marginal(track_row_sums)
     return display_p_x_given_n, row_sums, track_identity_marginal
 
 
@@ -15060,8 +15061,8 @@ def _walkthru_build_long_short_display_posterior(p_x_given_n, context_names):
 def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArray], save_path: Union[str, Path], context_names: Optional[List[str]] = None, max_time_bins: Optional[int] = None, cmap: str = 'viridis', show_epoch_sum: bool = True, title: Optional[str] = None, also_save_png: bool = True, figsize: Optional[Tuple[float, float]] = None) -> Tuple[Any, Dict[str, Any]]:
     """Reproduce the figS2 Map-Based Context Decoder walkthrough PDF for one epoch Pseudo2D posterior.
 
-    Left: raw Long/Short x/y unit-grid heatmaps per time bin (directional contexts collapsed when n_contexts==4).
-    Mid: row ∑ over position (∑_{x,y}), then + across Long/Short.
+    Left: vertical stack of n_t raw (non-marginalized) posterior matrices, each (n_contexts × n_pos) — e.g. 4 decoder rows × position bins.
+    Mid: beside each matrix (small margin, row-aligned): the (n_contexts × 1) row ∑ over position, then + across contexts into track identity.
     Right: track_identity marginal (2 × T), with a grey trapezoid callout from the mid column.
 
     Parameters
@@ -15082,7 +15083,7 @@ def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArr
     from matplotlib.gridspec import GridSpec, GridSpecFromSubplotSpec
     from matplotlib.patches import Polygon
     from matplotlib.colors import Normalize
-    from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import long_short_display_config_manager
+    from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import DecoderIdentityColors, long_short_display_config_manager
 
     save_path = Path(save_path).resolve()
     save_path.parent.mkdir(parents=True, exist_ok=True)
@@ -15090,8 +15091,7 @@ def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArr
     p_x_given_n, resolved_context_names = _walkthru_extract_p_x_given_n(pseudo2D_posterior, context_names=context_names)
     display_p_x_given_n, row_sums, track_identity_marginal = _walkthru_build_long_short_display_posterior(p_x_given_n, resolved_context_names)
 
-    n_x, n_y, n_tracks, n_t_full = display_p_x_given_n.shape
-    assert n_tracks == 2
+    n_x, n_y, n_contexts, n_t_full = display_p_x_given_n.shape
     if max_time_bins is not None and n_t_full > int(max_time_bins):
         n_t = int(max_time_bins)
         display_p_x_given_n = display_p_x_given_n[:, :, :, :n_t]
@@ -15117,22 +15117,30 @@ def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArr
     bg = '#1a1028'
     fg = '#e8e0f0'
     mid_fg = '#b0a8c0'
+    decoder_color_dict: Dict[str, str] = {'long_LR': '#0099ff', 'long_RL': '#1b115a', 'short_LR': '#f51616', 'short_RL': '#891111', 'long': long_color, 'short': short_color}
+    try:
+        decoder_color_dict.update(DecoderIdentityColors.build_decoder_color_dict(wants_hex_str=True))
+    except Exception:
+        pass
+    context_labels: List[str] = list(resolved_context_names)
+    context_colors: List[str] = [decoder_color_dict.get(name, mid_fg) for name in context_labels]
+
+    n_pos: int = int(n_x * n_y)  # spatial bins per decoder row (n_y==1 for the common linear-track case)
 
     if figsize is None:
-        # Scale height with time bins and y-bin count (true 2D maps need taller strips)
-        y_height_scale: float = max(1.0, float(n_y) / 4.0)
-        figsize = (6.6, max(4.5, 0.55 * n_t * y_height_scale + 1.8))
+        # One (n_contexts × n_pos) matrix per t; height scales with n_t and rows per matrix
+        figsize = (7.2, max(5.0, 0.32 * n_t * n_contexts + 1.8))
     ## END if figsize is None...
 
     fig = plt.figure(figsize=figsize, facecolor=bg, constrained_layout=False)
-    # Columns: t-label | raw (Long above Short per t) | row-sum | + | spacer/flow | track_identity marginal | epoch sum
-    # Height ratios: per time bin → Long strip, Short strip (2 rows), matching figS2 vertical stack
-    n_strip_rows: int = n_t * 2
-    outer = GridSpec(1, 7, figure=fig, width_ratios=[0.45, 4.2, 0.28, 0.28, 0.55, 1.5, 0.45 if show_epoch_sum else 0.05], left=0.07, right=0.98, top=0.90, bottom=0.06, wspace=0.10)
+    # Columns: t-label | raw (n_contexts × n_pos per t) | row-sum (n_contexts × 1, row-aligned) | track-ID (2 × 1, v-center) | + | spacer/flow | track_identity marginal | epoch sum
+    # raw + row-sum share the same n_t-row GridSpec (same hspace) so the small column lines up with each matrix
+    outer = GridSpec(1, 8, figure=fig, width_ratios=[0.55, 4.2, 0.28, 0.28, 0.28, 0.55, 1.5, 0.45 if show_epoch_sum else 0.05], left=0.08, right=0.98, top=0.90, bottom=0.06, wspace=0.10)
 
-    raw_gs = GridSpecFromSubplotSpec(n_strip_rows, 1, subplot_spec=outer[0, 1], hspace=0.15)
-    rowsum_gs = GridSpecFromSubplotSpec(n_strip_rows, 1, subplot_spec=outer[0, 2], hspace=0.15)
-    plus_gs = GridSpecFromSubplotSpec(n_t, 1, subplot_spec=outer[0, 3], hspace=0.45)
+    raw_gs = GridSpecFromSubplotSpec(n_t, 1, subplot_spec=outer[0, 1], hspace=0.25)
+    rowsum_gs = GridSpecFromSubplotSpec(n_t, 1, subplot_spec=outer[0, 2], hspace=0.25)
+    trackid_gs = GridSpecFromSubplotSpec(n_t, 1, subplot_spec=outer[0, 3], hspace=0.25)
+    plus_gs = GridSpecFromSubplotSpec(n_t, 1, subplot_spec=outer[0, 4], hspace=0.45)
     tlabel_gs = GridSpecFromSubplotSpec(n_t, 1, subplot_spec=outer[0, 0], hspace=0.45)
 
     vmax_raw = float(np.nanmax(display_p_x_given_n)) if np.any(np.isfinite(display_p_x_given_n)) else 1.0
@@ -15147,6 +15155,7 @@ def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArr
 
     raw_axes = []
     rowsum_axes = []
+    trackid_axes = []
     for t_i in range(n_t):
         ax_t = fig.add_subplot(tlabel_gs[t_i, 0])
         ax_t.set_facecolor(bg)
@@ -15164,38 +15173,57 @@ def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArr
         ## END for spine in ax_plus.spines.values()...
         ax_plus.text(0.5, 0.5, '+', transform=ax_plus.transAxes, ha='center', va='center', color=fg, fontsize=14, fontweight='bold')
 
-        for c_i, (lab, col) in enumerate(zip(track_labels, track_colors)):
-            strip_row: int = (t_i * 2) + c_i
-            ax = fig.add_subplot(raw_gs[strip_row, 0])
-            ax.set_facecolor(bg)
-            # (n_x, n_y) → imshow expects (n_y, n_x); extent keeps integer unit-bin edges
-            img = np.asarray(display_p_x_given_n[:, :, c_i, t_i], dtype=float).T
-            ax.imshow(img, aspect='auto', cmap=cmap, norm=norm_raw, interpolation='nearest', origin='lower', extent=[0, n_x, 0, n_y])
-            ax.set_xticks([]); ax.set_yticks([])
-            _walkthru_add_xy_unit_grid(ax, n_x=n_x, n_y=n_y, grid_color=mid_fg)
-            for spine in ax.spines.values():
-                spine.set_color(mid_fg); spine.set_linewidth(0.6)
-            ## END for spine in ax.spines.values()...
-            # Inline Long/Short label on the left of each strip (figS2 style)
-            ax.text(-0.02, 0.5, lab, transform=ax.transAxes, ha='right', va='center', color=col, fontsize=7, clip_on=False)
-            raw_axes.append(ax)
+        # One (n_contexts × n_pos) matrix per time bin: each decoder is one row, position bins run left→right
+        ax = fig.add_subplot(raw_gs[t_i, 0])
+        ax.set_facecolor(bg)
+        img = np.asarray(display_p_x_given_n[:, :, :, t_i], dtype=float).reshape(n_pos, n_contexts).T  # (n_contexts, n_pos)
+        ax.imshow(img, aspect='auto', cmap=cmap, norm=norm_raw, interpolation='nearest', origin='upper', extent=[0, n_pos, 0, n_contexts])
+        ax.set_xticks([]); ax.set_yticks([])
+        _walkthru_add_xy_unit_grid(ax, n_x=n_pos, n_y=n_contexts, grid_color=mid_fg)
+        for spine in ax.spines.values():
+            spine.set_color(mid_fg); spine.set_linewidth(0.6)
+        ## END for spine in ax.spines.values()...
+        # Decoder labels on the left, vertically centered on each matrix row
+        for c_i, (lab, col) in enumerate(zip(context_labels, context_colors)):
+            ax.text(-0.02, (c_i + 0.5) / n_contexts, lab, transform=ax.transAxes, ha='right', va='center', color=col, fontsize=6, clip_on=False)
+        ## END for c_i, (lab, col) in enumerate(zip(context_labels, context_colors))...
+        raw_axes.append(ax)
 
-            ax_rs = fig.add_subplot(rowsum_gs[strip_row, 0])
-            ax_rs.set_facecolor(bg)
-            ax_rs.imshow(np.array([[row_sums[c_i, t_i]]]), aspect='auto', cmap=cmap, vmin=0.0, vmax=vmax_row, interpolation='nearest')
-            ax_rs.set_xticks([]); ax_rs.set_yticks([])
-            for spine in ax_rs.spines.values():
-                spine.set_color(mid_fg); spine.set_linewidth(0.6)
-            ## END for spine in ax_rs.spines.values()...
-            if (t_i == 0) and (c_i == 0):
-                ax_rs.set_title('row ∑', color=mid_fg, fontsize=7, pad=2)
-            ## END if (t_i == 0) and (c_i == 0)...
-            rowsum_axes.append(ax_rs)
-        ## END for c_i, (lab, col) in enumerate(zip(track_labels, track_colors))...
+        # Beside the matrix: (n_contexts × 1) ∑ over position — same GridSpec row/hspace so it is row-aligned
+        ax_rs = fig.add_subplot(rowsum_gs[t_i, 0])
+        ax_rs.set_facecolor(bg)
+        ax_rs.imshow(row_sums[:, t_i].reshape(n_contexts, 1), aspect='auto', cmap=cmap, vmin=0.0, vmax=vmax_row, interpolation='nearest', origin='upper')
+        ax_rs.set_xticks([]); ax_rs.set_yticks([])
+        for spine in ax_rs.spines.values():
+            spine.set_color(mid_fg); spine.set_linewidth(0.6)
+        ## END for spine in ax_rs.spines.values()...
+        if t_i == 0:
+            ax_rs.set_title('row ∑', color=mid_fg, fontsize=7, pad=2)
+        ## END if t_i == 0...
+        rowsum_axes.append(ax_rs)
+
+        # To the right of the row-∑: (2 × 1) track_ID marginal for this t, vertically centered on the matrix row
+        ax_tid = fig.add_subplot(trackid_gs[t_i, 0])
+        ax_tid.set_facecolor(bg)
+        ax_tid.imshow(track_identity_marginal[:, t_i].reshape(2, 1), aspect='auto', cmap=cmap, vmin=0.0, vmax=1.0, interpolation='nearest', origin='upper')
+        ax_tid.set_xticks([]); ax_tid.set_yticks([])
+        for spine in ax_tid.spines.values():
+            spine.set_color(mid_fg); spine.set_linewidth(0.6)
+        ## END for spine in ax_tid.spines.values()...
+        if t_i == 0:
+            ax_tid.set_title('track_ID', color=mid_fg, fontsize=7, pad=2)
+        ## END if t_i == 0...
+        # v-align center: shrink the 2-row column to half the matrix height, centered on the same vertical midpoint
+        bb_mat = ax.get_position()
+        bb_tid = ax_tid.get_position()
+        half_h: float = bb_mat.height * (2.0 / float(n_contexts)) / 2.0
+        center_y: float = (bb_mat.y0 + bb_mat.y1) / 2.0
+        ax_tid.set_position([bb_tid.x0, center_y - half_h, bb_tid.width, 2.0 * half_h])
+        trackid_axes.append(ax_tid)
     ## END for t_i in range(n_t)...
 
-    # Right: track_identity marginal
-    ax_marg = fig.add_subplot(outer[0, 5])
+    # Right: track_identity marginal (Long/Short only — contexts collapsed here)
+    ax_marg = fig.add_subplot(outer[0, 6])
     ax_marg.set_facecolor(bg)
     ax_marg.imshow(track_identity_marginal, aspect='auto', cmap=cmap, vmin=0.0, vmax=1.0, interpolation='nearest', origin='upper')
     ax_marg.set_xticks(np.arange(n_t))
@@ -15231,7 +15259,7 @@ def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArr
         pass
 
     if show_epoch_sum:
-        ax_ep = fig.add_subplot(outer[0, 6])
+        ax_ep = fig.add_subplot(outer[0, 7])
         ax_ep.set_facecolor(bg)
         ax_ep.imshow(epoch_sum.reshape(2, 1), aspect='auto', cmap=cmap, vmin=0.0, vmax=1.0, interpolation='nearest', origin='upper')
         ax_ep.set_xticks([]); ax_ep.set_yticks([])
@@ -15264,11 +15292,13 @@ def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArr
         png_path=png_path,
         n_x=n_x,
         n_y=n_y,
+        n_contexts=n_contexts,
         n_time_bins_drawn=n_t,
         n_time_bins_full=n_t_full,
         ax_marginal=ax_marg,
         ax_epoch_sum=ax_ep,
         raw_axes=raw_axes,
         rowsum_axes=rowsum_axes,
+        trackid_axes=trackid_axes,
     )
     return fig, extras
