@@ -15093,7 +15093,7 @@ def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArr
         for spine in ax_t.spines.values():
             spine.set_visible(False)
         ## END for spine in ax_t.spines.values()...
-        ax_t.text(0.95, 0.5, f't={t_i}', transform=ax_t.transAxes, ha='right', va='center', color=fg, fontsize=8, fontweight='bold')
+        ax_t.text(0.95, 0.5, f't={t_i}', transform=ax_t.transAxes, ha='right', va='center', color=fg, fontsize=_label_fs, fontweight='bold')
         return ax_t
 
     def _subfn_draw_raw_posterior_matrix(t_i: int):
@@ -15105,11 +15105,11 @@ def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArr
         ax.set_xticks([]); ax.set_yticks([])
         _subfn_add_xy_unit_grid(ax, n_x=n_pos, n_y=n_contexts, grid_color=mid_fg)
         for spine in ax.spines.values():
-            spine.set_color(mid_fg); spine.set_linewidth(0.6)
+            spine.set_color(mid_fg); spine.set_linewidth(_axes_lw)
         ## END for spine in ax.spines.values()...
         # Decoder labels on the left, vertically centered on each matrix row
         for c_i, (lab, col) in enumerate(zip(context_labels, context_colors)):
-            ax.text(-0.02, (c_i + 0.5) / n_contexts, lab, transform=ax.transAxes, ha='right', va='center', color=col, fontsize=6, clip_on=False)
+            ax.text(-0.02, (c_i + 0.5) / n_contexts, lab, transform=ax.transAxes, ha='right', va='center', color=col, fontsize=_small_fs, clip_on=False)
         ## END for c_i, (lab, col) in enumerate(zip(context_labels, context_colors))...
         return ax
 
@@ -15120,10 +15120,10 @@ def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArr
         ax_rs.imshow(row_sums[:, t_i].reshape(n_contexts, 1), aspect='auto', cmap=cmap, vmin=0.0, vmax=vmax_row, interpolation='nearest', origin='upper')
         ax_rs.set_xticks([]); ax_rs.set_yticks([])
         for spine in ax_rs.spines.values():
-            spine.set_color(mid_fg); spine.set_linewidth(0.6)
+            spine.set_color(mid_fg); spine.set_linewidth(_axes_lw)
         ## END for spine in ax_rs.spines.values()...
         if t_i == 0:
-            ax_rs.set_title('row ∑', color=mid_fg, fontsize=7, pad=2)
+            ax_rs.set_title('row ∑', color=mid_fg, fontsize=_label_fs, pad=2)
         ## END if t_i == 0...
         return ax_rs
 
@@ -15134,10 +15134,10 @@ def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArr
         ax_tid.imshow(track_identity_marginal[:, t_i].reshape(2, 1), aspect='auto', cmap=cmap, vmin=0.0, vmax=1.0, interpolation='nearest', origin='upper')
         ax_tid.set_xticks([]); ax_tid.set_yticks([])
         for spine in ax_tid.spines.values():
-            spine.set_color(mid_fg); spine.set_linewidth(0.6)
+            spine.set_color(mid_fg); spine.set_linewidth(_axes_lw)
         ## END for spine in ax_tid.spines.values()...
         if t_i == 0:
-            ax_tid.set_title('track_ID', color=mid_fg, fontsize=7, pad=2)
+            ax_tid.set_title('track_ID', color=mid_fg, fontsize=_label_fs, pad=2)
         ## END if t_i == 0...
         # v-align center: shrink the 2-row column to half the matrix height, centered on the same vertical midpoint
         bb_mat = ax_mat.get_position()
@@ -15167,7 +15167,7 @@ def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArr
                 (conn_x1, y_hi),
                 (conn_x1, y_lo),
                 (bb_mat.x1, y_lo),
-            ], closed=True, transform=fig.transFigure, facecolor=(0.85, 0.85, 0.88, 0.92), edgecolor=(0.45, 0.45, 0.50, 0.9), linewidth=0.6, zorder=0.5, clip_on=False)
+            ], closed=True, transform=fig.transFigure, facecolor=(0.85, 0.85, 0.88, 0.92), edgecolor=(0.45, 0.45, 0.50, 0.9), linewidth=_axes_lw, zorder=0.5, clip_on=False)
             fig.add_artist(conn)
             # Small grey triangular '>' arrowhead between the connector's right edge and the 4-vec box
             arrow = Polygon([
@@ -15176,11 +15176,11 @@ def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArr
                 (conn_x1, y_lo),
             ], closed=True, transform=fig.transFigure, facecolor=(0.55, 0.55, 0.60, 0.95), edgecolor='none', zorder=1.5, clip_on=False)
             fig.add_artist(arrow)
-            fig.text((bb_mat.x1 + conn_x1) / 2.0, (y_hi + y_lo) / 2.0, 'row ∑', ha='center', va='center', color='#808088', fontsize=6, zorder=2)
+            fig.text((bb_mat.x1 + conn_x1) / 2.0, (y_hi + y_lo) / 2.0, 'row ∑', ha='center', va='center', color='#808088', fontsize=_small_fs, zorder=2)
         ## END for c_i in range(n_contexts)...
         if t_i == 0:
             # Large ∑ with x subscript above the connector stack (mathtext, like the schematic)
-            fig.text((bb_mat.x1 + bb_rs.x0) / 2.0, bb_mat.y1 + 0.012, r'$\sum_{x}$', ha='center', va='bottom', color=mid_fg, fontsize=16, zorder=2)
+            fig.text((bb_mat.x1 + bb_rs.x0) / 2.0, bb_mat.y1 + 0.012, r'$\sum_{x}$', ha='center', va='bottom', color=mid_fg, fontsize=2.0 * _title_fs, zorder=2)
         ## END if t_i == 0...
 
     def _subfn_draw_trapezoid_sums(ax_rs, ax_tid):
@@ -15197,7 +15197,7 @@ def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArr
                 (bb_tid.x0, tid_y_hi),
                 (bb_tid.x0, tid_y_lo),
                 (bb_rs.x1, rs_y_lo),
-            ], closed=True, transform=fig.transFigure, facecolor=(0.85, 0.85, 0.88, 0.92), edgecolor=(0.45, 0.45, 0.50, 0.9), linewidth=0.6, zorder=1, clip_on=False)
+            ], closed=True, transform=fig.transFigure, facecolor=(0.85, 0.85, 0.88, 0.92), edgecolor=(0.45, 0.45, 0.50, 0.9), linewidth=_axes_lw, zorder=1, clip_on=False)
             fig.add_artist(trap)
             # Large bold + sized to the trapezoid's height at its horizontal midpoint (screenshot style)
             trap_mid_h: float = ((rs_y_hi - rs_y_lo) + (tid_y_hi - tid_y_lo)) / 2.0
@@ -15244,13 +15244,23 @@ def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArr
             (col_x1, bb_marg.y0),
             (col_x1, bb_tid.y0),
             (bb_tid.x1, bb_tid.y0),
-        ], closed=True, transform=fig.transFigure, facecolor='none', edgecolor=band_edgecolor, linewidth=0.6, zorder=0.5, clip_on=False)
+        ], closed=True, transform=fig.transFigure, facecolor='none', edgecolor=band_edgecolor, linewidth=_axes_lw, zorder=0.5, clip_on=False)
         fig.add_artist(outline)
         # Long/Short labels at the right edge of the 2-vec, aligned with its two elements
         for lab_i, (lab, col) in enumerate(zip(track_labels, track_colors)):
             y_frac: float = 0.75 if lab_i == 0 else 0.25
-            fig.text(bb_tid.x1 + 0.004, bb_tid.y0 + bb_tid.height * y_frac, lab, ha='left', va='center', color=col, fontsize=7, zorder=2)
+            fig.text(bb_tid.x1 + 0.004, bb_tid.y0 + bb_tid.height * y_frac, lab, ha='left', va='center', color=col, fontsize=_label_fs, zorder=2)
         ## END for lab_i, (lab, col) in enumerate(zip(track_labels, track_colors))...
+
+    # KDiba publication typography/strokes (Artboard-3): Arial, ~8.077pt labels, ~9.087pt titles, 0.75pt lines, Type-42 vector fonts
+    pub_style = PhoPublicationFigureHelper.get_figure2_bar_style(prepare_for_publication=True)
+    _title_fs: float = float(pub_style.title_font_size)  # ≈ 9.087 pt
+    _label_fs: float = float(pub_style.axis_labelsize)  # ≈ 8.077 pt
+    _small_fs: float = float(pub_style.tick_labelsize) * 0.85  # small connector/decoder labels, below tick size
+    _axes_lw: float = float(pub_style.axes_linewidth)  # 0.75 pt
+    _prev_rc = mpl.rcParams.copy()
+    mpl.rcParams.update(pub_style.mpl_rc)
+    mpl.rcParams.update({'font.family': 'Arial', 'savefig.transparent': False})
 
     save_path = Path(save_path).resolve()
     save_path.parent.mkdir(parents=True, exist_ok=True)
@@ -15296,18 +15306,21 @@ def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArr
 
     if figsize is None:
         # One (n_contexts × n_pos) matrix per t; height scales with n_t and rows per matrix
-        figsize = (7.2, max(5.0, 0.32 * n_t * n_contexts + 1.8))
+        figsize = (6.5, max(5.0, 0.32 * n_t * n_contexts + 1.8))  # KDiba single-column-plus width: 6.5 in
     ## END if figsize is None...
 
     fig = plt.figure(figsize=figsize, facecolor=bg, constrained_layout=False)
     # Columns: t-label | raw (n_contexts × n_pos per t) | row-sum (n_contexts × 1, row-aligned) | trapezoid-sum gap | track-ID (2 × 1, v-center) | spacer | track_identity marginal | epoch sum
     # Rows: header row (row 0) holds the right two panels ABOVE the first t-row; main row (row 1) holds the per-t stack
     # raw + row-sum share the same n_t-row GridSpec (same hspace) so the small column lines up with each matrix
-    outer = GridSpec(2, 8, figure=fig, width_ratios=[0.55, 4.2, 0.28, 0.55, 0.28, 0.28, 1.5, 0.45 if show_epoch_sum else 0.05], height_ratios=[3.0, float(n_t * n_contexts)], left=0.08, right=0.98, top=0.90, bottom=0.06, wspace=0.30, hspace=0.35)
+    # Gap tuning: each inter-column gap = wspace × mean subplot width (fixed by GridSpec).
+    # Insert spacer columns to control gaps independently: col 3 = row-∑ connector gap (~1.5x), col 5 = trapezoid gap (~0.5x).
+    # Columns: t-label | raw matrix | row-∑ conn gap | row-sum 4-vec | trapezoid gap | track-ID 2-vec | spacer | marginal | epoch sum
+    outer = GridSpec(2, 9, figure=fig, width_ratios=[0.55, 4.2, 0.42, 0.28, 0.01, 0.28, 0.14, 1.5, 0.45 if show_epoch_sum else 0.05], height_ratios=[3.0, float(n_t * n_contexts)], left=0.08, right=0.98, top=0.90, bottom=0.06, wspace=0.30, hspace=0.35)
 
     raw_gs = GridSpecFromSubplotSpec(n_t, 1, subplot_spec=outer[1, 1], hspace=0.25)
-    rowsum_gs = GridSpecFromSubplotSpec(n_t, 1, subplot_spec=outer[1, 2], hspace=0.25)
-    trackid_gs = GridSpecFromSubplotSpec(n_t, 1, subplot_spec=outer[1, 4], hspace=0.25)
+    rowsum_gs = GridSpecFromSubplotSpec(n_t, 1, subplot_spec=outer[1, 3], hspace=0.25)
+    trackid_gs = GridSpecFromSubplotSpec(n_t, 1, subplot_spec=outer[1, 5], hspace=0.25)
     tlabel_gs = GridSpecFromSubplotSpec(n_t, 1, subplot_spec=outer[1, 0], hspace=0.45)
 
     vmax_raw = float(np.nanmax(display_p_x_given_n)) if np.any(np.isfinite(display_p_x_given_n)) else 1.0
@@ -15334,23 +15347,23 @@ def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArr
     ## END for t_i in range(n_t)...
 
     # Header row (above first t-row): track_identity marginal (Long/Short only — contexts collapsed here)
-    ax_marg = fig.add_subplot(outer[0, 6])
+    ax_marg = fig.add_subplot(outer[0, 7])
     ax_marg.set_facecolor(bg)
     ax_marg.imshow(track_identity_marginal, aspect='auto', cmap=cmap, vmin=0.0, vmax=1.0, interpolation='nearest', origin='upper')
     ax_marg.set_xticks(np.arange(n_t))
-    ax_marg.set_xticklabels([f't={i}' if (i % max(1, n_t // 10) == 0 or i == n_t - 1) else '' for i in range(n_t)], color=fg, fontsize=7)
+    ax_marg.set_xticklabels([f't={i}' if (i % max(1, n_t // 10) == 0 or i == n_t - 1) else '' for i in range(n_t)], color=fg, fontsize=_label_fs)
     ax_marg.xaxis.tick_top()  # t= labels ABOVE the marginal matrix
     ax_marg.xaxis.set_label_position('top')
     ax_marg.set_yticks([0, 1])
-    ax_marg.set_yticklabels(list(track_labels), fontsize=8)
+    ax_marg.set_yticklabels(list(track_labels), fontsize=_label_fs)
     for tick_label, col in zip(ax_marg.get_yticklabels(), track_colors):
         tick_label.set_color(col)
     ## END for tick_label, col in zip(ax_marg.get_yticklabels(), track_colors)...
     for spine in ax_marg.spines.values():
-        spine.set_color(mid_fg); spine.set_linewidth(0.8)
+        spine.set_color(mid_fg); spine.set_linewidth(_axes_lw)
     ## END for spine in ax_marg.spines.values()...
-    ax_marg.set_title('track_identity marginal', color=fg, fontsize=9, pad=6)
-    ax_marg.tick_params(colors=fg, length=2)
+    ax_marg.set_title('track_identity marginal', color=fg, fontsize=_title_fs, pad=6)
+    ax_marg.tick_params(colors=fg, length=float(pub_style.tick_length), width=float(pub_style.tick_width))
 
     # 'Insert' indicator bands: each row's 2-vec → its column in the header marginal (drawn under the axes)
     for t_i, ax_tid in enumerate(trackid_axes):
@@ -15371,18 +15384,18 @@ def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArr
     cbar_prob.set_ticks(np.linspace(0.0, 1.0, 6))
     cbar_prob.ax.tick_params(labelsize=8, colors=fg, length=3, width=0.6, pad=2)
     cbar_prob.outline.set_edgecolor(mid_fg)
-    cbar_prob.outline.set_linewidth(0.6)
-    cbar_prob.set_label('probability', color=fg, fontsize=9, labelpad=2)
+    cbar_prob.outline.set_linewidth(_axes_lw)
+    cbar_prob.set_label('probability', color=fg, fontsize=_title_fs, labelpad=2)
 
     if show_epoch_sum:
-        ax_ep = fig.add_subplot(outer[0, 7])
+        ax_ep = fig.add_subplot(outer[0, 8])
         ax_ep.set_facecolor(bg)
         ax_ep.imshow(epoch_sum.reshape(2, 1), aspect='auto', cmap=cmap, vmin=0.0, vmax=1.0, interpolation='nearest', origin='upper')
         ax_ep.set_xticks([]); ax_ep.set_yticks([])
         for spine in ax_ep.spines.values():
-            spine.set_color(mid_fg); spine.set_linewidth(0.8)
+            spine.set_color(mid_fg); spine.set_linewidth(_axes_lw)
         ## END for spine in ax_ep.spines.values()...
-        ax_ep.set_title('epoch', color=mid_fg, fontsize=7, pad=26)
+        ax_ep.set_title('epoch', color=mid_fg, fontsize=_label_fs, pad=26)
         # Same 'row ∑' horizontal connectors (with '>' arrowheads) between the marginal and the final epoch 2-vec, one per track row
         bb_marg = ax_marg.get_position()
         bb_ep = ax_ep.get_position()
@@ -15398,7 +15411,7 @@ def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArr
                 (conn_x1, y_hi),
                 (conn_x1, y_lo),
                 (bb_marg.x1, y_lo),
-            ], closed=True, transform=fig.transFigure, facecolor=(0.85, 0.85, 0.88, 0.92), edgecolor=(0.45, 0.45, 0.50, 0.9), linewidth=0.6, zorder=0.5, clip_on=False)
+            ], closed=True, transform=fig.transFigure, facecolor=(0.85, 0.85, 0.88, 0.92), edgecolor=(0.45, 0.45, 0.50, 0.9), linewidth=_axes_lw, zorder=0.5, clip_on=False)
             fig.add_artist(conn)
             arrow = Polygon([
                 (conn_x1, y_hi),
@@ -15406,16 +15419,16 @@ def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArr
                 (conn_x1, y_lo),
             ], closed=True, transform=fig.transFigure, facecolor=(0.55, 0.55, 0.60, 0.95), edgecolor='none', zorder=1.5, clip_on=False)
             fig.add_artist(arrow)
-            fig.text((bb_marg.x1 + conn_x1) / 2.0, (y_hi + y_lo) / 2.0, 'row ∑', ha='center', va='center', color='#808088', fontsize=6, zorder=2)
+            fig.text((bb_marg.x1 + conn_x1) / 2.0, (y_hi + y_lo) / 2.0, 'row ∑', ha='center', va='center', color='#808088', fontsize=_small_fs, zorder=2)
         ## END for r_i in range(2)...
         # Large ∑ with t subscript above the connectors, 'epoch' title above that (screenshot style)
-        fig.text((bb_marg.x1 + bb_ep.x0) / 2.0, bb_ep.y1 + 0.008, r'$\sum_{t}$', ha='center', va='bottom', color=mid_fg, fontsize=16, zorder=2)
+        fig.text((bb_marg.x1 + bb_ep.x0) / 2.0, bb_ep.y1 + 0.008, r'$\sum_{t}$', ha='center', va='bottom', color=mid_fg, fontsize=2.0 * _title_fs, zorder=2)
     else:
         ax_ep = None
     ## END if show_epoch_sum...
 
     header = title if title is not None else 'raw (non-marginalized) pseudo2D decoder for each time bin'
-    fig.suptitle(header, color=fg, fontsize=10, y=0.97)
+    fig.suptitle(header, color=fg, fontsize=_title_fs, y=0.97)
 
     fig.savefig(save_path, format='pdf', facecolor=fig.get_facecolor(), edgecolor='none', bbox_inches='tight')
     png_path = None
@@ -15423,6 +15436,8 @@ def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArr
         png_path = save_path.with_suffix('.png')
         fig.savefig(png_path, format='png', dpi=200, facecolor=fig.get_facecolor(), edgecolor='none', bbox_inches='tight')
     ## END if also_save_png...
+
+    mpl.rcParams.update(_prev_rc)  # restore caller's rcParams after publication-styled rendering/saving
 
     extras: Dict[str, Any] = dict(
         display_p_x_given_n=display_p_x_given_n,
