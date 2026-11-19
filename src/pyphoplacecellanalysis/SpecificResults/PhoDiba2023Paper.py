@@ -15134,14 +15134,15 @@ def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArr
 
     fig = plt.figure(figsize=figsize, facecolor=bg, constrained_layout=False)
     # Columns: t-label | raw (n_contexts × n_pos per t) | row-sum (n_contexts × 1, row-aligned) | track-ID (2 × 1, v-center) | + | spacer/flow | track_identity marginal | epoch sum
+    # Rows: header row (row 0) holds the right two panels ABOVE the first t-row; main row (row 1) holds the per-t stack
     # raw + row-sum share the same n_t-row GridSpec (same hspace) so the small column lines up with each matrix
-    outer = GridSpec(1, 8, figure=fig, width_ratios=[0.55, 4.2, 0.28, 0.28, 0.28, 0.55, 1.5, 0.45 if show_epoch_sum else 0.05], left=0.08, right=0.98, top=0.90, bottom=0.06, wspace=0.10)
+    outer = GridSpec(2, 8, figure=fig, width_ratios=[0.55, 4.2, 0.28, 0.28, 0.28, 0.55, 1.5, 0.45 if show_epoch_sum else 0.05], height_ratios=[3.0, float(n_t * n_contexts)], left=0.08, right=0.98, top=0.90, bottom=0.06, wspace=0.30, hspace=0.35)
 
-    raw_gs = GridSpecFromSubplotSpec(n_t, 1, subplot_spec=outer[0, 1], hspace=0.25)
-    rowsum_gs = GridSpecFromSubplotSpec(n_t, 1, subplot_spec=outer[0, 2], hspace=0.25)
-    trackid_gs = GridSpecFromSubplotSpec(n_t, 1, subplot_spec=outer[0, 3], hspace=0.25)
-    plus_gs = GridSpecFromSubplotSpec(n_t, 1, subplot_spec=outer[0, 4], hspace=0.45)
-    tlabel_gs = GridSpecFromSubplotSpec(n_t, 1, subplot_spec=outer[0, 0], hspace=0.45)
+    raw_gs = GridSpecFromSubplotSpec(n_t, 1, subplot_spec=outer[1, 1], hspace=0.25)
+    rowsum_gs = GridSpecFromSubplotSpec(n_t, 1, subplot_spec=outer[1, 2], hspace=0.25)
+    trackid_gs = GridSpecFromSubplotSpec(n_t, 1, subplot_spec=outer[1, 3], hspace=0.25)
+    plus_gs = GridSpecFromSubplotSpec(n_t, 1, subplot_spec=outer[1, 4], hspace=0.45)
+    tlabel_gs = GridSpecFromSubplotSpec(n_t, 1, subplot_spec=outer[1, 0], hspace=0.45)
 
     vmax_raw = float(np.nanmax(display_p_x_given_n)) if np.any(np.isfinite(display_p_x_given_n)) else 1.0
     if not np.isfinite(vmax_raw) or vmax_raw <= 0:
@@ -15222,7 +15223,7 @@ def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArr
         trackid_axes.append(ax_tid)
     ## END for t_i in range(n_t)...
 
-    # Right: track_identity marginal (Long/Short only — contexts collapsed here)
+    # Header row (above first t-row): track_identity marginal (Long/Short only — contexts collapsed here)
     ax_marg = fig.add_subplot(outer[0, 6])
     ax_marg.set_facecolor(bg)
     ax_marg.imshow(track_identity_marginal, aspect='auto', cmap=cmap, vmin=0.0, vmax=1.0, interpolation='nearest', origin='upper')
