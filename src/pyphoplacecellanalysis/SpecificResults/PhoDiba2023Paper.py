@@ -15249,8 +15249,9 @@ def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArr
             spine.set_color(mid_fg); spine.set_linewidth(_axes_lw)
         ## END for spine in ax_tid.spines.values()...
         if t_i == 0:
-            _title_tid = ax_tid.set_title('track_ID', color=mid_fg, fontsize=_label_fs, pad=2)
-            _title_tid.set_zorder(30)  # top z-pos: draw above the trapezoid/insert connector bands
+            _title_tid = ax_tid.set_title('track_ID', color=mid_fg, fontsize=_label_fs, pad=6)
+            _title_tid.set_zorder(30)  # top z-pos within its axes (title zorder is axes-local, not figure-wide)
+            ax_tid.set_zorder(3)  # bump the WHOLE first-row axes above the connector bands/trapezoids (default axes zorder=0)
         ## END if t_i == 0...
         # v-align center: shrink the 2-row column to half the matrix height, centered on the same vertical midpoint
         bb_mat = ax_mat.get_position()
