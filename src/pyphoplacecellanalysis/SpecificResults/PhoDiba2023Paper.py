@@ -15134,32 +15134,36 @@ def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArr
         """
         fig_w_in, fig_h_in = fig.get_size_inches()
         s: float = height_in / 47.123  # inches per SVG unit (∑ outline spans y 0..47.123)
+        ## Anchor in INCHES and draw via dpi_scale_trans: glyph geometry is in physical inches, so its aspect ratio
+        ## is preserved under any figure resize / bbox_inches='tight' export (figure-fraction verts would squash).
+        anchor_x_in: float = x_center * fig_w_in
+        anchor_y_in: float = y_top * fig_h_in
 
-        def _to_fig(vx: float, vy: float, cx_svg: float, y0_svg: float):
-            """SVG-local (y-down) → figure fraction; cx_svg is the horizontal centering offset in SVG units."""
-            return (x_center + (vx - cx_svg) * s / fig_w_in, y_top - (y0_svg + vy) * s / fig_h_in)
-        ## END def _to_fig...
+        def _to_inches(vx: float, vy: float, cx_svg: float, y0_svg_in: float, scale: float):
+            """SVG-local (y-down) → figure inches; cx_svg is the horizontal centering offset in SVG units."""
+            return (anchor_x_in + (vx - cx_svg) * scale, anchor_y_in - (y0_svg_in + vy * scale))
+        ## END def _to_inches...
 
         ## Big ∑ outline, SVG local coords (original translate(5.234, 27.378) dropped; centered on x=22.4)
         sigma_verts = [(40.731, 47.123), (44.801, 36.356), (43.962, 36.356), (35.211, 43.154), (24.744, 44.199), (4.444, 44.199), (21.577, 24.1), (21.878, 23.562), (21.646, 23.06), (5.959, 1.615), (24.406, 1.615), (32.281, 2.153), (39.686, 4.677), (43.962, 9.458), (44.801, 9.458), (40.731, 0.0), (0.945, 0.0), (0.037, 0.237), (0.0, 1.346), (17.808, 25.715), (0.369, 46.147), (0.037, 46.754), (0.945, 47.123), (40.731, 47.123)]
-        sigma_fig = [_to_fig(vx, vy, 22.4, 0.0) for vx, vy in sigma_verts]
-        fig.add_artist(Polygon(sigma_fig, closed=True, transform=fig.transFigure, facecolor=color, edgecolor='none', zorder=zorder, clip_on=False))
+        sigma_in = [_to_inches(vx, vy, 22.4, 0.0, s) for vx, vy in sigma_verts]
+        fig.add_artist(Polygon(sigma_in, closed=True, transform=fig.dpi_scale_trans, facecolor=color, edgecolor='none', zorder=zorder, clip_on=False))
         ## Small italic subscript centered below the ∑ (SVG: ∑ bottom 74.501, subscript top 82.919 → 8.418-unit gap)
-        sub_y0: float = 47.123 + 8.418
+        sub_y0_in: float = (47.123 + 8.418) * s
         sub_scale: float = 1.5 * s  # subscript ~1.5x bigger than the SVG's original proportion
         sub_h_svg: float = 14.958
         if subscript == 't':
             # Exact italic 't' outline from the SVG (local coords, width 7.965)
             t_verts = [(4.808, 5.415), (7.21, 5.415), (7.965, 4.898), (7.257, 4.566), (5.02, 4.566), (5.89, 1.082), (5.964, 0.749), (5.162, 0.0), (4.054, 1.008), (3.162, 4.566), (0.755, 4.566), (0.0, 5.088), (0.707, 5.415), (2.945, 5.415), (1.557, 10.973), (1.203, 12.72), (3.726, 14.958), (7.822, 11.353), (7.447, 11.047), (6.951, 11.496), (3.795, 14.298), (2.972, 13.143), (3.114, 12.177), (4.808, 5.415)]
-            t_fig = [(x_center + (vx - 7.965 / 2.0) * sub_scale / fig_w_in, y_top - (sub_y0 * s + vy * sub_scale) / fig_h_in) for vx, vy in t_verts]
-            fig.add_artist(Polygon(t_fig, closed=True, transform=fig.transFigure, facecolor=color, edgecolor='none', zorder=zorder, clip_on=False))
+            t_in = [_to_inches(vx, vy, 7.965 / 2.0, sub_y0_in, sub_scale) for vx, vy in t_verts]
+            fig.add_artist(Polygon(t_in, closed=True, transform=fig.dpi_scale_trans, facecolor=color, edgecolor='none', zorder=zorder, clip_on=False))
         else:
             # 'x' subscript rendered as mathtext $\vec{x}$ — same glyph as the 'position \vec{x}' xlabel
             sub_fs: float = sub_h_svg * sub_scale * 72.0  # match the (1.5x-enlarged) subscript height in points
-            sub_y_bottom: float = y_top - (sub_y0 * s + sub_h_svg * sub_scale) / fig_h_in
+            sub_y_bottom: float = (anchor_y_in - (sub_y0_in + sub_h_svg * sub_scale)) / fig_h_in
             fig.text(x_center, sub_y_bottom, r'$\vec{x}$', ha='center', va='bottom', color=color, fontsize=sub_fs, zorder=zorder)
         ## END if subscript == 't'...
-        return y_top - (sub_y0 * s + sub_h_svg * sub_scale) / fig_h_in
+        return (anchor_y_in - (sub_y0_in + sub_h_svg * sub_scale)) / fig_h_in
 
     def _subfn_draw_t_label(t_i: int):
         """Left-hand 't=i' label axes for one time-bin row."""
