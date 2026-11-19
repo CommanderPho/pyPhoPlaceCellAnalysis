@@ -15107,14 +15107,22 @@ def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArr
     _save_bbox_kwargs.setdefault('bbox_inches', 'tight')
     _save_bbox_kwargs.setdefault('pad_inches', 0.02)
 
-    def _subfn_add_xy_unit_grid(ax, n_x: int, n_y: int, grid_color: str = '#979797', linewidth: float = 0.35, alpha: float = 0.45):
-        """Overlay integer x/y bin-edge grid lines on a raw posterior axes (unit-index grid)."""
-        ax.set_xticks(np.arange(n_x + 1, dtype=float), minor=True)
-        ax.set_yticks(np.arange(n_y + 1, dtype=float), minor=True)
+    def _subfn_add_xy_unit_grid(ax, n_x: int, n_y: int, grid_color: str = '#979797', linewidth: float = 0.35, alpha: float = 0.45, keep_major_ticks: bool = False):
+        """Overlay integer x/y bin-edge grid lines on a matrix axes (unit-index grid).
+
+        Grid edges are derived from the axes' CURRENT imshow extents (do NOT overwrite xlim/ylim —
+        imshow defaults to (-0.5, n-0.5); forcing (0, n) would shift/shrink the cells and misalign the matrices).
+        keep_major_ticks=True preserves existing major ticks/labels (e.g. the header marginal's t-bin numbers).
+        """
+        x0, x1 = ax.get_xlim()
+        y0, y1 = ax.get_ylim()
+        ax.set_xticks(np.linspace(min(x0, x1), max(x0, x1), n_x + 1), minor=True)
+        ax.set_yticks(np.linspace(min(y0, y1), max(y0, y1), n_y + 1), minor=True)
         ax.grid(True, which='minor', color=grid_color, linestyle='-', linewidth=linewidth, alpha=alpha, zorder=10)
-        ax.tick_params(axis='both', which='both', bottom=False, top=False, left=False, right=False, labelbottom=False, labelleft=False)
-        ax.set_xlim(0, n_x)
-        ax.set_ylim(0, n_y)
+        ax.tick_params(axis='both', which='minor', bottom=False, top=False, left=False, right=False, labelbottom=False, labelleft=False)
+        if not keep_major_ticks:
+            ax.tick_params(axis='both', which='major', bottom=False, top=False, left=False, right=False, labelbottom=False, labelleft=False)
+        ## END if not keep_major_ticks...
 
     def _subfn_draw_t_label(t_i: int):
         """Left-hand 't=i' label axes for one time-bin row."""
@@ -15134,7 +15142,7 @@ def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArr
         img = np.asarray(display_p_x_given_n[:, :, :, t_i], dtype=float).reshape(n_pos, n_contexts).T  # (n_contexts, n_pos)
         ax.imshow(img, aspect='auto', cmap=cmap, norm=norm_raw, interpolation='nearest', origin='upper', extent=[0, n_pos, 0, n_contexts])
         ax.set_xticks([]); ax.set_yticks([])
-        _subfn_add_xy_unit_grid(ax, n_x=n_pos, n_y=n_contexts, grid_color=mid_fg)
+        _subfn_add_xy_unit_grid(ax, n_x=n_pos, n_y=n_contexts, grid_color=neutral_gray)
         for spine in ax.spines.values():
             spine.set_color(mid_fg); spine.set_linewidth(_axes_lw)
         ## END for spine in ax.spines.values()...
@@ -15182,6 +15190,7 @@ def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArr
         ax_rs.set_facecolor(bg)
         ax_rs.imshow(row_sums[:, t_i].reshape(n_contexts, 1), aspect='auto', cmap=cmap, vmin=0.0, vmax=vmax_row, interpolation='nearest', origin='upper')
         ax_rs.set_xticks([]); ax_rs.set_yticks([])
+        _subfn_add_xy_unit_grid(ax_rs, n_x=1, n_y=n_contexts, grid_color=neutral_gray)
         for spine in ax_rs.spines.values():
             spine.set_color(mid_fg); spine.set_linewidth(_axes_lw)
         ## END for spine in ax_rs.spines.values()...
@@ -15196,6 +15205,7 @@ def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArr
         ax_tid.set_facecolor(bg)
         ax_tid.imshow(track_identity_marginal[:, t_i].reshape(2, 1), aspect='auto', cmap=cmap, vmin=0.0, vmax=1.0, interpolation='nearest', origin='upper')
         ax_tid.set_xticks([]); ax_tid.set_yticks([])
+        _subfn_add_xy_unit_grid(ax_tid, n_x=1, n_y=2, grid_color=neutral_gray)
         for spine in ax_tid.spines.values():
             spine.set_color(mid_fg); spine.set_linewidth(_axes_lw)
         ## END for spine in ax_tid.spines.values()...
@@ -15268,7 +15278,9 @@ def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArr
             # Center each + in its trapezoid's vertical span at the midpoint x: top + sits up, bottom + sits clearly down (screenshot style)
             mid_y_hi: float = (rs_y_hi + tid_y_hi) / 2.0
             mid_y_lo: float = (rs_y_lo + tid_y_lo) / 2.0
-            fig.text((bb_rs.x1 + bb_tid.x0) / 2.0, (mid_y_hi + mid_y_lo) / 2.0, '+', ha='center', va='center', color=inner_dark_grey, fontsize=plus_fontsize, fontweight='bold', zorder=2)
+            plus_x: float = (bb_rs.x1 + bb_tid.x0) / 2.0 - 0.15 * (bb_tid.x0 - bb_rs.x1)  # nudged slightly left of the trapezoid midpoint
+            plus_y: float = (mid_y_hi + mid_y_lo) / 2.0 - 0.06 * (mid_y_hi - mid_y_lo)  # both +'s nudged very slightly down
+            fig.text(plus_x, plus_y, '+', ha='center', va='center', color=inner_dark_grey, fontsize=plus_fontsize, fontweight='bold', zorder=2)
         ## END for g_i, (rs_y_hi, rs_y_lo, tid_y_hi, tid_y_lo) in enumerate([...])...
 
     def _subfn_draw_insert_connectors(ax_tid, t_i: int):
@@ -15423,6 +15435,7 @@ def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArr
     ax_marg = fig.add_subplot(outer[0, 7])
     ax_marg.set_facecolor(bg)
     ax_marg.imshow(track_identity_marginal, aspect='auto', cmap=cmap, vmin=0.0, vmax=1.0, interpolation='nearest', origin='upper')
+    _subfn_add_xy_unit_grid(ax_marg, n_x=n_t, n_y=2, grid_color=neutral_gray, keep_major_ticks=True)  # bin grid; keep t-bin number labels
     ax_marg.set_xticks(np.arange(n_t))
     ax_marg.set_xticklabels([str(i) if (i % max(1, n_t // 10) == 0 or i == n_t - 1) else '' for i in range(n_t)], color=fg, fontsize=_label_fs)
     ax_marg.xaxis.tick_top()  # bin-number labels ABOVE the marginal matrix
@@ -15439,7 +15452,7 @@ def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArr
         spine.set_color(mid_fg); spine.set_linewidth(_axes_lw)
     ## END for spine in ax_marg.spines.values()...
     ax_marg.set_title('track_identity marginal', color=fg, fontsize=_title_fs, pad=6)
-    ax_marg.tick_params(colors=fg, length=float(pub_style.tick_length), width=float(pub_style.tick_width))
+    ax_marg.tick_params(axis='both', which='both', colors=fg, bottom=False, top=False, left=False, right=False, length=0)  # NO tick marks anywhere (labels only)
 
     # 'Insert' indicator bands: each row's 2-vec → its column in the header marginal (drawn under the axes)
     for t_i, ax_tid in enumerate(trackid_axes):
@@ -15458,7 +15471,7 @@ def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArr
     cax_prob = fig.add_axes([bb_raw_top.x0, cbar_y0, cbar_w, cbar_h])
     cbar_prob = fig.colorbar(ScalarMappable(norm=Normalize(vmin=0.0, vmax=1.0), cmap=cmap), cax=cax_prob, orientation='horizontal')
     cbar_prob.set_ticks(np.linspace(0.0, 1.0, 6))
-    cbar_prob.ax.tick_params(labelsize=8, colors=fg, length=3, width=0.6, pad=2)
+    cbar_prob.ax.tick_params(axis='both', which='both', labelsize=8, colors=fg, bottom=False, top=False, left=False, right=False, length=0, pad=2)  # NO tick marks (labels only)
     cbar_prob.outline.set_edgecolor(mid_fg)
     cbar_prob.outline.set_linewidth(_axes_lw)
     cbar_prob.set_label('probability', color=fg, fontsize=_title_fs, labelpad=2)
@@ -15468,6 +15481,7 @@ def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArr
         ax_ep.set_facecolor(bg)
         ax_ep.imshow(epoch_sum.reshape(2, 1), aspect='auto', cmap=cmap, vmin=0.0, vmax=1.0, interpolation='nearest', origin='upper')
         ax_ep.set_xticks([]); ax_ep.set_yticks([])
+        _subfn_add_xy_unit_grid(ax_ep, n_x=1, n_y=2, grid_color=neutral_gray)
         for spine in ax_ep.spines.values():
             spine.set_color(mid_fg); spine.set_linewidth(_axes_lw)
         ## END for spine in ax_ep.spines.values()...
