@@ -15290,7 +15290,8 @@ def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArr
         ## END for c_i in range(n_contexts)...
         if t_i == 0:
             # Large Sketch-style ∑ with x subscript above the connector stack (vector glyph, like the schematic)
-            _subfn_draw_sketch_sigma((bb_mat.x1 + bb_rs.x0) / 2.0, bb_mat.y1 + 0.012 + (2.0 * _title_fs / 72.0) / fig.get_size_inches()[1], height_in=1.9 * _title_fs / 72.0, subscript=r'\vec{x}', color=darkest_grey)
+            _subfn_draw_sketch_sigma((bb_mat.x1 + bb_rs.x0) / 2.0, (bb_mat.y1 + 0.012 + (2.0 * _title_fs / 72.0) / fig.get_size_inches()[1]),
+                 height_in=(1.9 * _title_fs / 72.0), subscript=r'\vec{x}', color=darkest_grey)
         ## END if t_i == 0...
 
     def _subfn_draw_trapezoid_sums(ax_rs, ax_tid):
