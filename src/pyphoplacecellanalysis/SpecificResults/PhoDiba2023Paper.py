@@ -15440,7 +15440,19 @@ def plot_map_based_context_decoder_walkthru(pseudo2D_posterior: Union[Any, NDArr
     # Gap tuning: each inter-column gap = wspace × mean subplot width (fixed by GridSpec).
     # Insert spacer columns to control gaps independently: col 3 = row-∑ connector gap (~1.5x), col 5 = trapezoid gap (~0.5x).
     # Columns: t-label | raw matrix | row-∑ conn gap | row-sum 4-vec | trapezoid gap | track-ID 2-vec | spacer | marginal | epoch sum
-    outer = GridSpec(2, 9, figure=fig, width_ratios=[0.30, 4.2, 0.24, 0.28, 0.01, 0.28, 0.14, 1.5, 0.45 if show_epoch_sum else 0.05], height_ratios=[1.6, float(n_t * n_contexts)], left=0.005, right=0.98, top=0.90, bottom=0.06, wspace=0.30, hspace=0.35)
+    # t-label column width is measured from the widest actual label ('t={n_t-1}' at its drawn fontsize) so double-digit t never overflows.
+    _tlabel_probe = fig.text(0, 0, f't={n_t - 1}', fontsize=10.0, fontweight='normal')
+    fig.canvas.draw()  # renderer refresh only (no file output) so the probe text has a valid window extent
+    _tlabel_w_in: float = _tlabel_probe.get_window_extent().width / fig.dpi
+    _tlabel_probe.remove()
+    _other_ratios = [4.2, 0.24, 0.28, 0.01, 0.28, 0.14, 1.5, 0.45 if show_epoch_sum else 0.05]
+    _gridspec_w_in: float = (0.98 - 0.005) * fig.get_size_inches()[0]
+    # GridSpec wspace model: col_i width = W·r_i / (S + wspace·(ncols-1)·mean(r)), S = sum(r).
+    # Solve for r0 giving col-0 the measured label width (+0.02" pad): r0 = d·k·S_other / (W - d·k), k = 1 + wspace·8/9.
+    _desired_w_in: float = _tlabel_w_in + 0.02
+    _k: float = 1.0 + 0.30 * 8.0 / 9.0
+    _r0: float = _desired_w_in * _k * float(sum(_other_ratios)) / (_gridspec_w_in - _desired_w_in * _k)
+    outer = GridSpec(2, 9, figure=fig, width_ratios=[max(0.10, _r0)] + _other_ratios, height_ratios=[1.6, float(n_t * n_contexts)], left=0.005, right=0.98, top=0.90, bottom=0.06, wspace=0.30, hspace=0.35)
 
     raw_gs = GridSpecFromSubplotSpec(n_t, 1, subplot_spec=outer[1, 1], hspace=0.25)
     rowsum_gs = GridSpecFromSubplotSpec(n_t, 1, subplot_spec=outer[1, 3], hspace=0.25)
