@@ -5531,7 +5531,7 @@ from pyphocorehelpers.plotting.media_output_helpers import PDFHelpers, SVGHelper
 
 @metadata_attributes(short_name=None, tags=['figure-s8', 's8', 'figure-4', 'fig4', 'figure-s6', 's6', 'figure', 'publication'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-10-26 07:57', related_items=[])
 class FigureS8:
-    """ Used to output Figure 4, Figure S3, Figure S6, Figure S8, Figure S9
+    """ Used to output Figure 4, Figure S3, Figure S4, Figure S6, Figure S8, Figure S9
 
         Usage:
             from pathlib import Path
@@ -5543,12 +5543,15 @@ class FigureS8:
 
             from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import FigureS8
 
-            ## Figure 4 + S3 + S8 + S9 in one call (preferred):
+            ## Figure 4 + S3 + S4 + S8 + S9 in one call (preferred):
             figures_out_dict = FigureS8.main_all_figs(df_filter=df_filter, plotly_helpers=plotly_helpers, additional_filter_predicates=additional_filter_predicates,
                                                       earliest_delta_aligned_t_start=earliest_delta_aligned_t_start, latest_delta_aligned_t_end=latest_delta_aligned_t_end)
 
             ## Figure S3 only (multi time_bin_size series):
             # figures_out_dict = FigureS8.main_all_figs(..., enabled_figure_names=['Figure S3'])
+
+            ## Figure S4 only (prior Short exposure overlay):
+            # figures_out_dict = FigureS8.main_all_figs(..., enabled_figure_names=['Figure S4'])
 
             ## Single figure:
             ## INPUTS: earliest_delta_aligned_t_start, latest_delta_aligned_t_end
@@ -5564,7 +5567,7 @@ class FigureS8:
     Sizes:
         Layout width (not figure-name identity) picks the preset:
           - reduced_width (Fig 4 / S9; summary bars side-by-side with each scatter): 5.3956 x 2.18 in, CSS 792 x 320
-          - full_width (Fig S3 / S8; separate combined summary figure): 6.4377 x 2.5227 in, CSS 945 x 370
+          - full_width (Fig S3 / S4 / S8; separate combined summary figure): 6.4377 x 2.5227 in, CSS 945 x 370
         Kaleido writes unitless px; `_save_publication_figs` stamps PUB_FIG_SIZE_INCHES onto the SVG.
         Type sizes are authored in real-world pt (`text_sizes_pts`); `_post_hoc_format_figure` converts via `pub_pt_to_css_px`
         using the active canvas width so Illustrator reads the intended pt after the inch stamp.
@@ -5578,11 +5581,11 @@ class FigureS8:
     # Presets keyed by layout width: inches for Illustrator page; css_px for Plotly layout (same aspect).
     PUB_FIG_SIZE_PRESETS: ClassVar[Dict[str, Dict[str, Dict[str, float]]]] = {
         'reduced_width': {'inches': dict(width=5.3956, height=2.18), 'css_px': dict(width=792, height=320)},  # Figure 4 / S9
-        'full_width': {'inches': dict(width=6.4377, height=2.5227), 'css_px': dict(width=945, height=370)},  # Figure S3 / S8
+        'full_width': {'inches': dict(width=6.4377, height=2.5227), 'css_px': dict(width=945, height=370)},  # Figure S3 / S4 / S8
     }
     # Aliases kept for older call sites / configs
     _PUB_FIG_SIZE_KEY_ALIASES: ClassVar[Dict[str, str]] = {'fig4': 'reduced_width', 's9': 'reduced_width', 's8': 'full_width'}
-    FULL_WIDTH_FIGURE_NAMES: ClassVar[Tuple[str, ...]] = ('Figure S3', 'Figure S8')
+    FULL_WIDTH_FIGURE_NAMES: ClassVar[Tuple[str, ...]] = ('Figure S3', 'Figure S4', 'Figure S8')
     PUB_FIG_SIZE_INCHES: Dict = dict(width=5.3956, height=2.18)  # active final SVG/PDF page size (default reduced_width)
     PUB_FIG_SIZE: Dict = dict(width=792, height=320)  # active Plotly CSS px (default reduced_width)
     figures_parent_folder: Path = None
@@ -5598,6 +5601,7 @@ class FigureS8:
         'sig_spearman_z': 'spearman-Passing',
         'is_heuristic_passing': 'Heuristic-passing',
         'heuristic_passing': 'Heuristic-passing',
+        'is_not_novel_exposure': 'prior Short exposure',
     }
     # Fixed summary-bar page sizes (matplotlib figsize inches) — same reduced/full layout rule as scatter presets.
     SUMMARY_BAR_FIGSIZE_PRESETS: ClassVar[Dict[str, Tuple[float, float]]] = {
@@ -5647,7 +5651,7 @@ class FigureS8:
     def resolve_pub_fig_size_key(cls, pub_fig_size_key: Optional[str] = None, fig_name: Optional[str] = None) -> str:
         """Map config / figure name → ``'reduced_width'`` or ``'full_width'``.
 
-        Full-width figures (separate combined summary): Figure S3, S8.
+        Full-width figures (separate combined summary): Figure S3, S4, S8.
         Reduced-width (summary side-by-side with each scatter): Figure 4, S9.
         """
         if pub_fig_size_key is not None:
@@ -6212,9 +6216,10 @@ class FigureS8:
             `color_by_time_bin_size=True` (Figure S3): color scatter/hist by `time_bin_size` as separate series; scatter legend off by default (`show_scatter_legend=True` to restore).
             `enabled_granularities` defaults to both `('_perTimeBin', '_perEpochs')`; pass e.g. `('_perTimeBin',)` for S3/S8/S9.
             `enabled_epoch_kinds` defaults to both `('Laps', 'PBEs')`; pass e.g. `('PBEs',)` for S8/S9 (skip Laps scatter).
-            `overlay_filter_panels`: sequence of `(panel_id, predicate_key)` for PBE overlay scatters (Figure S8 F8a/F8b).
-            Each panel uses grey-background overlay style with the named `additional_filter_predicates` key.
-            When unset, `enable_heuristic_filtered_outputs=True` still does a single `is_heuristic_passing` overlay.
+            `overlay_filter_panels`: sequence of `(panel_id, predicate_key)` for overlay scatters on all enabled epoch kinds
+            (Figure S8 F8a/F8b PBEs; Figure S4 S4a Laps+PBEs). Each panel uses grey-background overlay style with the named
+            `additional_filter_predicates` key. When unset, `enable_heuristic_filtered_outputs=True` still does a single
+            `is_heuristic_passing` overlay (PBEs only).
             `enable_main_figures=False`: skip Plotly scatter build/SVG export (stats still run for summary figs).
             `pub_fig_size_key`: ``'reduced_width'``/``'fig4'``/``'s9'`` (5.3956×2.18 in) or ``'full_width'``/``'s8'`` (6.4377×2.5227 in).
             `scatter_title_style`: kept for API compat; hist-scatter-hist titles always use the long ``Short-track Decoded Likelihood…`` form. Summary-bar titles use ``laps_panel_title`` / ``pbe_panel_title``.
@@ -6252,6 +6257,15 @@ class FigureS8:
 
         """
         cls.plotly_helpers = plotly_helpers
+        if additional_filter_predicates is None:
+            additional_filter_predicates = {}
+        # Figure S4: prior Short exposure = non-novel sessions (`~is_novel_exposure` from experience-rank CSV)
+        if 'is_not_novel_exposure' not in additional_filter_predicates:
+            def _is_not_novel_exposure(df: pd.DataFrame):
+                if 'is_novel_exposure' not in df.columns:
+                    raise KeyError("is_not_novel_exposure requires column 'is_novel_exposure' (from load_and_apply_session_experience_rank_csv); missing from df.columns")
+                return (~df['is_novel_exposure'].astype(bool))
+            additional_filter_predicates['is_not_novel_exposure'] = _is_not_novel_exposure
 
         # --- publication export setup -------------------------------------------------
         cls.plotly_helpers.export_png = False
@@ -6422,7 +6436,9 @@ class FigureS8:
 
                 epoch_kind: str = an_epoch_name  # 'Laps' or 'PBEs' — keep un-suffixed for stats keys
                 # Resolve overlay panel specs for this epoch kind: (panel_id|None, predicate_key|None)
-                if (overlay_filter_panels is not None) and epoch_kind.startswith('PBEs'):
+                # `overlay_filter_panels` applies to all enabled epoch kinds (e.g. Figure S4 Laps+PBEs);
+                # `enable_heuristic_filtered_outputs` fallback stays PBEs-only (Figure S8 / S9).
+                if overlay_filter_panels is not None:
                     panel_specs = list(overlay_filter_panels)
                 elif enable_heuristic_filtered_outputs and epoch_kind.startswith('PBEs'):
                     panel_specs = [(None, 'is_heuristic_passing')]
@@ -6563,7 +6579,7 @@ class FigureS8:
                       enabled_figure_names: Optional[Sequence[str]] = None, figures_config_dict: Optional[Dict] = None, figures_root: Optional[Path] = None, figures_date: Optional[str] = None,
                       should_compute_stats: bool = True, enable_add_stats_to_figures: bool = False, separate_laps_pbes_figures: bool = False, should_concatenate_figures: bool = False, store_debug_values: bool = False,
                       enable_main_figures: bool = True, **kwargs):
-        """Produce Figure 4, Figure S3, Figure S8, and Figure S9 from a single notebook call.
+        """Produce Figure 4, Figure S3, Figure S4, Figure S8, and Figure S9 from a single notebook call.
 
             from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import FigureS8
 
@@ -6572,11 +6588,13 @@ class FigureS8:
 
             # subset: figures_out_dict = FigureS8.main_all_figs(..., enabled_figure_names=['Figure S9'])
             # Figure S3 only: figures_out_dict = FigureS8.main_all_figs(..., enabled_figure_names=['Figure S3'])
+            # Figure S4 only (prior Short exposure overlay): figures_out_dict = FigureS8.main_all_figs(..., enabled_figure_names=['Figure S4'])
             # Override S3 time bins via figures_config_dict['Figure S3']['active_filter_constraints']['time_bin_size'].
             # Summary-only (skip scatter Plotly/SVG export): enable_main_figures=False
 
         Defaults write all configured figures. Pass `enabled_figure_names` to restrict, or `figures_config_dict` to replace the built-in output folders / per-figure flags.
         Figure S3 uses `color_by_time_bin_size=True` with multi-value `time_bin_size` constraints (overridable). S3 scatter panels hide the time-bin legend by default; pass `show_scatter_legend=True` in the Figure S3 config to show it.
+        Figure S4 overlays non-novel sessions (`is_not_novel_exposure` / `~is_novel_exposure`) on Laps+PBEs scatters.
         `enable_main_figures=False` skips main scatter build/export but still computes stats and summary bars (faster iteration).
         """
         if earliest_delta_aligned_t_start is not None:
@@ -6612,6 +6630,16 @@ class FigureS8:
                         'custom_replay_name': 'withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 8, 9]-frateThresh_2.0',
                         'time_bin_size': (0.016, 0.025, 0.05, 0.06, 0.075),  # overridable when you run
                     },
+                },
+                'Figure S4': {
+                    'figures_parent_folder': figures_root.joinpath(f'Figure S4 - Anticipation of Short Track in Map-Based Decoder', 'Inputs', f'{active_figure_export_folder_date}').resolve(),
+                    'enable_heuristic_filtered_outputs': False,
+                    'enabled_granularities': ('_perTimeBin',),
+                    'enabled_epoch_kinds': ('Laps', 'PBEs'),  # Fig 4–like
+                    'overlay_filter_panels': (
+                        ('S4a', 'is_not_novel_exposure'),
+                    ),
+                    'pub_fig_size_key': 'full_width',  # overlay legend like S8
                 },
 
                 'Figure S8': {
@@ -6656,7 +6684,7 @@ class FigureS8:
                     if _k in fig_config_dict:
                         fig_summary_bar_kwargs[_k] = fig_config_dict.pop(_k)
                 ## END for _k in _summary_panel_title_keys...
-                # full_width: S3/S8 (separate combined summary); reduced_width: Figure 4 / S9 (summary side-by-side).
+                # full_width: S3/S4/S8 (separate combined summary); reduced_width: Figure 4 / S9 (summary side-by-side).
                 fig_pub_fig_size_key: str = cls.resolve_pub_fig_size_key(fig_config_dict.pop('pub_fig_size_key', None), fig_name=fig_name)
                 fig_include_laps: bool = (fig_enabled_epoch_kinds is None) or ('Laps' in fig_enabled_epoch_kinds)
                 fig_include_pbes: bool = (fig_enabled_epoch_kinds is None) or ('PBEs' in fig_enabled_epoch_kinds)
