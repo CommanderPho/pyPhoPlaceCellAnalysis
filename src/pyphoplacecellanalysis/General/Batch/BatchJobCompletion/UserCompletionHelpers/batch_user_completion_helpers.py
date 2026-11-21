@@ -3247,6 +3247,49 @@ def export_decoded_variables_evaluation_completion_function(self, global_data_ro
     return across_session_results_extended_dict
 
 
+@function_attributes(short_name=None, tags=['TrainTestSplit', 'position', 'error', 'CSV', 'KDIBA', 'batch', 'export', 'shuffles-indep', 'pure'], input_requires=[], output_provides=['compute_and_export_kdiba_train_test_position_error_completion_function'], uses=['export_kdiba_train_test_position_error_csvs'], used_by=[], creation_date='2026-11-20 18:00', related_items=['generalized_decode_epochs_dict_and_export_results_completion_function', 'export_kdiba_train_test_position_error_csvs'])
+def compute_and_export_kdiba_train_test_position_error_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict,
+        active_laps_decoding_time_bin_size: float = 0.025, force_recompute_directional_train_test_split_result: bool = False, debug_print: bool = False,
+        export_filename_extra_suffix_parts: Optional[List[str]] = None) -> dict:
+    """Ensure ``TrainTestSplit`` (compute-if-missing), decode held-out lap test segments, export position-error CSVs.
+
+    Writes under ``self.collected_outputs_path``:
+      ``*(train_test_pos_err)_tbin-{size}.csv``
+      ``*(train_test_pos_err_agg)_tbin-{size}.csv``
+
+    from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import compute_and_export_kdiba_train_test_position_error_completion_function
+    """
+    from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import apply_export_filename_extra_suffix_parts_to_pipeline
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import export_kdiba_train_test_position_error_csvs
+
+    _callback_key = 'compute_and_export_kdiba_train_test_position_error_completion_function'
+    if across_session_results_extended_dict is None:
+        across_session_results_extended_dict = {}
+    print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
+    print(f'compute_and_export_kdiba_train_test_position_error_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, active_laps_decoding_time_bin_size: {active_laps_decoding_time_bin_size}, ...)')
+    assert self.collected_outputs_path.exists()
+    apply_export_filename_extra_suffix_parts_to_pipeline(curr_active_pipeline, export_filename_extra_suffix_parts=export_filename_extra_suffix_parts)
+
+    callback_outputs = {'train_test_pos_err_csv_paths': None, 'active_laps_decoding_time_bin_size': float(active_laps_decoding_time_bin_size), 'error': None}
+    try:
+        train_test_pos_err_csv_paths = export_kdiba_train_test_position_error_csvs(curr_active_pipeline=curr_active_pipeline, parent_output_path=self.collected_outputs_path.resolve(), active_laps_decoding_time_bin_size=float(active_laps_decoding_time_bin_size), output_date_str=getattr(self, 'BATCH_DATE_TO_USE', None), force_recompute_directional_train_test_split_result=bool(force_recompute_directional_train_test_split_result), debug_print=bool(debug_print))
+        callback_outputs['train_test_pos_err_csv_paths'] = train_test_pos_err_csv_paths
+        callback_outputs['error'] = None
+        print(f'train_test_pos_err_csv_paths: {train_test_pos_err_csv_paths}')
+    except Exception as e:
+        print(f'WARN: compute_and_export_kdiba_train_test_position_error_completion_function failed for {curr_session_context}: {e}')
+        callback_outputs['train_test_pos_err_csv_paths'] = None
+        callback_outputs['error'] = repr(e)
+        across_session_results_extended_dict[_callback_key] = callback_outputs
+        if getattr(self, 'fail_on_exception', False):
+            raise
+        return across_session_results_extended_dict
+
+    across_session_results_extended_dict[_callback_key] = callback_outputs
+    print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
+    return across_session_results_extended_dict
+
+
 # ==================================================================================================================== #
 # Bapun Train-Test Decoder Error                                                                                       #
 # ==================================================================================================================== #
@@ -5221,6 +5264,7 @@ def MAIN_get_template_string(BATCH_DATE_TO_USE: str, collected_outputs_path:Path
                                     'figures_plot_cell_first_spikes_characteristics_completion_function': figures_plot_cell_first_spikes_characteristics_completion_function,
                                     'generalized_decode_epochs_dict_and_export_results_completion_function': generalized_decode_epochs_dict_and_export_results_completion_function,
                                     'export_decoded_variables_evaluation_completion_function': export_decoded_variables_evaluation_completion_function,
+                                    'compute_and_export_kdiba_train_test_position_error_completion_function': compute_and_export_kdiba_train_test_position_error_completion_function,
                                     'figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function': figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function,
                                     'figures_export_laps_correct_decoder_side_by_side_completion_function': figures_export_laps_correct_decoder_side_by_side_completion_function,
                                     # 'generalized_export_figures_customizazble_completion_function': generalized_export_figures_customizazble_completion_function,
