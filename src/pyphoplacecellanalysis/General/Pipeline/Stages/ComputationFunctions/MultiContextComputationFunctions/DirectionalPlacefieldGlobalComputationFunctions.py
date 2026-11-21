@@ -5838,6 +5838,72 @@ def _do_train_test_split_decode_and_evaluate(curr_active_pipeline, active_laps_d
 
 
 
+@function_attributes(short_name=None, tags=['TrainTestSplit', 'position', 'error', 'CSV', 'KDIBA'], input_requires=[], output_provides=[], uses=['_do_train_test_split_decode_and_evaluate'], used_by=['export_kdiba_train_test_position_error_csvs'], creation_date='2026-11-20 17:50', related_items=[])
+def compute_kdiba_train_test_position_error_dfs(curr_active_pipeline, active_laps_decoding_time_bin_size: float = 0.025, force_recompute_directional_train_test_split_result: bool = False, debug_print: bool = False) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    """Ensure TrainTestSplit, decode held-out test lap segments, return (train_test_pos_err_df, train_test_pos_err_agg_df).
+
+    ``train_test_pos_err_df``: per-epoch rows with ``decoder_name``, ``session_name``, ``time_bin_size``, ``t``, ``sq_err``, ``err_cm`` (+ optional ``*_1D``/``*_2D``).
+    ``train_test_pos_err_agg_df``: per-``decoder_name`` mean/median ``err_cm`` and counts for session QC.
+    """
+    _out = _do_train_test_split_decode_and_evaluate(curr_active_pipeline=curr_active_pipeline, active_laps_decoding_time_bin_size=float(active_laps_decoding_time_bin_size), force_recompute_directional_train_test_split_result=force_recompute_directional_train_test_split_result, compute_separate_decoder_results=True, included_neuron_IDs=None, debug_print=debug_print)
+    _out_separate_decoder_results = _out[-1]
+    assert _out_separate_decoder_results is not None, "compute_separate_decoder_results=True but _out_separate_decoder_results is None"
+    _test_decoder_results_dict, _train_decoded_results_dict, train_decoded_measured_diff_df_dict = _out_separate_decoder_results
+    session_name: str = str(curr_active_pipeline.session_name)
+    tbin: float = float(active_laps_decoding_time_bin_size)
+    per_decoder_dfs: List[pd.DataFrame] = []
+    for decoder_name, a_diff_df in train_decoded_measured_diff_df_dict.items():
+        a_df = deepcopy(a_diff_df)
+        a_df['decoder_name'] = str(decoder_name)
+        a_df['session_name'] = session_name
+        a_df['time_bin_size'] = tbin
+        per_decoder_dfs.append(a_df)
+    ## END for decoder_name, a_diff_df in train_decoded_measured_diff_df_dict.items()...
+
+    assert len(per_decoder_dfs) > 0, "train_decoded_measured_diff_df_dict was empty"
+    train_test_pos_err_df: pd.DataFrame = pd.concat(per_decoder_dfs, axis='index', ignore_index=True)
+
+    agg_kwargs = dict(err_cm_mean=('err_cm', 'mean'), err_cm_median=('err_cm', 'median'), sq_err_mean=('sq_err', 'mean'), n_epochs=('err_cm', 'count'))
+    if 'err_cm_2D' in train_test_pos_err_df.columns:
+        agg_kwargs.update(err_cm_2D_mean=('err_cm_2D', 'mean'), err_cm_2D_median=('err_cm_2D', 'median'))
+    if 'err_cm_1D' in train_test_pos_err_df.columns:
+        agg_kwargs.update(err_cm_1D_mean=('err_cm_1D', 'mean'), err_cm_1D_median=('err_cm_1D', 'median'))
+    train_test_pos_err_agg_df: pd.DataFrame = train_test_pos_err_df.groupby(['decoder_name'], dropna=False).agg(**agg_kwargs).reset_index()
+    train_test_pos_err_agg_df['session_name'] = session_name
+    train_test_pos_err_agg_df['time_bin_size'] = tbin
+    return train_test_pos_err_df, train_test_pos_err_agg_df
+
+
+
+@function_attributes(short_name=None, tags=['TrainTestSplit', 'position', 'error', 'CSV', 'KDIBA', 'export'], input_requires=[], output_provides=[], uses=['compute_kdiba_train_test_position_error_dfs', 'build_complete_session_identifier_filename_string'], used_by=['generalized_decode_epochs_dict_and_export_results_completion_function'], creation_date='2026-11-20 17:50', related_items=[])
+def export_kdiba_train_test_position_error_csvs(curr_active_pipeline, parent_output_path: Path, active_laps_decoding_time_bin_size: float = 0.025, output_date_str: Optional[str] = None, force_recompute_directional_train_test_split_result: bool = False, debug_print: bool = False) -> Dict[str, Path]:
+    """Compute held-out lap position errors and write parseable collected_outputs CSVs.
+
+    Filenames: ``*(train_test_pos_err)_tbin-{size}.csv`` and ``*(train_test_pos_err_agg)_tbin-{size}.csv``.
+    """
+    parent_output_path = Path(parent_output_path).resolve()
+    parent_output_path.mkdir(parents=True, exist_ok=True)
+    if output_date_str is None:
+        output_date_str = get_now_rounded_time_str(rounded_minutes=10)
+    train_test_pos_err_df, train_test_pos_err_agg_df = compute_kdiba_train_test_position_error_dfs(curr_active_pipeline=curr_active_pipeline, active_laps_decoding_time_bin_size=float(active_laps_decoding_time_bin_size), force_recompute_directional_train_test_split_result=force_recompute_directional_train_test_split_result, debug_print=debug_print)
+    tbin_str: str = str(float(active_laps_decoding_time_bin_size))
+    out_paths: Dict[str, Path] = {}
+    for file_type_key, export_df in (('train_test_pos_err', train_test_pos_err_df), ('train_test_pos_err_agg', train_test_pos_err_agg_df)):
+        data_identifier_str: str = f'({file_type_key})_tbin-{tbin_str}'
+        out_path, _out_filename, _out_basename = curr_active_pipeline.build_complete_session_identifier_filename_string(output_date_str=output_date_str, data_identifier_str=data_identifier_str, parent_output_path=parent_output_path, out_extension='.csv')
+        export_df.to_csv(out_path, index=False)
+        out_paths[file_type_key] = Path(out_path).resolve()
+        print(f'exported {file_type_key} CSV: {out_paths[file_type_key]}')
+        try:
+            curr_active_pipeline.register_output_file(output_path=out_paths[file_type_key], output_metadata=dict(kind=file_type_key, time_bin_size=float(active_laps_decoding_time_bin_size), source_fn='export_kdiba_train_test_position_error_csvs'))
+        except Exception as e:
+            print(f'WARN: register_output_file failed for {out_paths[file_type_key]}: {e}')
+    ## END for file_type_key, export_df in (('train_test_pos_err', train_test_pos_err_df), ('train_test_pos_err_agg', train_test_pos_err_agg_df))...
+
+    return out_paths
+
+
+
 ## INPUTS: output_full_directional_merged_decoders_result, sweep_params_idx: int = -1
 @function_attributes(short_name=None, tags=['context', 'param_sweep', 'sweep'], input_requires=[], output_provides=[], uses=['DecodedEpochSlicesPaginatedFigureController'], used_by=[], creation_date='2024-04-03 00:00', related_items=['CustomDecodeEpochsResult', '_do_custom_decode_epochs', '_do_custom_decode_epochs_dict', 'CustomDecodeEpochsResult'])
 def _show_sweep_result(output_full_directional_merged_decoders_result=None, global_measured_position_df: pd.DataFrame=None, xbin=None, active_context: IdentifyingContext=None, sweep_params_idx: int = -1, sweep_key_name: str="desired_shared_decoding_time_bin_size", debug_print=False, **kwargs):

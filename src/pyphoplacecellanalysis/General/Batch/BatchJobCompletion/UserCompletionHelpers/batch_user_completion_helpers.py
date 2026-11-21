@@ -2934,18 +2934,21 @@ def compute_and_export_session_extended_placefield_peak_information_completion_f
 
 
 @function_attributes(short_name=None, tags=['posterior', 'marginal', 'CSV', 'non-PBE', 'epochs', 'decoding'], input_requires=[], output_provides=[], uses=['GenericDecoderDictDecodedEpochsDictResult', 'pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions.EpochComputationFunctions.perform_compute_non_PBE_epochs'], used_by=[], creation_date='2025-03-09 16:35', related_items=['figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function'])
-def generalized_decode_epochs_dict_and_export_results_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, epochs_decoding_time_bin_size:float=0.025, force_recompute:bool=True, debug_print:bool=True, export_pkl: bool=True, compute_2D=False, export_filename_extra_suffix_parts: Optional[List[str]]=None) -> dict:
+def generalized_decode_epochs_dict_and_export_results_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, epochs_decoding_time_bin_size:float=0.025, force_recompute:bool=True, debug_print:bool=True, export_pkl: bool=True, compute_2D=False, export_filename_extra_suffix_parts: Optional[List[str]]=None, train_test_laps_decoding_time_bin_size: Optional[float]=None) -> dict:
     """ Aims to generally:
     1. Build a dict of decoders (usually 1D) built on several different subsets of input epochs (long_LR_laps-only, long_laps-only, long_non_PBE-only, ...etc
     2. Use these decoders and the neural data to decode posteriors for a variety of parameters (e.g. cell types, epochs-to-be-decoded, time_bin_sizes, etc)
     3. Compute Pseudo2D (Context x Position) versions of these sets of decoders and decode using thse
     4. Compute a variety of marginals for each result (track_ID marginals, run_dir_marginals, etc)
-    5. Export all the results to .CSV for later plotting and across-session analysis 
+    5. Export all the results to .CSV for later plotting and across-session analysis
+    6. After those CSVs (including ``perfmnc_session``), export TrainTestSplit held-out lap position-error CSVs
+       (``train_test_pos_err`` / ``train_test_pos_err_agg``) via ``export_kdiba_train_test_position_error_csvs``.
+       Override bin size with ``train_test_laps_decoding_time_bin_size`` (defaults to ``epochs_decoding_time_bin_size``).
     
     Calls ['non_PBE_epochs_results', 'generalized_specific_epochs_decoding'] global computation functions
     
     
-    USES: `GenericDecoderDictDecodedEpochsDictResult`
+    USES: `GenericDecoderDictDecodedEpochsDictResult`, `export_kdiba_train_test_position_error_csvs`
     
     from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import generalized_decode_epochs_dict_and_export_results_completion_function
     
@@ -2971,7 +2974,7 @@ def generalized_decode_epochs_dict_and_export_results_completion_function(self, 
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import EpochComputationFunctions, EpochComputationsComputationsContainer, DecodingResultND, Compute_NonPBE_Epochs, KnownFilterEpochs, GeneralDecoderDictDecodedEpochsDictResult
     from neuropy.utils.result_context import DisplaySpecifyingIdentifyingContext
     from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult, SingleEpochDecodedResult
-    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import TrainTestSplitResult, TrainTestLapsSplitting, CustomDecodeEpochsResult, decoder_name, epoch_split_key, get_proper_global_spikes_df, DirectionalPseudo2DDecodersResult
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import TrainTestSplitResult, TrainTestLapsSplitting, CustomDecodeEpochsResult, decoder_name, epoch_split_key, get_proper_global_spikes_df, DirectionalPseudo2DDecodersResult, export_kdiba_train_test_position_error_csvs
     from pyphoplacecellanalysis.Analysis.Decoder.context_dependent import GenericDecoderDictDecodedEpochsDictResult #, KnownNamedDecoderTrainedComputeEpochsType, KnownNamedDecodingEpochsType, MaskedTimeBinFillType, DataTimeGrain, GenericResultTupleIndexType
     from pyphocorehelpers.assertion_helpers import Assert
     from pyphoplacecellanalysis.General.Batch.NonInteractiveProcessing import batch_evaluate_required_computations, batch_extended_computations
@@ -3111,6 +3114,21 @@ def generalized_decode_epochs_dict_and_export_results_completion_function(self, 
     across_session_results_extended_dict['generalized_decode_epochs_dict_and_export_results_completion_function']['csv_save_paths_dict'] = deepcopy(csv_save_paths_dict)
     print(f'csv_save_paths_dict: {csv_save_paths_dict}\n')
 
+    # TrainTestSplit held-out lap position error (alongside perfmnc context metrics)
+    _tt_tbin: float = float(train_test_laps_decoding_time_bin_size) if (train_test_laps_decoding_time_bin_size is not None) else float(decoding_time_bin_size)
+    try:
+        train_test_pos_err_csv_paths = export_kdiba_train_test_position_error_csvs(curr_active_pipeline=curr_active_pipeline, parent_output_path=active_export_parent_output_path, active_laps_decoding_time_bin_size=_tt_tbin, output_date_str=getattr(self, 'BATCH_DATE_TO_USE', None), force_recompute_directional_train_test_split_result=False, debug_print=bool(debug_print))
+        across_session_results_extended_dict['generalized_decode_epochs_dict_and_export_results_completion_function']['train_test_pos_err_csv_paths'] = deepcopy(train_test_pos_err_csv_paths)
+        across_session_results_extended_dict['generalized_decode_epochs_dict_and_export_results_completion_function']['train_test_pos_err_error'] = None
+        csv_save_paths_dict = {**csv_save_paths_dict, **{f'train_test_{k}': v for k, v in train_test_pos_err_csv_paths.items()}}
+        across_session_results_extended_dict['generalized_decode_epochs_dict_and_export_results_completion_function']['csv_save_paths_dict'] = deepcopy(csv_save_paths_dict)
+        print(f'train_test_pos_err_csv_paths: {train_test_pos_err_csv_paths}')
+    except Exception as e:
+        print(f'WARN: TrainTestSplit position-error export failed for {curr_session_context}: {e}')
+        across_session_results_extended_dict['generalized_decode_epochs_dict_and_export_results_completion_function']['train_test_pos_err_csv_paths'] = None
+        across_session_results_extended_dict['generalized_decode_epochs_dict_and_export_results_completion_function']['train_test_pos_err_error'] = repr(e)
+        if getattr(self, 'fail_on_exception', False):
+            raise
 
 
     if export_pkl:

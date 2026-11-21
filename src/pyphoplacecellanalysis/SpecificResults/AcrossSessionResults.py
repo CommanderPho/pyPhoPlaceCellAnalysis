@@ -3533,11 +3533,15 @@ def _new_process_csv_files(parsed_csv_files_df: pd.DataFrame, t_delta_dict: Dict
                                                             'ripple_WCorrShuffle_df': {},
                                                             'perfmnc_session': {},
                                                             'fig5_occupancy': {},
+                                                            'train_test_pos_err': {},
+                                                            'train_test_pos_err_agg': {},
                                            }
     final_sessions_loaded_extra_dfs: Dict[str, pd.DataFrame] = {'ripple_EpochScoreShuffle_df': None,
                                                                 'ripple_WCorrShuffle_df': None,
                                                                 'perfmnc_session': None,
                                                                 'fig5_occupancy': None,
+                                                                'train_test_pos_err': None,
+                                                                'train_test_pos_err_agg': None,
                                       }
     
     basic_marginals_file_types = ['laps_marginals_df', 'ripple_marginals_df', 'laps_time_bin_marginals_df', 'ripple_time_bin_marginals_df',]
@@ -3657,6 +3661,12 @@ def _new_process_csv_files(parsed_csv_files_df: pd.DataFrame, t_delta_dict: Dict
                 _curr_dict = final_sessions_loaded_extra_df_dict[file_type]
                 _is_file_valid = _subfn_new_df_process_and_load_exported_file(path, _curr_dict, session_name, curr_session_t_delta, time_key=None, **additional_columns_dict)
                 ## update when done:
+                final_sessions_loaded_extra_df_dict[file_type] = _curr_dict
+            elif file_type in ('train_test_pos_err', 'train_test_pos_err_agg'):
+                ## held-out TrainTestSplit lap position error (KDIBA); detailed DF has epoch-center `t`, agg has no time column
+                _curr_dict = final_sessions_loaded_extra_df_dict[file_type]
+                _tt_time_key = 't' if (file_type == 'train_test_pos_err') else None
+                _is_file_valid = _subfn_new_df_process_and_load_exported_file(path, _curr_dict, session_name, curr_session_t_delta, time_key=_tt_time_key, **additional_columns_dict)
                 final_sessions_loaded_extra_df_dict[file_type] = _curr_dict
             elif file_type == 'FAT':
                 # 2025-03-01 - a bulk export .CSV format where all results are stacked vertically and fields duplicated as needed (no attentioned paid to disk
