@@ -19746,8 +19746,10 @@ def _perform_plot_multi_decoder_meas_pred_position_track(curr_active_pipeline, f
 
 
 @function_attributes(short_name=None, tags=['decoder', 'matplotlib', 'plot', 'posterior', 'groundtruth', 'continuous', '1D'], input_requires=[], output_provides=[], uses=['plot_1D_most_likely_position_comparsions'], used_by=[], creation_date='2026-11-23 13:45', related_items=['_perform_plot_multi_decoder_meas_pred_position_track'])
-def plot_gt_masked_continuous_1D_decoder_posteriors(curr_active_pipeline, desired_time_bin_size: Optional[float]=None, variable_name: str='x', enable_flat_line_drawing: bool=False, masked_bad_color: str='white', figsize: Optional[Tuple[float, float]]=None, debug_print: bool=False):
+def plot_gt_masked_continuous_1D_decoder_posteriors(curr_active_pipeline, desired_time_bin_size: Optional[float]=None, variable_name: str='lin_pos', enable_flat_line_drawing: bool=False, masked_bad_color: str='white', figsize: Optional[Tuple[float, float]]=None, debug_print: bool=False):
     """ Builds a 4-row matplotlib figure (one row per track-template decoder: long_LR, long_RL, short_LR, short_RL) showing each decoder's continuous 1D position posterior MASKED to only the time bins where that decoder is the groundtruth-correct decoder, with the measured position (red) and the most-likely decoded position (grey) overlaid on every row.
+
+    variable_name: the measured position column drawn as the red reference line on every row (default 'lin_pos', the linearized track position). NOTE: the posterior heatmap and most-likely decoded line remain on each decoder's own position-bin axis.
 
     Each row: that decoder's continuous `marginal_x.p_x_given_n` with columns where `truth_decoder_name != a_decoder_name` set to NaN (rendered as `masked_bad_color`), plus the raw most-likely decoded position line NaN-padded outside GT-active bins. Measured position is drawn on every row for the full session so behavior can be compared against the GT-active posterior. Non-lap / no-truth time bins stay fully masked on all rows.
 
@@ -19804,6 +19806,7 @@ def plot_gt_masked_continuous_1D_decoder_posteriors(curr_active_pipeline, desire
     assert 'truth_decoder_name' in laps_df.columns, f"laps_df is missing 'truth_decoder_name' after adding_true_decoder_identifier: {laps_df.columns}"
     ## Positions (measured, drawn on every row for the full session):
     pos_df: pd.DataFrame = deepcopy(curr_active_pipeline.sess.position).to_dataframe()
+    assert variable_name in pos_df.columns, f"measured position df is missing the requested variable_name: '{variable_name}'. Available columns: {list(pos_df.columns)}"
 
     decoder_color_dict: Dict[types.DecoderName, str] = DecoderIdentityColors.build_decoder_color_dict()
     masked_cmap = get_heatmap_cmap(cmap='Oranges', bad_color=masked_bad_color, under_color='white', over_color='red') ## NaN-masked (non-GT) bins render as `masked_bad_color` instead of the default black
@@ -19823,7 +19826,8 @@ def plot_gt_masked_continuous_1D_decoder_posteriors(curr_active_pipeline, desire
         active_xbin = track_templates.get_decoders_dict()[a_decoder_name].xbin
 
         ## Attach the groundtruth decoder identity to each time bin (same pattern as `_perform_plot_multi_decoder_meas_pred_position_track`):
-        bin_df = pd.DataFrame({'t': time_window_centers, 'label': np.arange(len(time_window_centers))}) # 'label' required by TimePointEventAccessor.add_maze_id_if_needed
+        bin_df = pd.DataFrame({'t': time_window_centers, 'x': active_most_likely_positions_x, 'label': np.arange(len(time_window_centers))}) # 'x' required by PositionAccessor; 'label' required by TimePointEventAccessor.add_maze_id_if_needed
+        bin_df = bin_df.position.adding_lap_info(laps_df=laps_df, inplace=False) ## ensures ['lap_dir', 'is_LR_dir']
         bin_df = bin_df.time_point_event.adding_true_decoder_identifier(t_start=t_start, t_delta=t_delta, t_end=t_end) ## ensures ['maze_id', 'is_LR_dir', 'truth_decoder_name']
         assert 'truth_decoder_name' in bin_df.columns, f"bin_df is missing 'truth_decoder_name' after adding_true_decoder_identifier: {bin_df.columns}"
         is_gt_active = (bin_df['truth_decoder_name'].fillna('') == a_decoder_name).to_numpy() # non-lap / no-truth bins are inactive on all rows
