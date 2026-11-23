@@ -19745,6 +19745,105 @@ def _perform_plot_multi_decoder_meas_pred_position_track(curr_active_pipeline, f
     return _out_artists
 
 
+@function_attributes(short_name=None, tags=['decoder', 'matplotlib', 'plot', 'posterior', 'groundtruth', 'continuous', '1D'], input_requires=[], output_provides=[], uses=['plot_1D_most_likely_position_comparsions'], used_by=[], creation_date='2026-11-23 13:45', related_items=['_perform_plot_multi_decoder_meas_pred_position_track'])
+def plot_gt_masked_continuous_1D_decoder_posteriors(curr_active_pipeline, desired_time_bin_size: Optional[float]=None, variable_name: str='x', enable_flat_line_drawing: bool=False, masked_bad_color: str='white', figsize: Optional[Tuple[float, float]]=None, debug_print: bool=False):
+    """ Builds a 4-row matplotlib figure (one row per track-template decoder: long_LR, long_RL, short_LR, short_RL) showing each decoder's continuous 1D position posterior MASKED to only the time bins where that decoder is the groundtruth-correct decoder, with the measured position (red) and the most-likely decoded position (grey) overlaid on every row.
+
+    Each row: that decoder's continuous `marginal_x.p_x_given_n` with columns where `truth_decoder_name != a_decoder_name` set to NaN (rendered as `masked_bad_color`), plus the raw most-likely decoded position line NaN-padded outside GT-active bins. Measured position is drawn on every row for the full session so behavior can be compared against the GT-active posterior. Non-lap / no-truth time bins stay fully masked on all rows.
+
+    Usage:
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import plot_gt_masked_continuous_1D_decoder_posteriors
+
+        ## Compute continuous decoding first (if not already computed):
+        curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['directional_decoders_decode_continuous'], computation_kwargs_list=[{'time_bin_size': 0.025}], enabled_filter_names=None, fail_on_exception=True, debug_print=False)
+
+        fig, axs, out_artists_dict = plot_gt_masked_continuous_1D_decoder_posteriors(curr_active_pipeline, desired_time_bin_size=0.025)
+        fig.show()
+
+    Returns: (fig, axs, _out_artists) where _out_artists is a dict keyed by decoder name containing the artists returned by `plot_1D_most_likely_position_comparsions` for that row.
+    """
+    from neuropy.utils.matplotlib_helpers import get_heatmap_cmap
+
+    ## get from parameters:
+    minimum_inclusion_fr_Hz: float = curr_active_pipeline.global_computation_results.computation_config.rank_order_shuffle_analysis.minimum_inclusion_fr_Hz
+    included_qclu_values: List[int] = curr_active_pipeline.global_computation_results.computation_config.rank_order_shuffle_analysis.included_qclu_values
+
+    directional_laps_results: DirectionalLapsResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalLaps']
+    track_templates: TrackTemplates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values)
+
+    ## Resolve the continuous decoding result (same cache-resolution path as `_perform_plot_multi_decoder_meas_pred_position_track`):
+    directional_decoders_decode_result: DirectionalDecodersContinuouslyDecodedResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersDecoded']
+    previously_decoded_keys: List[DecodingContinuousCacheKey] = list(directional_decoders_decode_result.continuously_decoded_result_cache_dict.keys())
+    if debug_print:
+        print(f'previously_decoded (W,H) keys: {previously_decoded_keys}')
+
+    if desired_time_bin_size is None:
+        time_bin_size: float = directional_decoders_decode_result.most_recent_decoding_time_bin_size
+        continuously_decoded_dict: Dict[str, DecodedFilterEpochsResult] = directional_decoders_decode_result.most_recent_continuously_decoded_dict
+    else:
+        desired_ck: DecodingContinuousCacheKey = normalize_continuous_decoding_cache_lookup_key(desired_time_bin_size, None)
+        if desired_ck not in previously_decoded_keys:
+            print(f'desired_time_bin_size: {desired_time_bin_size} is missing from previously decoded continuous cache. Must recompute.')
+            curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['directional_decoders_decode_continuous'], computation_kwargs_list=[{'time_bin_size': desired_time_bin_size}], enabled_filter_names=None, fail_on_exception=True, debug_print=False)
+            directional_decoders_decode_result = curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersDecoded'] ## update the result
+            print(f'\tcalculation complete.')
+
+        time_bin_size: float = float(desired_ck[0])
+        continuously_decoded_dict: Dict[str, DecodedFilterEpochsResult] = directional_decoders_decode_result.continuously_decoded_result_cache_dict[desired_ck]
+
+    ## END if desired_time_bin_size is None...
+
+    all_directional_continuously_decoded_dict: Dict[types.DecoderName, DecodedFilterEpochsResult] = {k:v for k, v in (continuously_decoded_dict or {}).items() if k in TrackTemplates.get_decoder_names()}
+    missing_decoder_names = [k for k in TrackTemplates.get_decoder_names() if k not in all_directional_continuously_decoded_dict]
+    assert len(missing_decoder_names) == 0, f"missing continuous decoding results for decoders: {missing_decoder_names}. Compute 'directional_decoders_decode_continuous' first."
+
+    ## Laps + groundtruth:
+    global_laps_obj: Laps = deepcopy(curr_active_pipeline.sess.laps)
+    t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
+    laps_df = global_laps_obj.adding_true_decoder_identifier(t_start, t_delta, t_end) ## ensures ['maze_id', 'lap_dir', 'is_LR_dir', 'truth_decoder_name']
+    assert 'truth_decoder_name' in laps_df.columns, f"laps_df is missing 'truth_decoder_name' after adding_true_decoder_identifier: {laps_df.columns}"
+    ## Positions (measured, drawn on every row for the full session):
+    pos_df: pd.DataFrame = deepcopy(curr_active_pipeline.sess.position).to_dataframe()
+
+    decoder_color_dict: Dict[types.DecoderName, str] = DecoderIdentityColors.build_decoder_color_dict()
+    masked_cmap = get_heatmap_cmap(cmap='Oranges', bad_color=masked_bad_color, under_color='white', over_color='red') ## NaN-masked (non-GT) bins render as `masked_bad_color` instead of the default black
+
+    if figsize is None:
+        figsize = (18.0, 10.0)
+    fig, axs = plt.subplots(nrows=len(TrackTemplates.get_decoder_names()), ncols=1, figsize=figsize, sharex=True, sharey=False, constrained_layout=True, clear=True)
+    _out_artists = {}
+    for i, a_decoder_name in enumerate(TrackTemplates.get_decoder_names()):
+        an_ax = axs[i]
+        a_continuously_decoded_result = all_directional_continuously_decoded_dict[a_decoder_name]
+        assert len(a_continuously_decoded_result.p_x_given_n_list) == 1
+        time_window_centers = a_continuously_decoded_result.time_bin_containers[0].centers
+        a_marginal_x = a_continuously_decoded_result.marginal_x_list[0]
+        active_posterior = np.asarray(a_marginal_x['p_x_given_n'], dtype=float).copy() # (n_pos_bins, n_time_bins)
+        active_most_likely_positions_x = np.asarray(a_marginal_x['most_likely_positions_1D'], dtype=float).copy()
+        active_xbin = track_templates.get_decoders_dict()[a_decoder_name].xbin
+
+        ## Attach the groundtruth decoder identity to each time bin (same pattern as `_perform_plot_multi_decoder_meas_pred_position_track`):
+        bin_df = pd.DataFrame({'t': time_window_centers, 'label': np.arange(len(time_window_centers))}) # 'label' required by TimePointEventAccessor.add_maze_id_if_needed
+        bin_df = bin_df.time_point_event.adding_true_decoder_identifier(t_start=t_start, t_delta=t_delta, t_end=t_end) ## ensures ['maze_id', 'is_LR_dir', 'truth_decoder_name']
+        assert 'truth_decoder_name' in bin_df.columns, f"bin_df is missing 'truth_decoder_name' after adding_true_decoder_identifier: {bin_df.columns}"
+        is_gt_active = (bin_df['truth_decoder_name'].fillna('') == a_decoder_name).to_numpy() # non-lap / no-truth bins are inactive on all rows
+        if debug_print:
+            print(f'{a_decoder_name}: {np.sum(is_gt_active)}/{len(is_gt_active)} GT-active time bins')
+
+        ## Mask the posterior + most-likely positions outside the GT-active bins:
+        active_posterior[:, ~is_gt_active] = np.nan
+        active_most_likely_positions_x[~is_gt_active] = np.nan
+
+        _, _, _out_artists[a_decoder_name] = plot_1D_most_likely_position_comparsions(pos_df, time_window_centers=time_window_centers, xbin=active_xbin, posterior=active_posterior, active_most_likely_positions_1D=active_most_likely_positions_x,
+                                                        ax=an_ax, variable_name=variable_name, enable_flat_line_drawing=enable_flat_line_drawing, posterior_heatmap_imshow_kwargs={'cmap': masked_cmap}, debug_print=debug_print, return_created_artists=True)
+        an_ax.set_title(f'{a_decoder_name} (GT-active bins only) - {variable_name}', color=decoder_color_dict[a_decoder_name])
+    ## END for i, a_decoder_name in enumerate(TrackTemplates.get_decoder_names())...
+
+    axs[-1].set_xlabel('time [s]')
+    fig.suptitle(f'GT-masked continuous 1D decoder posteriors (time_bin_size: {time_bin_size})')
+    return fig, axs, _out_artists
+
+
 # ==================================================================================================================== #
 # 2024-12-31 - Decoder ID x Position                                                                                   #
 # ==================================================================================================================== #
@@ -21891,8 +21990,10 @@ def _perform_build_individual_time_bin_decoded_posteriors_df(curr_active_pipelin
 
 # appearing_or_disappearing_aclus, appearing_stability_df, appearing_aclus, disappearing_stability_df, disappearing_aclus
 @function_attributes(short_name=None, tags=['performance'], input_requires=[], output_provides=[], uses=['_do_train_test_split_decode_and_evaluate'], used_by=[], creation_date='2024-10-08 00:00', related_items=[])
-def _perform_run_rigorous_decoder_performance_assessment(curr_active_pipeline, included_neuron_IDs, active_laps_decoding_time_bin_size: float = 0.25, force_recompute_directional_train_test_split_result: bool = False, debug_print=False):
+def _perform_run_rigorous_decoder_performance_assessment(curr_active_pipeline, included_neuron_IDs, active_laps_decoding_time_bin_size: float = 0.25, force_recompute_directional_train_test_split_result: bool = False, measured_pos_column_name: str = 'lin_pos', debug_print=False):
     """ runs for a specific subset of cells
+
+    measured_pos_column_name (str): measured 1D position column used for the primary ``sq_err`` / ``err_cm`` comparison metrics (default ``'lin_pos'``; falls back to ``'x'`` if missing or all-NaN).
     """
     # Inputs: all_directional_pf1D_Decoder, alt_directional_merged_decoders_result
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import TrainTestSplitResult, TrainTestLapsSplitting, CustomDecodeEpochsResult, decoder_name, epoch_split_key, get_proper_global_spikes_df, DirectionalPseudo2DDecodersResult
@@ -21931,7 +22032,7 @@ def _perform_run_rigorous_decoder_performance_assessment(curr_active_pipeline, i
 
     complete_decoded_context_correctness_tuple, laps_marginals_df, all_directional_pf1D_Decoder, all_test_epochs_df, test_all_directional_decoder_result, all_directional_laps_filter_epochs_decoder_result, _out_separate_decoder_results = _do_train_test_split_decode_and_evaluate(curr_active_pipeline=curr_active_pipeline, active_laps_decoding_time_bin_size=active_laps_decoding_time_bin_size,
                                                                                                                                                                                                                                                   included_neuron_IDs=included_neuron_IDs,
-                                                                                                                                                                                                                                                  force_recompute_directional_train_test_split_result=force_recompute_directional_train_test_split_result, compute_separate_decoder_results=True, debug_print=debug_print)
+                                                                                                                                                                                                                                                  force_recompute_directional_train_test_split_result=force_recompute_directional_train_test_split_result, compute_separate_decoder_results=True, measured_pos_column_name=measured_pos_column_name, debug_print=debug_print)
     (is_decoded_track_correct, is_decoded_dir_correct, are_both_decoded_properties_correct), (percent_laps_track_identity_estimated_correctly, percent_laps_direction_estimated_correctly, percent_laps_estimated_correctly) = complete_decoded_context_correctness_tuple
     if debug_print:
         print(f"percent_laps_track_identity_estimated_correctly: {round(percent_laps_track_identity_estimated_correctly*100.0, ndigits=3)}%")
