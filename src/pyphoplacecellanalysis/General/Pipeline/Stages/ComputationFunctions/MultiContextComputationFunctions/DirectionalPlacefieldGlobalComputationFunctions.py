@@ -5219,14 +5219,14 @@ class CustomDecodeEpochsResult(UnpackableMixin):
     
 
     @classmethod
-    def init_from_single_decoder_decoding_result_and_measured_pos_df(cls, a_decoder_decoding_result: DecodedFilterEpochsResult, global_measured_position_df: pd.DataFrame, pfND_Decoder: Optional[BasePositionDecoder]=None, debug_print:bool=False) -> "CustomDecodeEpochsResult":
+    def init_from_single_decoder_decoding_result_and_measured_pos_df(cls, a_decoder_decoding_result: DecodedFilterEpochsResult, global_measured_position_df: pd.DataFrame, pfND_Decoder: Optional[BasePositionDecoder]=None, debug_print:bool=False, measured_pos_column_name: str = 'x') -> "CustomDecodeEpochsResult":
         """ compare the decoded most-likely-positions and the measured positions interpolated to the same time bins.
         
          all_directional_laps_filter_epochs_decoder_custom_result: CustomDecodeEpochsResult = CustomDecodeEpochsResult.init_from_single_decoder_decoding_result_and_measured_pos_df(a_decoder_decoding_result=deepcopy(all_directional_laps_filter_epochs_decoder_result), global_measured_position_df=deepcopy(curr_active_pipeline.sess.position.to_dataframe()).dropna(subset=['lap']))
          all_directional_laps_filter_epochs_decoder_custom_result
         """
         # all_directional_laps_filter_epochs_decoder_custom_result: MeasuredDecodedPositionComparison = cls.build_single_measured_decoded_position_comparison(a_decoder_decoding_result=deepcopy(all_directional_laps_filter_epochs_decoder_result), global_measured_position_df=deepcopy(curr_active_pipeline.sess.position.to_dataframe()).dropna(subset=['lap']))
-        a_custom_decoder_decoding_result = cls(measured_decoded_position_comparion=cls.build_single_measured_decoded_position_comparison(a_decoder_decoding_result=a_decoder_decoding_result, global_measured_position_df=global_measured_position_df),
+        a_custom_decoder_decoding_result = cls(measured_decoded_position_comparion=cls.build_single_measured_decoded_position_comparison(a_decoder_decoding_result=a_decoder_decoding_result, global_measured_position_df=global_measured_position_df, measured_pos_column_name=measured_pos_column_name),
                                                                                                  decoder_result=a_decoder_decoding_result,
                                                                                                  epochs_bin_by_bin_performance_analysis_df=None,
         )
@@ -5246,10 +5246,12 @@ class CustomDecodeEpochsResult(UnpackableMixin):
         
 
     @classmethod
-    def build_single_measured_decoded_position_comparison(cls, a_decoder_decoding_result: DecodedFilterEpochsResult, global_measured_position_df: pd.DataFrame, should_drop_epochs_with_no_valid_timebins: bool = True) -> MeasuredDecodedPositionComparison:
+    def build_single_measured_decoded_position_comparison(cls, a_decoder_decoding_result: DecodedFilterEpochsResult, global_measured_position_df: pd.DataFrame, should_drop_epochs_with_no_valid_timebins: bool = True, measured_pos_column_name: str = 'x') -> MeasuredDecodedPositionComparison:
         """ compare the decoded most-likely-positions and the measured positions interpolated to the same time bins.
 
-        When the decoder produces multi-dimensional positions (2D or higher, e.g. ``pf2D_Decoder``), adds ``sq_err_2D`` / ``err_cm_2D``: RMSE of Euclidean distance in ``(x, y)`` vs interpolated measured ``x`` and ``y``. ``sq_err`` / ``err_cm`` remain x-marginal vs measured ``x`` for backward compatibility.
+        measured_pos_column_name (str): measured 1D position column used for the primary ``sq_err`` / ``err_cm`` metrics (default ``'x'``). Pass ``'lin_pos'`` to compare against linearized position instead; falls back to ``'x'`` if the column is missing or all-NaN.
+
+        When the decoder produces multi-dimensional positions (2D or higher, e.g. ``pf2D_Decoder``), adds ``sq_err_2D`` / ``err_cm_2D``: RMSE of Euclidean distance in ``(x, y)`` vs interpolated measured ``x`` and ``y``. ``sq_err`` / ``err_cm`` are x-marginal vs measured ``measured_pos_column_name`` (``x`` by default, for backward compatibility).
 
         When ``lin_pos`` is present and the decoder produces native 1D positions (e.g. ``pf1D_Decoder``), also compares decoded positions to measured ``lin_pos`` and adds ``sq_err_1D`` / ``err_cm_1D`` columns.
         
@@ -5259,7 +5261,10 @@ class CustomDecodeEpochsResult(UnpackableMixin):
         decoded_time_bin_centers_list = deepcopy([a_cont.centers for a_cont in a_decoder_decoding_result.time_bin_containers]) # this is NOT the same for all decoders because they could have different numbers of test laps because different directions/configs might have different numbers of general laps
 
         should_compute_1D_lin_pos_comparison = ('lin_pos' in global_measured_position_df.columns) and global_measured_position_df['lin_pos'].notna().any()
-        additional_interp_column_names = ['lin_pos'] if should_compute_1D_lin_pos_comparison else None
+        if (measured_pos_column_name != 'x') and ((measured_pos_column_name not in global_measured_position_df.columns) or (not global_measured_position_df[measured_pos_column_name].notna().any())):
+            print(f"WARN: measured_pos_column_name: '{measured_pos_column_name}' missing or all-NaN in global_measured_position_df, falling back to 'x'.")
+            measured_pos_column_name = 'x'
+        additional_interp_column_names = list(dict.fromkeys((['lin_pos'] if should_compute_1D_lin_pos_comparison else []) + ([measured_pos_column_name] if measured_pos_column_name != 'x' else []))) or None
 
         measured_positions_dfs_list = []
         decoded_positions_df_list = [] # one per epoch
@@ -5279,7 +5284,7 @@ class CustomDecodeEpochsResult(UnpackableMixin):
             assert len(a_sample_times) == len(decoded_positions), f"len(a_sample_times): {len(a_sample_times)} == len(decoded_positions): {len(decoded_positions)}"
             
 
-            interpolated_measured_x = interpolated_measured_df['x'].to_numpy()
+            interpolated_measured_x = interpolated_measured_df[measured_pos_column_name].to_numpy()
 
             timebin_is_valid_for_both: NDArray = np.logical_and(np.isfinite(decoded_positions), np.isfinite(interpolated_measured_x)) # bool array of valid indicies for both
             num_valid_timebins = np.sum(timebin_is_valid_for_both)
@@ -5325,15 +5330,16 @@ class CustomDecodeEpochsResult(UnpackableMixin):
                 decoded_xy = raw_decoded_positions_arr if raw_decoded_positions_arr.ndim >= 2 else raw_decoded_positions_arr.reshape(-1, 1)
                 if decoded_xy.shape[0] != len(a_sample_times) and decoded_xy.shape[1] == len(a_sample_times) and decoded_xy.shape[0] >= 2:
                     decoded_xy = decoded_xy.T
+                interpolated_measured_raw_x = interpolated_measured_df['x'].to_numpy() # 2D Euclidean error always uses raw measured 'x', regardless of measured_pos_column_name
                 interpolated_measured_y = interpolated_measured_df['y'].to_numpy()
                 n_spatial_dims = min(decoded_xy.shape[-1], 2)
-                timebin_is_valid_for_2D: NDArray = np.all(np.isfinite(decoded_xy[:, :n_spatial_dims]), axis=1) & np.isfinite(interpolated_measured_x) & np.isfinite(interpolated_measured_y)
+                timebin_is_valid_for_2D: NDArray = np.all(np.isfinite(decoded_xy[:, :n_spatial_dims]), axis=1) & np.isfinite(interpolated_measured_raw_x) & np.isfinite(interpolated_measured_y)
                 num_valid_timebins_2D = np.sum(timebin_is_valid_for_2D)
                 if num_valid_timebins_2D == 0:
                     diff_row['sq_err_2D'] = np.nan
                     diff_row['err_cm_2D'] = np.nan
                 else:
-                    dx = decoded_xy[timebin_is_valid_for_2D, 0] - interpolated_measured_x[timebin_is_valid_for_2D]
+                    dx = decoded_xy[timebin_is_valid_for_2D, 0] - interpolated_measured_raw_x[timebin_is_valid_for_2D]
                     dy = decoded_xy[timebin_is_valid_for_2D, 1] - interpolated_measured_y[timebin_is_valid_for_2D]
                     sq_err_per_bin = dx ** 2 + dy ** 2
                     test_decoded_measured_diff_2D: float = float(np.mean(sq_err_per_bin))
@@ -5362,7 +5368,7 @@ class CustomDecodeEpochsResult(UnpackableMixin):
 
 
     @classmethod
-    def build_measured_decoded_position_comparison(cls, test_laps_decoder_results_dict: Dict[str, DecodedFilterEpochsResult], global_measured_position_df: pd.DataFrame):
+    def build_measured_decoded_position_comparison(cls, test_laps_decoder_results_dict: Dict[str, DecodedFilterEpochsResult], global_measured_position_df: pd.DataFrame, measured_pos_column_name: str = 'x'):
         """ compare the decoded most-likely-positions and the measured positions interpolated to the same time bins.
         
         from sklearn.metrics import mean_squared_error
@@ -5381,7 +5387,7 @@ class CustomDecodeEpochsResult(UnpackableMixin):
 
         for k, a_decoder_decoding_result in test_laps_decoder_results_dict.items():
             # Using `build_single_measured_decoded_position_comparison`
-            measured_positions_dfs_list, decoded_positions_df_list, decoded_measured_diff_df = cls.build_single_measured_decoded_position_comparison(a_decoder_decoding_result, global_measured_position_df=global_measured_position_df)
+            measured_positions_dfs_list, decoded_positions_df_list, decoded_measured_diff_df = cls.build_single_measured_decoded_position_comparison(a_decoder_decoding_result, global_measured_position_df=global_measured_position_df, measured_pos_column_name=measured_pos_column_name)
             test_measured_positions_dfs_dict[k] = measured_positions_dfs_list
             test_decoded_positions_df_dict[k] = decoded_positions_df_list
             test_decoded_measured_diff_df_dict[k] = decoded_measured_diff_df
@@ -5617,9 +5623,11 @@ class CustomDecodeEpochsResult(UnpackableMixin):
 
 
 @function_attributes(short_name='custom_decode_epochs', tags=['USEFUL', 'decode', 'pure'], input_requires=[], output_provides=[], uses=[], used_by=['_do_custom_decode_epochs_dict', '_do_train_test_split_decode_and_evaluate'], creation_date='2024-04-05 11:59', related_items=[])
-def _do_custom_decode_epochs(global_spikes_df: pd.DataFrame,  global_measured_position_df: pd.DataFrame, pfND_Decoder: BasePositionDecoder, epochs_to_decode_df: pd.DataFrame, decoding_time_bin_size: float, debug_print=False, **kwargs) -> CustomDecodeEpochsResult: #Tuple[MeasuredDecodedPositionComparison, DecodedFilterEpochsResult]:
+def _do_custom_decode_epochs(global_spikes_df: pd.DataFrame,  global_measured_position_df: pd.DataFrame, pfND_Decoder: BasePositionDecoder, epochs_to_decode_df: pd.DataFrame, decoding_time_bin_size: float, debug_print=False, measured_pos_column_name: str = 'x', **kwargs) -> CustomDecodeEpochsResult: #Tuple[MeasuredDecodedPositionComparison, DecodedFilterEpochsResult]:
     """
     Do a single position decoding using a single decoder for a single set of epochs
+
+    measured_pos_column_name (str): measured 1D position column used for the primary ``sq_err`` / ``err_cm`` comparison metrics (default ``'x'``; pass ``'lin_pos'`` for linearized position).
     
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import _do_custom_decode_epochs
     
@@ -5630,6 +5638,7 @@ def _do_custom_decode_epochs(global_spikes_df: pd.DataFrame,  global_measured_po
     ## INPUTS: test_all_directional_decoder_result, all_directional_pf1D_Decoder
     test_all_directional_decoder_result: CustomDecodeEpochsResult = CustomDecodeEpochsResult.init_from_single_decoder_decoding_result_and_measured_pos_df(decoder_result, global_measured_position_df=global_measured_position_df,
                                                                                                                                                             pfND_Decoder=deepcopy(pfND_Decoder), debug_print=debug_print,
+                                                                                                                                                            measured_pos_column_name=measured_pos_column_name,
                                                                                                                                                           )
     # epochs_bin_by_bin_performance_analysis_df = test_all_directional_decoder_result.epochs_bin_by_bin_performance_analysis_df ## UNPACK WITH: 
     
@@ -5702,8 +5711,10 @@ def _do_custom_decode_epochs_dict(global_spikes_df: pd.DataFrame, global_measure
 
 @function_attributes(short_name=None, tags=['TrainTestSplit', 'decode'], input_requires=[], output_provides=[],
                       uses=['_do_custom_decode_epochs', 'get_proper_global_spikes_df', '_check_result_laps_epochs_df_performance', 'DirectionalPseudo2DDecodersResult'], used_by=['_perform_run_rigorous_decoder_performance_assessment'], creation_date='2024-10-08 02:35', related_items=[])
-def _do_train_test_split_decode_and_evaluate(curr_active_pipeline, active_laps_decoding_time_bin_size: float=1.5, force_recompute_directional_train_test_split_result: bool=False, compute_separate_decoder_results: bool=True, included_neuron_IDs=None, debug_print=False):
+def _do_train_test_split_decode_and_evaluate(curr_active_pipeline, active_laps_decoding_time_bin_size: float=1.5, force_recompute_directional_train_test_split_result: bool=False, compute_separate_decoder_results: bool=True, included_neuron_IDs=None, measured_pos_column_name: str = 'x', debug_print=False):
     """ 
+    measured_pos_column_name (str): measured 1D position column used for the primary ``sq_err`` / ``err_cm`` comparison metrics (default ``'x'``; pass ``'lin_pos'`` for linearized position).
+
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import _do_train_test_split_decode_and_evaluate
 
     # active_laps_decoding_time_bin_size: float = 0.25
@@ -5787,7 +5798,7 @@ def _do_train_test_split_decode_and_evaluate(curr_active_pipeline, active_laps_d
                                                                                                                                         pfND_Decoder_dict=train_lap_specific_pfND_Decoder_dict,
                                                                                                                                         epochs_to_decode_dict=deepcopy(test_epochs_dict), 
                                                                                                                                         decoding_time_bin_size=active_laps_decoding_time_bin_size,
-                                                                                                                                        decoder_and_epoch_keys_independent=False, debug_print=debug_print)
+                                                                                                                                        decoder_and_epoch_keys_independent=False, measured_pos_column_name=measured_pos_column_name, debug_print=debug_print)
         train_decoded_results_dict: Dict[types.DecoderName, DecodedFilterEpochsResult] = {k:v.decoder_result for k, v in test_decoder_results_dict.items()}
         # weighted_corr_data_dict = compute_weighted_correlations(train_decoded_results_dict, debug_print=True)
         # # weighted_corr_data_dict
@@ -5803,7 +5814,7 @@ def _do_train_test_split_decode_and_evaluate(curr_active_pipeline, active_laps_d
     ## Decoding of the test epochs (what matters) for `all_directional_pf1D_Decoder`:
     test_all_directional_decoder_result: CustomDecodeEpochsResult = _do_custom_decode_epochs(global_spikes_df=get_proper_global_spikes_df(curr_active_pipeline), global_measured_position_df=deepcopy(curr_active_pipeline.sess.position.to_dataframe()).dropna(subset=['lap']),
                                                             pfND_Decoder=all_directional_pf1D_Decoder, epochs_to_decode_df=deepcopy(all_test_epochs_df),
-                                                            decoding_time_bin_size=active_laps_decoding_time_bin_size, debug_print=debug_print)
+                                                            decoding_time_bin_size=active_laps_decoding_time_bin_size, measured_pos_column_name=measured_pos_column_name, debug_print=debug_print)
     all_directional_laps_filter_epochs_decoder_result: DecodedFilterEpochsResult = test_all_directional_decoder_result.decoder_result
     ## INPUTS: test_all_directional_decoder_result
     (laps_directional_marginals_tuple, laps_track_identity_marginals_tuple, laps_non_marginalized_decoder_marginals_tuple), laps_marginals_df = all_directional_laps_filter_epochs_decoder_result.compute_marginals(epoch_idx_col_name='lap_idx', epoch_start_t_col_name='lap_start_t',
