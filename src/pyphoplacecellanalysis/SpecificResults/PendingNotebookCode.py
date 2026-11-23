@@ -23458,3 +23458,78 @@ def compare_historical_FAT_P_Short_across_exports(collected_outputs_directory: O
     return fat_files_df, pairwise_compare_df, break_candidates_df
 
 
+
+@function_attributes(short_name=None, tags=['laps', 'groundtruth', 'decode', 'posterior', 'plot', 'lin_pos'], input_requires=["global_computation_results.computed_data['DirectionalDecodersDecoded']"], output_provides=[], uses=['add_laps_groundtruth_information_to_dataframe', 'get_proper_global_spikes_df'], used_by=[], creation_date='2026-11-23 14:20', related_items=[])
+def decode_and_plot_laps_with_groundtruth_decoder(curr_active_pipeline, decoding_time_bin_size: float = 0.025, n_cols: int = 10, subplot_size=(2.0, 1.6), cmap: str = 'viridis', debug_print: bool = False):
+    """ Decodes each lap using only its ground-truth correct 1D decoder (one of 'long_LR', 'long_RL', 'short_LR', 'short_RL', given by `true_decoder_index`), and plots one posterior subplot per lap with the measured 'lin_pos' overlaid in red.
+
+    Usage:
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import decode_and_plot_laps_with_groundtruth_decoder
+
+        laps_df, laps_decoded_results_dict, fig, axs = decode_and_plot_laps_with_groundtruth_decoder(curr_active_pipeline, decoding_time_bin_size=0.025)
+
+    Returns:
+        laps_df: laps with ground-truth columns ['maze_id', 'is_LR_dir', 'true_decoder_index', 'true_decoder_name']
+        laps_decoded_results_dict: Dict[lap_id, (true_decoder_name, p_x_given_n (n_pos_bins, n_t_bins), (t_start, t_end), xbin)]
+    """
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import add_laps_groundtruth_information_to_dataframe, get_proper_global_spikes_df
+
+    decoder_names: Tuple[str, str, str, str] = ('long_LR', 'long_RL', 'short_LR', 'short_RL') # ordering matches `true_decoder_index = (maze_id * 2) + is_RL`
+    directional_decoders_decode_result = curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersDecoded']
+    pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = directional_decoders_decode_result.pf1D_Decoder_dict
+
+    ## Ground truth for each lap:
+    laps_df: pd.DataFrame = ensure_dataframe(deepcopy(curr_active_pipeline.sess.laps))
+    laps_df = add_laps_groundtruth_information_to_dataframe(curr_active_pipeline=curr_active_pipeline, result_laps_epochs_df=laps_df)
+    laps_df['true_decoder_name'] = [decoder_names[int(i)] for i in laps_df['true_decoder_index'].to_numpy()]
+
+    global_spikes_df: pd.DataFrame = get_proper_global_spikes_df(curr_active_pipeline)
+    pos_df: pd.DataFrame = deepcopy(curr_active_pipeline.sess.position.to_dataframe())
+
+    ## Decode each lap with only its correct decoder:
+    laps_decoded_results_dict: Dict[int, Tuple] = {}
+    for a_decoder_name in decoder_names:
+        a_laps_df: pd.DataFrame = laps_df[laps_df['true_decoder_name'] == a_decoder_name].copy()
+        if len(a_laps_df) == 0:
+            continue
+        a_decoder: BasePositionDecoder = pf1D_Decoder_dict[a_decoder_name]
+        a_decoded_result: DecodedFilterEpochsResult = a_decoder.decode_specific_epochs(spikes_df=deepcopy(global_spikes_df), filter_epochs=a_laps_df, decoding_time_bin_size=decoding_time_bin_size, debug_print=False)
+        for a_lap_id, a_p_x_given_n, a_time_bin_container in zip(a_laps_df['lap_id'].to_numpy(), a_decoded_result.p_x_given_n_list, a_decoded_result.time_bin_containers):
+            a_time_bin_centers = np.asarray(a_time_bin_container.centers)
+            a_time_extent = (a_time_bin_centers[0] - (decoding_time_bin_size / 2.0), a_time_bin_centers[-1] + (decoding_time_bin_size / 2.0)) # from centers, since `.edges` can be inconsistent
+            laps_decoded_results_dict[int(a_lap_id)] = (a_decoder_name, a_p_x_given_n, a_time_extent, deepcopy(a_decoder.xbin))
+        ## END for a_lap_id, a_p_x_given_n, a_time_bin_container in zip(...)...
+
+        if debug_print:
+            print(f'{a_decoder_name}: decoded {len(a_laps_df)} laps')
+    ## END for a_decoder_name in decoder_names...
+
+    ## Plot one subplot per lap:
+    lap_ids = [int(v) for v in laps_df['lap_id'].to_numpy() if int(v) in laps_decoded_results_dict]
+    n_laps: int = len(lap_ids)
+    n_rows: int = int(np.ceil(n_laps / n_cols))
+    fig, axs = plt.subplots(nrows=n_rows, ncols=n_cols, figsize=(subplot_size[0] * n_cols, subplot_size[1] * n_rows), squeeze=False, num='laps_groundtruth_decoder_posteriors', clear=True)
+    laps_df_by_id = laps_df.set_index('lap_id', drop=False)
+    for i, a_lap_id in enumerate(lap_ids):
+        ax = axs.flat[i]
+        a_decoder_name, a_p_x_given_n, a_time_extent, a_xbin = laps_decoded_results_dict[a_lap_id]
+        a_lap = laps_df_by_id.loc[a_lap_id]
+        ax.imshow(a_p_x_given_n, aspect='auto', origin='lower', interpolation='nearest', cmap=cmap, extent=(a_time_extent[0], a_time_extent[1], a_xbin[0], a_xbin[-1]))
+        a_lap_pos_df = pos_df[(pos_df['t'] >= a_lap['start']) & (pos_df['t'] <= a_lap['stop'])]
+        ax.plot(a_lap_pos_df['t'].to_numpy(), a_lap_pos_df['lin_pos'].to_numpy(), color='#ff0000', alpha=0.7, linewidth=1.0)
+        ax.set_xlim(a_time_extent[0], a_time_extent[1])
+        ax.set_ylim(a_xbin[0], a_xbin[-1])
+        ax.set_title(f'lap {a_lap_id}: {a_decoder_name}', fontsize=7)
+        ax.set_xticks([])
+        ax.set_yticks([])
+    ## END for i, a_lap_id in enumerate(lap_ids)...
+
+    for ax in axs.flat[n_laps:]:
+        ax.set_visible(False)
+    ## END for ax in axs.flat[n_laps:]...
+
+    fig.suptitle(f'Laps decoded with ground-truth decoder (t_bin={decoding_time_bin_size}) - red: measured lin_pos')
+    fig.tight_layout()
+    return laps_df, laps_decoded_results_dict, fig, axs
+
+

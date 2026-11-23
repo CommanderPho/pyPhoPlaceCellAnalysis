@@ -11080,7 +11080,7 @@ class AddNewDecodedPosteriors_MatplotlibPlotCommand(BaseMenuCommand):
             measured_position_df = deepcopy(curr_active_pipeline.sess.position.to_dataframe())
             if measured_position_df is not None:
                 widget.plots_data.measured_position_df = measured_position_df
-                _out_artists = cls._perform_overlay_measured_position(identifier_name=identifier_name, widget=widget, matplotlib_fig=fig, matplotlib_fig_axes=[an_ax], measured_position_df=measured_position_df)
+                _out_artists = cls._perform_overlay_measured_position(identifier_name=identifier_name, widget=widget, matplotlib_fig=fig, matplotlib_fig_axes=[an_ax], measured_position_df=measured_position_df, variable_name='lin_pos')
                 widget.plots.measured_position_artists = _out_artists
                 
         widget.draw() # alternative to accessing through full path?
