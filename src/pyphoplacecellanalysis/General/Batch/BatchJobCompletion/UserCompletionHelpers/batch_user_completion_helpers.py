@@ -4457,11 +4457,12 @@ def compute_and_figures_nwb_wmaze_maze_context_probabilities_completion_function
 def figures_export_laps_correct_decoder_side_by_side_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict,
                                                                          max_subplots_per_page: int = 8, posterior_masking_value: float = 0.0, dpi: int = 150,
                                                                          should_dim_low_firing_bins: bool = True, min_num_spikes_per_bin_to_be_considered_active: int = 1, min_num_unique_active_neurons_per_time_bin: Optional[int] = 1,
-                                                                         fail_on_exception_for_debugging: bool = False, debug_print: bool = False, **kwargs) -> dict:
+                                                                         delete_temporary_outputs: bool = True, fail_on_exception_for_debugging: bool = False, debug_print: bool = False, **kwargs) -> dict:
     """Batch/SLURM headless Agg export: 4-decoder lap posteriors side-by-side with green ground-truth boxes; all pages stacked into one PNG under collected_outputs.
 
     `posterior_masking_value` default 0.0 (no under-threshold whitening); non-zero vmin + white under_color washes out low/high-P contrast.
     Low-firing dimming defaults match ``export_train_test_pos_err`` (`min_num_unique_active_neurons_per_time_bin=1`).
+    After a successful flat copy of the merged PNG into ``laps_correct_decoder_side_by_side/``, ``delete_temporary_outputs=True`` removes the nested session folder (page PNGs + nested merged PNG).
     """
     import os
     import shutil
@@ -4469,8 +4470,8 @@ def figures_export_laps_correct_decoder_side_by_side_completion_function(self, g
     import matplotlib
     matplotlib.use('Agg', force=False)
 
-    print(f'figures_export_laps_correct_decoder_side_by_side_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...)', flush=True)
-    callback_outputs = {'combined_img_out_path': None, 'page_png_paths': None, 'n_pages': None, 'n_laps': None, 'output_dir': None, 'error': None}
+    print(f'figures_export_laps_correct_decoder_side_by_side_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, delete_temporary_outputs={delete_temporary_outputs}, ...)', flush=True)
+    callback_outputs = {'combined_img_out_path': None, 'page_png_paths': None, 'n_pages': None, 'n_laps': None, 'output_dir': None, 'deleted_temporary_outputs': False, 'error': None}
     across_session_results_extended_dict['figures_export_laps_correct_decoder_side_by_side_completion_function'] = callback_outputs
 
     try:
@@ -4487,8 +4488,11 @@ def figures_export_laps_correct_decoder_side_by_side_completion_function(self, g
         ## Unwrap {display_context: graphics_output_dict}
         graphics_output_dict = list(_out.values())[0] if isinstance(_out, dict) else _out
         nested_combined_img_out_path = graphics_output_dict.get('combined_img_out_path')
+        page_png_paths = graphics_output_dict.get('page_png_paths')
+        output_dir = graphics_output_dict.get('output_dir')
         combined_img_out_path = nested_combined_img_out_path
-        ## Copy merged PNG one level up into laps_correct_decoder_side_by_side/ for flat browsing (pages stay nested):
+        deleted_temporary_outputs: bool = False
+        ## Copy merged PNG one level up into laps_correct_decoder_side_by_side/ for flat browsing (pages stay nested unless deleted):
         if nested_combined_img_out_path is not None:
             nested_combined_img_out_path = Path(nested_combined_img_out_path).resolve()
             if nested_combined_img_out_path.exists():
@@ -4496,7 +4500,16 @@ def figures_export_laps_correct_decoder_side_by_side_completion_function(self, g
                 shutil.copy2(nested_combined_img_out_path, flat_combined_img_out_path)
                 combined_img_out_path = flat_combined_img_out_path
                 print(f'\tcopied merged PNG -> {flat_combined_img_out_path}', flush=True)
-        callback_outputs.update(dict(combined_img_out_path=combined_img_out_path, page_png_paths=graphics_output_dict.get('page_png_paths'), n_pages=graphics_output_dict.get('n_pages'), n_laps=graphics_output_dict.get('n_laps'), output_dir=graphics_output_dict.get('output_dir')))
+                ## Delete nested session folder (page PNGs + nested merged PNG) once flat copy is verified:
+                if bool(delete_temporary_outputs) and flat_combined_img_out_path.exists():
+                    temp_output_dir = Path(output_dir).resolve() if (output_dir is not None) else nested_combined_img_out_path.parent
+                    if temp_output_dir.exists() and (temp_output_dir.resolve() != flat_combined_img_out_path.parent.resolve()):
+                        shutil.rmtree(temp_output_dir)
+                        deleted_temporary_outputs = True
+                        page_png_paths = None
+                        output_dir = None
+                        print(f'\tdeleted temporary outputs under: {temp_output_dir}', flush=True)
+        callback_outputs.update(dict(combined_img_out_path=combined_img_out_path, page_png_paths=page_png_paths, n_pages=graphics_output_dict.get('n_pages'), n_laps=graphics_output_dict.get('n_laps'), output_dir=output_dir, deleted_temporary_outputs=deleted_temporary_outputs))
         print(f'\tcombined_img_out_path: {callback_outputs["combined_img_out_path"]}', flush=True)
     except Exception as e:
         callback_outputs['error'] = str(e)
