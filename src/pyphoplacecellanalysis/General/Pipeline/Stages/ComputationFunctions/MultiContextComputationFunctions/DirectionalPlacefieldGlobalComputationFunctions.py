@@ -6093,12 +6093,12 @@ class TrainTestLapsSplitting:
     @function_attributes(short_name=None, tags=['split', 'train-test'], input_requires=[], output_provides=[], uses=['split_laps_training_and_test'], used_by=['_split_train_test_laps_data'], creation_date='2024-03-29 22:14', related_items=[])
     @classmethod
     def compute_train_test_split_laps_decoders(cls, directional_laps_results: DirectionalLapsResult, track_templates: TrackTemplates, training_data_portion: float=9.0/10.0,
-                                            train_test_full_lap: bool = True, debug_output_hdf5_file_path=None, debug_plot: bool = False, debug_print: bool = False) -> TrainTestSplitResult: #Tuple[Tuple[Dict[str, pd.DataFrame], Dict[str, pd.DataFrame]], Dict[str, BasePositionDecoder], Dict[str, DynamicContainer]]:
+                                            train_test_full_lap: bool = False, debug_output_hdf5_file_path=None, debug_plot: bool = False, debug_print: bool = False) -> TrainTestSplitResult: #Tuple[Tuple[Dict[str, pd.DataFrame], Dict[str, pd.DataFrame]], Dict[str, BasePositionDecoder], Dict[str, DynamicContainer]]:
         """ 
         ## Split the lap epochs into training and test periods.
         ##### Ideally we could test the lap decoding error by sampling randomly from the time bins and omitting 1/10 of time bins from the placefield building (effectively the training data). These missing bins will be used as the "test data" and the decoding error will be computed by decoding them and subtracting the actual measured position during these bins.
 
-        train_test_full_lap (bool): if True (default), hold out whole laps as test (~``1 - training_data_portion`` of lap count); if False, leave out a temporal fraction within each lap.
+        train_test_full_lap (bool): if True, hold out whole laps as test (~``1 - training_data_portion`` of lap count); if False (default), leave out a temporal fraction within each lap.
 
         ## Get custom decoder that is only trained on a portion of the laps
         ## Build the `BasePositionDecoder` for each of the four templates analagous to what is done in `_long_short_decoding_analysis_from_decoders`:
@@ -9130,7 +9130,7 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
                         validate_computation_test=_workaround_validate_has_directional_train_test_split_result, 
                         is_global=True, computation_precidence=(1002.3))
     def _split_train_test_laps_data(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False,
-                                    training_data_portion: float = (9.0/10.0), train_test_full_lap: bool = True, debug_output_hdf5_file_path = None):
+                                    training_data_portion: float = (9.0/10.0), train_test_full_lap: bool = False, debug_output_hdf5_file_path = None):
         """ Using the four 1D decoders, performs 1D Bayesian decoding for each of the known epochs (Laps, Ripple) from the neural activity during these peirods.
         
         Requires:
@@ -9142,7 +9142,7 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
                 ['DirectionalDecodersEpochsEvaluations']['continuously_decoded_result_cache_dict']
                 a_train_test_result = global_computation_results.computed_data['TrainTestSplit']
 
-        train_test_full_lap: if True (default), hold out whole laps as test; if False, leave out a temporal fraction within each lap.
+        train_test_full_lap: if True, hold out whole laps as test; if False (default), leave out a temporal fraction within each lap.
         """
         if global_computation_results.computation_config is None:
             raise NotImplementedError(f'global_computation_results.computation_config is None!')

@@ -19260,7 +19260,7 @@ def _bapun_session_supports_lin_pos_decoder_eval(curr_active_pipeline, maze_epoc
     return True
 
 
-def _bapun_split_maze_train_test_decoder(curr_active_pipeline, maze_name: str, a_decoder: BasePositionDecoder, training_data_portion: float, laps_resolution_decoder: Optional[BasePositionDecoder] = None, train_test_full_lap: bool = True, debug_print: bool = False):
+def _bapun_split_maze_train_test_decoder(curr_active_pipeline, maze_name: str, a_decoder: BasePositionDecoder, training_data_portion: float, laps_resolution_decoder: Optional[BasePositionDecoder] = None, train_test_full_lap: bool = False, debug_print: bool = False):
     """Split laps for one Bapun maze and retrain ``a_decoder`` on train epochs only."""
     laps_resolution_decoder = a_decoder if laps_resolution_decoder is None else laps_resolution_decoder
     a_prev_computation_epochs_df: pd.DataFrame = _resolve_bapun_train_test_split_laps_df(curr_active_pipeline=curr_active_pipeline, maze_name=maze_name, a_decoder=laps_resolution_decoder)
@@ -19289,7 +19289,7 @@ def _assemble_train_test_split_result(train_test_split_epochs_df_dict: Dict[str,
 
 
 @function_attributes(short_name=None, tags=['split', 'train-test', 'bapun'], input_requires=[], output_provides=[], uses=['split_laps_training_and_test'], used_by=['_split_train_test_laps_data'], creation_date='2025-01-27 22:14', related_items=[])
-def compute_train_test_split_epochs_decoders(directional_laps_results: Optional[DirectionalLapsResult] = None, track_templates: Optional[TrackTemplates] = None, curr_active_pipeline=None, maze_epoch_names: Optional[List[str]] = None, training_data_portion: float=9.0/10.0, train_test_full_lap: bool = True, include_lin_pos_decoder: bool = True, use_clusterless_decoders: Optional[bool] = None, use_spyglass_clusterless_decoders: Optional[bool] = None, debug_output_hdf5_file_path=None, debug_plot: bool = False, debug_print: bool = False) -> TrainTestSplitResult:
+def compute_train_test_split_epochs_decoders(directional_laps_results: Optional[DirectionalLapsResult] = None, track_templates: Optional[TrackTemplates] = None, curr_active_pipeline=None, maze_epoch_names: Optional[List[str]] = None, training_data_portion: float=9.0/10.0, train_test_full_lap: bool = False, include_lin_pos_decoder: bool = True, use_clusterless_decoders: Optional[bool] = None, use_spyglass_clusterless_decoders: Optional[bool] = None, debug_output_hdf5_file_path=None, debug_plot: bool = False, debug_print: bool = False) -> TrainTestSplitResult:
     """Split lap epochs into train/test periods and rebuild decoders on training data only.
 
     Supports two input modes:
@@ -19318,7 +19318,7 @@ def compute_train_test_split_epochs_decoders(directional_laps_results: Optional[
     training_data_portion : float
         Fraction used for training (default 9/10). With ``train_test_full_lap=True``, this is a fraction of whole-lap count; with ``False``, a temporal fraction within each lap.
     train_test_full_lap : bool
-        If True (default), hold out whole laps as test; if False, leave out a temporal fraction within each lap.
+        If True, hold out whole laps as test; if False (default), leave out a temporal fraction within each lap.
     use_clusterless_decoders : bool, optional
         ``None`` preserves backwards-compatible auto mode: use standard decoders when present,
         falling back to clusterless decoders only when the standard decoder is missing.
