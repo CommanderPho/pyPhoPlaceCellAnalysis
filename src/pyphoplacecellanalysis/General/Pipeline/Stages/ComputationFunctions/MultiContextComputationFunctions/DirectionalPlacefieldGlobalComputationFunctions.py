@@ -10665,6 +10665,9 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
 
         `posterior_masking_value` is imshow `vmin` (default 0.0 = no under-threshold whitening). Non-zero values clip low-P to `under_color` and dominate low/high-P contrast.
 
+        Defaults for measured-traj contrast: posterior cmap ``viridis`` (black under/bad, white over) + cyan measured line ``#00e5ff`` @ 0.85.
+        Within-lap TrainTestSplit intervals are shaded when available (train=light green, test=purple); left ylabel is ``Lap {lap_id}``.
+
         Low-firing bin dimming (default on): same thresholds as ``export_train_test_pos_err`` / ``_do_custom_decode_epochs``
         (`min_num_spikes_per_bin_to_be_considered_active=1`, `min_num_unique_active_neurons_per_time_bin=1`). Inactive bins get a semi-transparent black overlay.
 
@@ -10742,17 +10745,41 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
             return ax.imshow(mask_rgba, origin='lower', aspect='auto', interpolation='nearest', extent=(xmin, xmax, ymin, ymax), animated=False, zorder=zorder)
 
 
+        def _subfn_train_test_intervals_for_lap(epochs_df: Optional[pd.DataFrame], lap_id) -> List[Tuple[float, float]]:
+            """Return (start, stop) intervals for `lap_id` from a TrainTestSplit train/test epochs df."""
+            if (epochs_df is None) or (lap_id is None) or ('lap_id' not in getattr(epochs_df, 'columns', [])):
+                return []
+            rows = epochs_df[epochs_df['lap_id'].to_numpy() == lap_id]
+            if len(rows) == 0:
+                return []
+            stop_col: str = 'stop' if ('stop' in rows.columns) else 'end'
+            return [(float(st), float(en)) for st, en in zip(rows['start'].to_numpy(), rows[stop_col].to_numpy())]
+
+
+        def _subfn_shade_train_test_intervals(ax, train_intervals: List[Tuple[float, float]], test_intervals: List[Tuple[float, float]], train_facecolor: str = 'green', test_facecolor: str = 'purple', train_alpha: float = 0.08, test_alpha: float = 0.12, zorder: float = 5.0):
+            """Shade within-lap train (light green) and test (purple) fragments — palette matches `TrainTestLapsSplitting.debug_draw_laps_train_test_split_epochs`."""
+            for t0, t1 in train_intervals:
+                ax.axvspan(t0, t1, facecolor=train_facecolor, alpha=train_alpha, linewidth=0, zorder=zorder)
+            ## END for t0, t1 in train_intervals...
+            for t0, t1 in test_intervals:
+                ax.axvspan(t0, t1, facecolor=test_facecolor, alpha=test_alpha, linewidth=0, zorder=zorder)
+            ## END for t0, t1 in test_intervals...
+
+
         # @function_attributes(short_name=None, tags=['laps', 'posterior', 'four-decoder', 'matplotlib', 'Agg', 'headless'], input_requires=[], output_provides=[], uses=['plot_1D_most_likely_position_comparsions', '_subfn_draw_green_groundtruth_axis_box'], used_by=['_subfn_export_laps_four_decoder_gt_boxed_combined_figure'], creation_date='2026-11-12 00:00', related_items=[])
         def _subfn_plot_laps_four_decoder_posterior_page(decoder_laps_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult], decoder_xbin_dict: Dict[str, NDArray], global_pos_df: pd.DataFrame,
                                                          page_lap_indicies: NDArray, truth_decoder_names_for_page: NDArray, decoder_names: Optional[List[str]] = None, variable_name: str = 'lin_pos',
                                                          posterior_masking_value: float = 0.0, figsize_per_row: float = 1.6, figsize_width: float = 16.0, dpi: int = 150,
                                                          spikes_df: Optional[pd.DataFrame] = None, should_dim_low_firing_bins: bool = True,
-                                                         min_num_spikes_per_bin_to_be_considered_active: int = 1, min_num_unique_active_neurons_per_time_bin: Optional[int] = 1, **kwargs) -> Tuple[plt.Figure, NDArray]:
+                                                         min_num_spikes_per_bin_to_be_considered_active: int = 1, min_num_unique_active_neurons_per_time_bin: Optional[int] = 1,
+                                                         page_lap_ids: Optional[NDArray] = None, train_epochs_dict: Optional[Dict[str, pd.DataFrame]] = None, test_epochs_dict: Optional[Dict[str, pd.DataFrame]] = None, **kwargs) -> Tuple[plt.Figure, NDArray]:
             """Plot one page: rows = laps on this page, columns = four directional decoders; green-box the ground-truth decoder per row.
 
             `page_lap_indicies`: positional indices into each decoder's DecodedFilterEpochsResult lists (shared lap order).
             `truth_decoder_names_for_page`: length == len(page_lap_indicies), values in decoder_names.
             `posterior_masking_value`: imshow vmin; keep 0.0 so low-P stays on the colormap (non-zero + under_color white washes out P contrast).
+            Default cmap is ``viridis`` with cyan measured traj for decode–trajectory contrast; override via `cmap` / post-style.
+            When `train_epochs_dict`/`test_epochs_dict` and `page_lap_ids` are provided, shade within-lap train/test intervals on every column.
             When `should_dim_low_firing_bins` and `spikes_df` are set, bins with fewer than `min_num_unique_active_neurons_per_time_bin` firing aclus are dimmed (same defaults as train-test pos-err; default 1).
             """
             if decoder_names is None:
@@ -10761,16 +10788,25 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
             n_cols: int = int(len(decoder_names))
             assert n_rows == len(truth_decoder_names_for_page)
             enable_low_firing_dimming: bool = bool(should_dim_low_firing_bins) and (spikes_df is not None)
+            enable_train_test_spans: bool = (train_epochs_dict is not None) and (test_epochs_dict is not None) and (page_lap_ids is not None)
 
-            # under/over still set for out-of-range; with vmin=0.0 low-P uses the Oranges floor instead of white clipping
-            cmap = kwargs.pop('cmap', get_heatmap_cmap(cmap='Oranges', bad_color='white', under_color='white', over_color='red'))
+            # under/over still set for out-of-range; viridis + cyan measured traj for decode–trajectory contrast (override via cmap kwarg)
+            cmap = kwargs.pop('cmap', get_heatmap_cmap(cmap='viridis', bad_color='black', under_color='black', over_color='white'))
             posterior_heatmap_imshow_kwargs = kwargs.pop('posterior_heatmap_imshow_kwargs', dict(cmap=cmap, vmin=float(posterior_masking_value), vmax=1.0))
             skip_plotting_most_likely_positions: bool = kwargs.pop('skip_plotting_most_likely_positions', True)
             skip_plotting_measured_positions: bool = kwargs.pop('skip_plotting_measured_positions', False)
+            measured_line_color: str = kwargs.pop('measured_line_color', '#00e5ff')
+            measured_line_alpha: float = float(kwargs.pop('measured_line_alpha', 0.85))
 
             fig, axs = plt.subplots(nrows=n_rows, ncols=n_cols, figsize=(figsize_width, max(figsize_per_row * float(n_rows), 2.0)), dpi=dpi, squeeze=False, sharex=False, sharey=False, constrained_layout=True)
             for row_i, lap_idx in enumerate(page_lap_indicies):
                 truth_name: str = str(truth_decoder_names_for_page[row_i])
+                lap_id = page_lap_ids[row_i] if (page_lap_ids is not None) else None
+                train_intervals: List[Tuple[float, float]] = []
+                test_intervals: List[Tuple[float, float]] = []
+                if enable_train_test_spans:
+                    train_intervals = _subfn_train_test_intervals_for_lap(train_epochs_dict.get(truth_name), lap_id)
+                    test_intervals = _subfn_train_test_intervals_for_lap(test_epochs_dict.get(truth_name), lap_id)
                 ## Compute low-firing mask once per lap (shared time bins across the four directional decoders):
                 low_firing_mask_rgba, low_firing_xmin, low_firing_xmax = None, None, None
                 if enable_low_firing_dimming:
@@ -10786,20 +10822,25 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
                                                             active_most_likely_positions_1D=curr_most_likely, variable_name=variable_name, enable_flat_line_drawing=False,
                                                             skip_plotting_measured_positions=skip_plotting_measured_positions, skip_plotting_most_likely_positions=skip_plotting_most_likely_positions,
                                                             posterior_heatmap_imshow_kwargs=posterior_heatmap_imshow_kwargs, return_created_artists=True)
-                    # measured traj default is #ff000066 @ 0.35; solid red @ 0.3 so posterior shows through
+                    # measured traj: cyan @ 0.85 for contrast against viridis (override via measured_line_color / measured_line_alpha)
                     _measured_lines = _artists.get('line_measured_position')
                     if _measured_lines is not None:
                         for _ln in (_measured_lines if isinstance(_measured_lines, (list, tuple)) else [_measured_lines]):
-                            _ln.set_color('#ff0000')
-                            _ln.set_alpha(0.3)
+                            _ln.set_color(measured_line_color)
+                            _ln.set_alpha(measured_line_alpha)
                         ## END for _ln in (_measured_lines if isinstance(_measured_lines, (list, tuple)) else [_measured_lines])...
                     ## END if _measured_lines is not None...
                     epoch_slice = ensure_dataframe(a_result.active_filter_epochs).iloc[int(lap_idx)][['start', 'stop']].to_numpy()
                     ax.set_xlim(*epoch_slice)
                     ax.set_title(f'{a_decoder_name}' if row_i == 0 else '')
-                    if col_i != 0:
+                    if col_i == 0:
+                        if lap_id is not None:
+                            ax.set_ylabel(f'Lap {lap_id}')
+                    else:
                         ax.set_ylabel('')
                         ax.tick_params(axis='y', labelleft=False)  # y labels only on leftmost column
+                    if enable_train_test_spans:
+                        _subfn_shade_train_test_intervals(ax, train_intervals=train_intervals, test_intervals=test_intervals)
                     if a_decoder_name == truth_name:
                         _subfn_draw_green_groundtruth_axis_box(ax)
                     else:
@@ -10816,12 +10857,14 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
                                                                      output_dir, combined_image_basename: str = 'laps_4decoder_gt_boxed', max_subplots_per_page: int = 8, variable_name: str = 'lin_pos',
                                                                      posterior_masking_value: float = 0.0, dpi: int = 150, write_png: bool = True, debug_print: bool = False,
                                                                      spikes_df: Optional[pd.DataFrame] = None, should_dim_low_firing_bins: bool = True,
-                                                                     min_num_spikes_per_bin_to_be_considered_active: int = 1, min_num_unique_active_neurons_per_time_bin: Optional[int] = 1, **kwargs) -> Dict[str, Any]:
+                                                                     min_num_spikes_per_bin_to_be_considered_active: int = 1, min_num_unique_active_neurons_per_time_bin: Optional[int] = 1,
+                                                                     train_epochs_dict: Optional[Dict[str, pd.DataFrame]] = None, test_epochs_dict: Optional[Dict[str, pd.DataFrame]] = None, **kwargs) -> Dict[str, Any]:
             """Headless Agg export: paginate all laps as 4-decoder side-by-side pages with GT green boxes, then vertical-stack PNGs into one combined figure.
 
             Returns dict with keys: `laps_epochs_df`, `page_png_paths`, `combined_img_out_path`, `n_pages`, `n_laps`.
             `posterior_masking_value` default 0.0 disables under-threshold whitening (pass >0 only if intentional clipping is desired).
             Low-firing dimming defaults match ``export_train_test_pos_err`` (`min_num_unique_active_neurons_per_time_bin=1`).
+            When `train_epochs_dict`/`test_epochs_dict` are provided, shades within-lap train/test intervals (viridis + cyan measured traj by default).
             """
             output_dir = Path(output_dir).resolve()
             output_dir.mkdir(parents=True, exist_ok=True)
@@ -10839,18 +10882,26 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
 
             all_lap_indicies = np.arange(n_laps, dtype=int)
             truth_names_all = laps_epochs_df['truth_decoder_name'].to_numpy()
+            if 'lap_id' in laps_epochs_df.columns:
+                all_lap_ids = laps_epochs_df['lap_id'].to_numpy()
+            elif 'lap_idx' in laps_epochs_df.columns:
+                all_lap_ids = (laps_epochs_df['lap_idx'].to_numpy().astype(int) + 1)
+            else:
+                all_lap_ids = None
             page_chunks = [all_lap_indicies[i:i + max_subplots_per_page] for i in range(0, n_laps, max_subplots_per_page)]
             n_pages: int = int(len(page_chunks))
             if debug_print:
-                print(f'_subfn_export_laps_four_decoder_gt_boxed_combined_figure: n_laps={n_laps}, n_pages={n_pages}, max_subplots_per_page={max_subplots_per_page}, output_dir={output_dir}, should_dim_low_firing_bins={should_dim_low_firing_bins}, min_num_unique_active_neurons_per_time_bin={min_num_unique_active_neurons_per_time_bin}')
+                print(f'_subfn_export_laps_four_decoder_gt_boxed_combined_figure: n_laps={n_laps}, n_pages={n_pages}, max_subplots_per_page={max_subplots_per_page}, output_dir={output_dir}, should_dim_low_firing_bins={should_dim_low_firing_bins}, min_num_unique_active_neurons_per_time_bin={min_num_unique_active_neurons_per_time_bin}, has_train_test={(train_epochs_dict is not None) and (test_epochs_dict is not None)}')
 
             page_png_paths = []
             for page_idx, page_lap_indicies in enumerate(page_chunks):
                 truth_for_page = truth_names_all[page_lap_indicies]
+                page_lap_ids = all_lap_ids[page_lap_indicies] if (all_lap_ids is not None) else None
                 fig, axs = _subfn_plot_laps_four_decoder_posterior_page(decoder_laps_filter_epochs_decoder_result_dict=decoder_laps_filter_epochs_decoder_result_dict, decoder_xbin_dict=decoder_xbin_dict, global_pos_df=global_pos_df,
                                                                        page_lap_indicies=page_lap_indicies, truth_decoder_names_for_page=truth_for_page, decoder_names=decoder_names, variable_name=variable_name,
                                                                        posterior_masking_value=posterior_masking_value, dpi=dpi, spikes_df=spikes_df, should_dim_low_firing_bins=should_dim_low_firing_bins,
-                                                                       min_num_spikes_per_bin_to_be_considered_active=min_num_spikes_per_bin_to_be_considered_active, min_num_unique_active_neurons_per_time_bin=min_num_unique_active_neurons_per_time_bin, **kwargs)
+                                                                       min_num_spikes_per_bin_to_be_considered_active=min_num_spikes_per_bin_to_be_considered_active, min_num_unique_active_neurons_per_time_bin=min_num_unique_active_neurons_per_time_bin,
+                                                                       page_lap_ids=page_lap_ids, train_epochs_dict=train_epochs_dict, test_epochs_dict=test_epochs_dict, **kwargs)
                 page_png_path = pages_dir.joinpath(f'{combined_image_basename}_page{page_idx:03d}_of{n_pages:03d}.png')
                 if write_png:
                     fig.savefig(page_png_path, dpi=dpi, bbox_inches='tight', facecolor='white')
@@ -10891,6 +10942,15 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
         decoder_laps_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult] = directional_decoders_epochs_decode_result.decoder_laps_filter_epochs_decoder_result_dict
         assert decoder_laps_filter_epochs_decoder_result_dict is not None, 'DirectionalDecodersEpochsEvaluations.decoder_laps_filter_epochs_decoder_result_dict is required'
 
+        train_test_split_result = global_computation_results.computed_data.get('TrainTestSplit', None)
+        train_epochs_dict: Optional[Dict[str, pd.DataFrame]] = None
+        test_epochs_dict: Optional[Dict[str, pd.DataFrame]] = None
+        if train_test_split_result is not None:
+            train_epochs_dict = getattr(train_test_split_result, 'train_epochs_dict', None)
+            test_epochs_dict = getattr(train_test_split_result, 'test_epochs_dict', None)
+        else:
+            print('WARN: TrainTestSplit missing; skipping train/test axvspans on laps_correct_decoder_side_by_side figure', flush=True)
+
         complete_session_context, (session_context, additional_session_context) = owning_pipeline_reference.get_complete_session_context()
         active_context = kwargs.pop('active_context', None)
         if active_context is None:
@@ -10918,7 +10978,8 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
                                                                               output_dir=output_dir, combined_image_basename=combined_image_basename, max_subplots_per_page=max_subplots_per_page, variable_name=variable_name,
                                                                               posterior_masking_value=posterior_masking_value, dpi=dpi, write_png=bool(save_figure), debug_print=debug_print,
                                                                               spikes_df=spikes_df_for_dimming, should_dim_low_firing_bins=should_dim_low_firing_bins,
-                                                                              min_num_spikes_per_bin_to_be_considered_active=min_num_spikes_per_bin_to_be_considered_active, min_num_unique_active_neurons_per_time_bin=min_num_unique_active_neurons_per_time_bin, **kwargs)
+                                                                              min_num_spikes_per_bin_to_be_considered_active=min_num_spikes_per_bin_to_be_considered_active, min_num_unique_active_neurons_per_time_bin=min_num_unique_active_neurons_per_time_bin,
+                                                                              train_epochs_dict=train_epochs_dict, test_epochs_dict=test_epochs_dict, **kwargs)
 
         graphics_output_dict = dict(display_context=display_context, output_dir=output_dir, combined_img_out_path=export_out.get('combined_img_out_path'), page_png_paths=export_out.get('page_png_paths'), n_pages=export_out.get('n_pages'), n_laps=export_out.get('n_laps'), laps_epochs_df=export_out.get('laps_epochs_df'), defer_render=defer_render,
                                     should_dim_low_firing_bins=should_dim_low_firing_bins, min_num_unique_active_neurons_per_time_bin=min_num_unique_active_neurons_per_time_bin)
