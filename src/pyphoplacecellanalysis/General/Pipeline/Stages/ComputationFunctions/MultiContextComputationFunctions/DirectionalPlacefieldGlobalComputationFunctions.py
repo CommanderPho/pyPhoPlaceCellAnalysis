@@ -6156,15 +6156,162 @@ class TrainTestLapsSplitting:
             test_laps_decoder_results_dict[k] = v.decode_specific_epochs(spikes_df=active_spikes_df, filter_epochs=deepcopy(test_epochs_dict[k]), decoding_time_bin_size=laps_decoding_time_bin_size, debug_print=False)
         return test_laps_decoder_results_dict
 
-    @function_attributes(short_name=None, tags=['split', 'train-test'], input_requires=[], output_provides=[], uses=['split_laps_training_and_test'], used_by=['_split_train_test_laps_data'], creation_date='2024-03-29 22:14', related_items=[])
+
+    @classmethod
+    def _subfn_merge_contiguous_labeled_bins_to_epochs(cls, bin_starts: NDArray, bin_stops: NDArray, is_test: NDArray, identity_values: Dict[str, Any]) -> Tuple[List[dict], List[dict]]:
+        """Merge contiguous active bins sharing the same train/test label into epoch rows."""
+        train_rows: List[dict] = []
+        test_rows: List[dict] = []
+        if len(bin_starts) == 0:
+            return train_rows, test_rows
+        run_start_t: float = float(bin_starts[0])
+        run_stop_t: float = float(bin_stops[0])
+        run_is_test: bool = bool(is_test[0])
+        for i in range(1, len(bin_starts)):
+            same_label: bool = (bool(is_test[i]) == run_is_test)
+            contiguous: bool = np.isclose(float(bin_starts[i]), run_stop_t)
+            if same_label and contiguous:
+                run_stop_t = float(bin_stops[i])
+            else:
+                row = {'start': run_start_t, 'stop': run_stop_t, 'duration': float(run_stop_t - run_start_t), **identity_values}
+                (test_rows if run_is_test else train_rows).append(row)
+                run_start_t = float(bin_starts[i])
+                run_stop_t = float(bin_stops[i])
+                run_is_test = bool(is_test[i])
+            ## END if same_label and contiguous...
+        ## END for i in range(1, len(bin_starts))...
+        row = {'start': run_start_t, 'stop': run_stop_t, 'duration': float(run_stop_t - run_start_t), **identity_values}
+        (test_rows if run_is_test else train_rows).append(row)
+        return train_rows, test_rows
+
+
+    @classmethod
+    def _subfn_build_lap_time_bin_edges(cls, lap_start: float, lap_stop: float, time_bin_size: float) -> Optional[NDArray]:
+        """Non-overlapping decoding-style edges covering [lap_start, lap_stop]. Returns None if no valid bins."""
+        lap_start_f, lap_stop_f = float(lap_start), float(lap_stop)
+        if (not np.isfinite(lap_start_f)) or (not np.isfinite(lap_stop_f)) or (lap_stop_f <= lap_start_f) or (float(time_bin_size) <= 0):
+            return None
+        edges = np.arange(lap_start_f, lap_stop_f, float(time_bin_size), dtype=float)
+        if len(edges) == 0:
+            return None
+        if (len(edges) == 1) or (edges[-1] < (lap_stop_f - 1e-12)):
+            edges = np.append(edges, lap_stop_f)
+        if len(edges) < 2:
+            return None
+        return edges
+
+
+    @function_attributes(short_name=None, tags=['split', 'train-test', 'active-bins', 'low-firing'], input_requires=[], output_provides=[], uses=['compute_unit_time_binned_spike_counts_and_mask'], used_by=['compute_train_test_split_laps_decoders'], creation_date='2026-11-24 14:30', related_items=[])
+    @classmethod
+    def split_laps_active_bins_into_train_test(cls, laps_df: pd.DataFrame, spikes_df: pd.DataFrame, time_bin_size: float, training_data_portion: float = 0.9,
+                                               group_column_name: str = 'lap_id', additional_epoch_identity_column_names: Optional[List[str]] = None,
+                                               train_test_full_lap: bool = False, min_num_spikes_per_bin_to_be_considered_active: int = 1,
+                                               min_num_unique_active_neurons_per_time_bin: int = 1, included_neuron_ids: Optional[NDArray] = None, debug_print: bool = False) -> Tuple[pd.DataFrame, pd.DataFrame]:
+        """Drop low-firing bins first, then hold out ~``1 - training_data_portion`` of remaining **active** bins as test.
+
+        For ``train_test_full_lap=False``: per-lap random active-bin holdout (bin-count fraction).
+        For ``train_test_full_lap=True``: hold out whole laps by count, then restrict train/test epochs to that lap's active bins only.
+        """
+        from neuropy.core.epoch import ensure_dataframe
+        laps_df = ensure_dataframe(deepcopy(laps_df))
+        if additional_epoch_identity_column_names is None:
+            additional_epoch_identity_column_names = [c for c in ['label', 'lap_id', 'lap_dir'] if c in laps_df.columns]
+        else:
+            additional_epoch_identity_column_names = [c for c in additional_epoch_identity_column_names if c in laps_df.columns]
+        if group_column_name not in laps_df.columns:
+            raise KeyError(f'split_laps_active_bins_into_train_test requires column {group_column_name!r} on laps_df; columns={list(laps_df.columns)}')
+        test_data_portion: float = 1.0 - float(training_data_portion)
+        stop_col: str = 'stop' if ('stop' in laps_df.columns) else 'end'
+
+        ## Per-lap active bin edges (shared by both modes):
+        lap_active_bins: Dict[Any, Dict[str, Any]] = {}
+        for epoch_id, group in laps_df.groupby(group_column_name, sort=False):
+            lap_start = float(group['start'].min())
+            lap_stop = float(group[stop_col].max())
+            identity_values = {c: group[c].to_numpy()[0] for c in additional_epoch_identity_column_names}
+            edges = cls._subfn_build_lap_time_bin_edges(lap_start, lap_stop, time_bin_size=float(time_bin_size))
+            if edges is None:
+                if debug_print:
+                    print(f'\tlap_id={epoch_id}: no valid time bins; skipping')
+                continue
+            _counts, _units, (is_time_bin_active, _inactive_mask, _mask_rgba) = spikes_df.spikes.compute_unit_time_binned_spike_counts_and_mask(time_bin_edges=edges, included_neuron_ids=included_neuron_ids, min_num_spikes_per_bin_to_be_considered_active=int(min_num_spikes_per_bin_to_be_considered_active), min_num_unique_active_neurons_per_time_bin=min_num_unique_active_neurons_per_time_bin)
+            active_idxs = np.flatnonzero(np.asarray(is_time_bin_active, dtype=bool))
+            if len(active_idxs) == 0:
+                if debug_print:
+                    print(f'\tlap_id={epoch_id}: zero active bins; skipping')
+                continue
+            bin_starts = edges[:-1][active_idxs]
+            bin_stops = edges[1:][active_idxs]
+            lap_active_bins[epoch_id] = dict(bin_starts=bin_starts, bin_stops=bin_stops, identity_values=identity_values, n_active=int(len(active_idxs)))
+        ## END for epoch_id, group in laps_df.groupby(group_column_name, sort=False)...
+
+        train_rows: List[dict] = []
+        test_rows: List[dict] = []
+        unique_lap_ids = list(lap_active_bins.keys())
+        n_laps_active: int = len(unique_lap_ids)
+        if n_laps_active == 0:
+            empty_cols = ['start', 'stop', 'duration', *additional_epoch_identity_column_names]
+            return pd.DataFrame(columns=empty_cols), pd.DataFrame(columns=empty_cols)
+
+        if train_test_full_lap:
+            if n_laps_active <= 1:
+                test_lap_ids = set()
+                train_lap_ids = set(unique_lap_ids)
+            else:
+                n_test: int = int(np.round(n_laps_active * test_data_portion))
+                n_test = min(max(n_test, 1), n_laps_active - 1)
+                chosen_idxs = np.random.choice(n_laps_active, size=n_test, replace=False)
+                test_lap_ids = {unique_lap_ids[int(i)] for i in chosen_idxs}
+                train_lap_ids = set(unique_lap_ids) - test_lap_ids
+            if debug_print:
+                print(f'train_test_full_lap=True (active-bin restricted): n_laps_active={n_laps_active}, n_test_laps={len(test_lap_ids)}, n_train_laps={len(train_lap_ids)}')
+            for epoch_id, info in lap_active_bins.items():
+                is_test_arr = np.full(info['n_active'], fill_value=(epoch_id in test_lap_ids), dtype=bool)
+                _tr, _te = cls._subfn_merge_contiguous_labeled_bins_to_epochs(info['bin_starts'], info['bin_stops'], is_test=is_test_arr, identity_values=info['identity_values'])
+                train_rows.extend(_tr)
+                test_rows.extend(_te)
+            ## END for epoch_id, info in lap_active_bins.items()...
+        else:
+            for epoch_id, info in lap_active_bins.items():
+                n_active: int = int(info['n_active'])
+                if n_active == 1:
+                    ## Single active bin: keep as train (no held-out test for this lap)
+                    is_test_arr = np.zeros(n_active, dtype=bool)
+                else:
+                    n_test: int = int(np.round(n_active * test_data_portion))
+                    n_test = min(max(n_test, 1), n_active - 1)
+                    test_local_idxs = np.random.choice(n_active, size=n_test, replace=False)
+                    is_test_arr = np.zeros(n_active, dtype=bool)
+                    is_test_arr[np.asarray(test_local_idxs, dtype=int)] = True
+                _tr, _te = cls._subfn_merge_contiguous_labeled_bins_to_epochs(info['bin_starts'], info['bin_stops'], is_test=is_test_arr, identity_values=info['identity_values'])
+                train_rows.extend(_tr)
+                test_rows.extend(_te)
+            ## END for epoch_id, info in lap_active_bins.items()...
+            if debug_print:
+                print(f'train_test_full_lap=False (active-bin holdout): n_laps_active={n_laps_active}, n_train_epochs={len(train_rows)}, n_test_epochs={len(test_rows)}')
+        ## END if train_test_full_lap...
+
+        empty_cols = ['start', 'stop', 'duration', *additional_epoch_identity_column_names]
+        epochs_training_df = pd.DataFrame(train_rows) if (len(train_rows) > 0) else pd.DataFrame(columns=empty_cols)
+        epochs_test_df = pd.DataFrame(test_rows) if (len(test_rows) > 0) else pd.DataFrame(columns=empty_cols)
+        epochs_training_df = epochs_training_df.reset_index(drop=True)
+        epochs_test_df = epochs_test_df.reset_index(drop=True)
+        return epochs_training_df, epochs_test_df
+
+
+    @function_attributes(short_name=None, tags=['split', 'train-test'], input_requires=[], output_provides=[], uses=['split_laps_active_bins_into_train_test', 'split_into_training_and_test'], used_by=['_split_train_test_laps_data'], creation_date='2024-03-29 22:14', related_items=[])
     @classmethod
     def compute_train_test_split_laps_decoders(cls, directional_laps_results: DirectionalLapsResult, track_templates: TrackTemplates, training_data_portion: float=9.0/10.0,
-                                            train_test_full_lap: bool = False, debug_output_hdf5_file_path=None, debug_plot: bool = False, debug_print: bool = False) -> TrainTestSplitResult: #Tuple[Tuple[Dict[str, pd.DataFrame], Dict[str, pd.DataFrame]], Dict[str, BasePositionDecoder], Dict[str, DynamicContainer]]:
+                                            train_test_full_lap: bool = False, debug_output_hdf5_file_path=None, debug_plot: bool = False, debug_print: bool = False,
+                                            spikes_df: Optional[pd.DataFrame] = None, laps_decoding_time_bin_size: float = 0.025,
+                                            should_filter_inactive_bins_before_split: bool = True, min_num_spikes_per_bin_to_be_considered_active: int = 1,
+                                            min_num_unique_active_neurons_per_time_bin: Optional[int] = 1, included_neuron_ids: Optional[NDArray] = None) -> TrainTestSplitResult: #Tuple[Tuple[Dict[str, pd.DataFrame], Dict[str, pd.DataFrame]], Dict[str, BasePositionDecoder], Dict[str, DynamicContainer]]:
         """ 
         ## Split the lap epochs into training and test periods.
         ##### Ideally we could test the lap decoding error by sampling randomly from the time bins and omitting 1/10 of time bins from the placefield building (effectively the training data). These missing bins will be used as the "test data" and the decoding error will be computed by decoding them and subtracting the actual measured position during these bins.
 
-        train_test_full_lap (bool): if True, hold out whole laps as test (~``1 - training_data_portion`` of lap count); if False (default), leave out a temporal fraction within each lap.
+        When ``should_filter_inactive_bins_before_split=True`` and ``spikes_df`` is provided: drop low-firing bins first, then hold out active bins (default).
+        train_test_full_lap (bool): if True, hold out whole laps as test (~``1 - training_data_portion`` of lap count); if False (default), leave out a fraction of active bins within each lap.
 
         ## Get custom decoder that is only trained on a portion of the laps
         ## Build the `BasePositionDecoder` for each of the four templates analagous to what is done in `_long_short_decoding_analysis_from_decoders`:
@@ -6253,9 +6400,21 @@ class TrainTestLapsSplitting:
             # type(a_config['pf_params'].computation_epochs) # Epoch
             # a_config['pf_params'].computation_epochs
             a_laps_df: pd.DataFrame = ensure_dataframe(deepcopy(a_config['pf_params'].computation_epochs))
-            # ensure non-overlapping first:
-            a_laps_training_df, a_laps_test_df = a_laps_df.epochs.split_into_training_and_test(training_data_portion=training_data_portion, group_column_name ='lap_id', additional_epoch_identity_column_names=['label', 'lap_id', 'lap_dir'], skip_get_non_overlapping=False, train_test_full_lap=train_test_full_lap, debug_print=False) # a_laps_training_df, a_laps_test_df both comeback good here.
-            
+            ## Prefer active-bin-first split (drop low-firing bins, then hold out active bins) when spikes_df is available:
+            _use_active_bin_split: bool = bool(should_filter_inactive_bins_before_split) and (spikes_df is not None)
+            if _use_active_bin_split:
+                a_laps_training_df, a_laps_test_df = cls.split_laps_active_bins_into_train_test(laps_df=a_laps_df, spikes_df=spikes_df, time_bin_size=float(laps_decoding_time_bin_size), training_data_portion=float(training_data_portion),
+                                                                                               group_column_name='lap_id', additional_epoch_identity_column_names=['label', 'lap_id', 'lap_dir'], train_test_full_lap=train_test_full_lap,
+                                                                                               min_num_spikes_per_bin_to_be_considered_active=int(min_num_spikes_per_bin_to_be_considered_active),
+                                                                                               min_num_unique_active_neurons_per_time_bin=(1 if min_num_unique_active_neurons_per_time_bin is None else int(min_num_unique_active_neurons_per_time_bin)),
+                                                                                               included_neuron_ids=included_neuron_ids, debug_print=bool(debug_print))
+            else:
+                if bool(should_filter_inactive_bins_before_split) and (spikes_df is None) and debug_print:
+                    print(f'WARN: compute_train_test_split_laps_decoders: should_filter_inactive_bins_before_split=True but spikes_df is None; falling back to duration-based split for {a_modern_name}')
+                a_laps_training_df, a_laps_test_df = a_laps_df.epochs.split_into_training_and_test(training_data_portion=training_data_portion, group_column_name='lap_id', additional_epoch_identity_column_names=['label', 'lap_id', 'lap_dir'], skip_get_non_overlapping=False, train_test_full_lap=train_test_full_lap, debug_print=False)
+            ## END if _use_active_bin_split...
+            assert len(a_laps_training_df) > 0, f'compute_train_test_split_laps_decoders: empty training epochs for decoder {a_modern_name!r} after split (active-bin filter may have removed all bins).'
+
             if debug_output_hdf5_file_path is not None:
                 # Write out to HDF5 file:
                 a_possible_hdf5_file_output_prefix: str = 'provided'
@@ -9196,7 +9355,9 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
                         validate_computation_test=_workaround_validate_has_directional_train_test_split_result, 
                         is_global=True, computation_precidence=(1002.3))
     def _split_train_test_laps_data(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False,
-                                    training_data_portion: float = (9.0/10.0), train_test_full_lap: bool = False, debug_output_hdf5_file_path = None):
+                                    training_data_portion: float = (9.0/10.0), train_test_full_lap: bool = False, debug_output_hdf5_file_path=None,
+                                    laps_decoding_time_bin_size: Optional[float] = None, should_filter_inactive_bins_before_split: bool = True,
+                                    min_num_spikes_per_bin_to_be_considered_active: int = 1, min_num_unique_active_neurons_per_time_bin: Optional[int] = 1):
         """ Using the four 1D decoders, performs 1D Bayesian decoding for each of the known epochs (Laps, Ripple) from the neural activity during these peirods.
         
         Requires:
@@ -9208,7 +9369,8 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
                 ['DirectionalDecodersEpochsEvaluations']['continuously_decoded_result_cache_dict']
                 a_train_test_result = global_computation_results.computed_data['TrainTestSplit']
 
-        train_test_full_lap: if True, hold out whole laps as test; if False (default), leave out a temporal fraction within each lap.
+        train_test_full_lap: if True, hold out whole laps as test; if False (default), leave out a fraction of active bins within each lap.
+        Low-firing bins are dropped before the split when ``should_filter_inactive_bins_before_split=True`` (default) so test epochs use non-NaN active bins only.
         """
         if global_computation_results.computation_config is None:
             raise NotImplementedError(f'global_computation_results.computation_config is None!')
@@ -9218,25 +9380,41 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
 
         directional_laps_results: DirectionalLapsResult = global_computation_results.computed_data['DirectionalLaps']
         track_templates: TrackTemplates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values) # non-shared-only -- !! Is minimum_inclusion_fr_Hz=None the issue/difference?
-        # print(f'minimum_inclusion_fr_Hz: {minimum_inclusion_fr_Hz}')
-        # print(f'included_qclu_values: {included_qclu_values}')
+
+        ## Resolve decoding time bin size (prefer explicit kwarg, else DirectionalMergedDecoders, else 0.025):
+        if laps_decoding_time_bin_size is None:
+            _tt_params = getattr(global_computation_results.computation_config, 'directional_train_test_split', None)
+            if (_tt_params is not None) and (getattr(_tt_params, 'laps_decoding_time_bin_size', None) is not None):
+                laps_decoding_time_bin_size = float(_tt_params.laps_decoding_time_bin_size)
+            ## END if (_tt_params is not None) and ...
+        if laps_decoding_time_bin_size is None:
+            directional_merged_decoders_result = global_computation_results.computed_data.get('DirectionalMergedDecoders', None)
+            if directional_merged_decoders_result is not None:
+                try:
+                    laps_decoding_time_bin_size = float(directional_merged_decoders_result.laps_decoding_time_bin_size)
+                except Exception:
+                    laps_decoding_time_bin_size = None
+            ## END if directional_merged_decoders_result is not None...
+        if laps_decoding_time_bin_size is None:
+            laps_decoding_time_bin_size = 0.025
 
         test_data_portion: float = 1.0 - training_data_portion # test data portion is 1/10 of the total duration
-        print(f'training_data_portion: {training_data_portion}, test_data_portion: {test_data_portion}, train_test_full_lap: {train_test_full_lap}')
+        print(f'training_data_portion: {training_data_portion}, test_data_portion: {test_data_portion}, train_test_full_lap: {train_test_full_lap}, laps_decoding_time_bin_size: {laps_decoding_time_bin_size}, should_filter_inactive_bins_before_split: {should_filter_inactive_bins_before_split}')
 
-        # decoders_dict = deepcopy(track_templates.get_decoders_dict())
+        spikes_df_for_split: Optional[pd.DataFrame] = None
+        if bool(should_filter_inactive_bins_before_split):
+            spikes_df_for_split = deepcopy(get_proper_global_spikes_df(owning_pipeline_reference, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values))
 
-        # debug_output_hdf5_file_path = Path('output', 'laps_train_test_split.h5').resolve()
         debug_output_hdf5_file_path = None
         a_train_test_result: TrainTestSplitResult = TrainTestLapsSplitting.compute_train_test_split_laps_decoders(directional_laps_results=directional_laps_results, track_templates=track_templates, training_data_portion=training_data_portion,
-                                                                                                                                    train_test_full_lap=train_test_full_lap, debug_output_hdf5_file_path=debug_output_hdf5_file_path, debug_plot=False, debug_print=debug_print)  # type: Tuple[Tuple[Dict[str, Any], Dict[str, Any]], Dict[str, BasePositionDecoder], Any]
+                                                                                                                                    train_test_full_lap=train_test_full_lap, debug_output_hdf5_file_path=debug_output_hdf5_file_path, debug_plot=False, debug_print=debug_print,
+                                                                                                                                    spikes_df=spikes_df_for_split, laps_decoding_time_bin_size=float(laps_decoding_time_bin_size),
+                                                                                                                                    should_filter_inactive_bins_before_split=bool(should_filter_inactive_bins_before_split),
+                                                                                                                                    min_num_spikes_per_bin_to_be_considered_active=int(min_num_spikes_per_bin_to_be_considered_active),
+                                                                                                                                    min_num_unique_active_neurons_per_time_bin=min_num_unique_active_neurons_per_time_bin,
+                                                                                                                                    included_neuron_ids=track_templates.any_decoder_neuron_IDs)
 
         global_computation_results.computed_data['TrainTestSplit'] = a_train_test_result
-        
-
-        ## decode:
-        
-
         return global_computation_results
 
 
@@ -10686,6 +10864,7 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
 
         Defaults for measured-traj contrast: posterior cmap ``viridis`` (black under/bad, white over) + thin red measured line ``#ff0000`` @ 0.45, linewidth 0.8.
         Within-lap TrainTestSplit: train = yellow / test = orange hard brackets just above the axes top (tips down); zorder above GT green box.
+        Test intervals also get thin white (40% opacity) measured↔decoded I-bars at each time bin (displacement behind the left GT test-err metrics).
         Optional ``train_test_pos_err_df`` kwarg: left column viridis_r color cell for GT-decoder held-out test-segment error (joined on lap_id + truth_decoder_name).
 
         Low-firing bin dimming (default on): same thresholds as ``export_train_test_pos_err`` / ``_do_custom_decode_epochs``
@@ -10852,6 +11031,32 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
             ## END for t0, t1 in test_intervals...
 
 
+        def _subfn_draw_test_interval_measured_decoded_ibars(ax, time_bin_centers: NDArray, measured_y: NDArray, decoded_y: NDArray, test_intervals: List[Tuple[float, float]],
+                                                            color: str = '#ffffff', alpha: float = 0.40, linewidth: float = 0.35, cap_half_width_s: float = 0.006, zorder: float = 14.0):
+            """Draw very thin white I-bars (measured ↔ decoded) at time bins whose centers fall inside any test interval."""
+            if (test_intervals is None) or (len(test_intervals) == 0):
+                return
+            t = np.asarray(time_bin_centers, dtype=float).reshape(-1)
+            y_meas = np.asarray(measured_y, dtype=float).reshape(-1)
+            y_dec = np.asarray(decoded_y, dtype=float).reshape(-1)
+            if (len(t) == 0) or (len(t) != len(y_meas)) or (len(t) != len(y_dec)):
+                return
+            in_test = np.zeros(len(t), dtype=bool)
+            for t0, t1 in test_intervals:
+                in_test |= (t >= float(t0)) & (t <= float(t1))
+            ## END for t0, t1 in test_intervals...
+            valid = in_test & np.isfinite(y_meas) & np.isfinite(y_dec)
+            if not np.any(valid):
+                return
+            t_v = t[valid]
+            y0 = y_meas[valid]
+            y1 = y_dec[valid]
+            ax.vlines(t_v, y0, y1, colors=color, alpha=alpha, linewidth=linewidth, zorder=zorder, clip_on=True)
+            _cap = float(cap_half_width_s)
+            ax.hlines(y0, t_v - _cap, t_v + _cap, colors=color, alpha=alpha, linewidth=linewidth, zorder=zorder, clip_on=True)
+            ax.hlines(y1, t_v - _cap, t_v + _cap, colors=color, alpha=alpha, linewidth=linewidth, zorder=zorder, clip_on=True)
+
+
         def _subfn_pick_pos_err_metric_column(pos_err_df: Optional[pd.DataFrame]) -> Optional[str]:
             """Prefer abs_err_cm_1D_median → abs_err_cm_median → err_cm_1D → err_cm (paper-notebook order)."""
             if pos_err_df is None or len(pos_err_df) == 0:
@@ -10918,6 +11123,7 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
             `page_lap_indicies`: positional indices into each decoder's DecodedFilterEpochsResult lists (shared lap order).
             `truth_decoder_names_for_page`: length == len(page_lap_indicies), values in decoder_names.
             Col 0: viridis_r color cell for held-out test-segment GT-decoder error (joined on lap_id + truth_decoder_name).
+            When train/test spans are available: thin white (40% opacity) measured↔decoded I-bars inside test intervals only (all decoder columns).
             """
             if decoder_names is None:
                 decoder_names = list(TrackTemplates.get_decoder_names())
@@ -10975,10 +11181,14 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
                     ax = axs[row_i, col_i + 1]
                     a_result: DecodedFilterEpochsResult = decoder_laps_filter_epochs_decoder_result_dict[a_decoder_name]
                     curr_time_bins = a_result.time_bin_containers[int(lap_idx)].centers
-                    curr_posterior = a_result.marginal_x_list[int(lap_idx)].p_x_given_n
-                    curr_most_likely = None if skip_plotting_most_likely_positions else a_result.marginal_x_list[int(lap_idx)].most_likely_positions_1D
+                    _marginal_x = a_result.marginal_x_list[int(lap_idx)]
+                    curr_posterior = _marginal_x.p_x_given_n if hasattr(_marginal_x, 'p_x_given_n') else _marginal_x['p_x_given_n']
+                    decoded_y_for_ibars = getattr(_marginal_x, 'most_likely_positions_1D', None)
+                    if decoded_y_for_ibars is None and isinstance(_marginal_x, dict):
+                        decoded_y_for_ibars = _marginal_x.get('most_likely_positions_1D', None)
+                    curr_most_likely_for_line = None if skip_plotting_most_likely_positions else decoded_y_for_ibars
                     _fig, _ax, _artists = plot_1D_most_likely_position_comparsions(global_pos_df, time_window_centers=curr_time_bins, xbin=decoder_xbin_dict[a_decoder_name], ax=ax, posterior=curr_posterior,
-                                                            active_most_likely_positions_1D=curr_most_likely, variable_name=variable_name, enable_flat_line_drawing=False,
+                                                            active_most_likely_positions_1D=curr_most_likely_for_line, variable_name=variable_name, enable_flat_line_drawing=False,
                                                             skip_plotting_measured_positions=skip_plotting_measured_positions, skip_plotting_most_likely_positions=skip_plotting_most_likely_positions,
                                                             posterior_heatmap_imshow_kwargs=posterior_heatmap_imshow_kwargs, return_created_artists=True)
                     # measured traj: thin red @ 0.45 so posterior mass stays readable (override via measured_line_*)
@@ -11006,6 +11216,18 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
                     ## Brackets after GT green box so they paint on top (also zorder=1100 > FancyBboxPatch 1000):
                     if enable_train_test_spans and ((len(train_intervals) + len(test_intervals)) > 0):
                         _subfn_shade_train_test_intervals(ax, train_intervals=train_intervals, test_intervals=test_intervals)
+                    ## White I-bars (40% opacity): measured↔decoded displacement inside test intervals only:
+                    if enable_train_test_spans and (len(test_intervals) > 0) and (decoded_y_for_ibars is not None):
+                        measured_y_for_ibars: Optional[NDArray] = None
+                        _extra_interp_cols = [variable_name] if ((variable_name is not None) and (variable_name in global_pos_df.columns) and (variable_name != 'x')) else None
+                        try:
+                            _interp_df = TrainTestLapsSplitting.interpolate_positions(global_pos_df, np.asarray(curr_time_bins, dtype=float), additional_interp_column_names=_extra_interp_cols)
+                            _meas_col = variable_name if ((variable_name is not None) and (variable_name in _interp_df.columns)) else 'x'
+                            measured_y_for_ibars = _interp_df[_meas_col].to_numpy(dtype=float)
+                        except Exception:
+                            measured_y_for_ibars = None
+                        if measured_y_for_ibars is not None:
+                            _subfn_draw_test_interval_measured_decoded_ibars(ax, time_bin_centers=curr_time_bins, measured_y=measured_y_for_ibars, decoded_y=decoded_y_for_ibars, test_intervals=test_intervals)
 
                 ## END for col_i, a_decoder_name in enumerate(decoder_names)...
             ## END for row_i, lap_idx in enumerate(page_lap_indicies)...

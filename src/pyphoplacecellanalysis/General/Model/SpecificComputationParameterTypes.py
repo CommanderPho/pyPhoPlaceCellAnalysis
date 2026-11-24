@@ -402,15 +402,25 @@ class directional_decoders_epoch_heuristic_scoring_Parameters(HDF_SerializationM
 
 @define(slots=False, eq=False, repr=False)
 class directional_train_test_split_Parameters(HDF_SerializationMixin, AttrsBasedClassHelperMixin, BaseGlobalComputationParameters):
-    """ Docstring for directional_train_test_split_Parameters. 
+    """ Docstring for directional_train_test_split_Parameters.
+
+    Active-bin-first split (default): drop low-firing bins at ``laps_decoding_time_bin_size``, then hold out ``1 - training_data_portion`` of remaining active bins as test.
     """
     training_data_portion: float = serialized_attribute_field(default=0.9)
     train_test_full_lap: bool = serialized_attribute_field(default=False)
     debug_output_hdf5_file_path: Optional[pathlib.Path] = serialized_attribute_field(default=None)
+    laps_decoding_time_bin_size: Optional[float] = serialized_attribute_field(default=None)
+    should_filter_inactive_bins_before_split: bool = serialized_attribute_field(default=True)
+    min_num_spikes_per_bin_to_be_considered_active: int = serialized_attribute_field(default=1)
+    min_num_unique_active_neurons_per_time_bin: int = serialized_attribute_field(default=1)
     ## PARAMS - these are class properties
     training_data_portion_PARAM = param.Number(default=0.9, doc='training_data_portion param', label='training_data_portion')
-    train_test_full_lap_PARAM = param.Boolean(default=False, doc='hold out whole laps as test (vs temporal fraction within each lap)', label='train_test_full_lap')
+    train_test_full_lap_PARAM = param.Boolean(default=False, doc='hold out whole laps as test (vs active-bin fraction within each lap)', label='train_test_full_lap')
     debug_output_hdf5_file_path_PARAM = param.Path(default=None, doc='debug_output_hdf5_file_path param', label='debug_output_hdf5_file_path')
+    laps_decoding_time_bin_size_PARAM = param.Number(default=None, doc='decoding time bin size used to build active-bin mask before split (None -> DirectionalMergedDecoders / 0.025)', label='laps_decoding_time_bin_size')
+    should_filter_inactive_bins_before_split_PARAM = param.Boolean(default=True, doc='drop low-firing bins before train/test division so test uses non-NaN active bins only', label='should_filter_inactive_bins_before_split')
+    min_num_spikes_per_bin_to_be_considered_active_PARAM = param.Integer(default=1, doc='min spikes per aclu per bin to count as active', label='min_num_spikes_per_bin_to_be_considered_active')
+    min_num_unique_active_neurons_per_time_bin_PARAM = param.Integer(default=1, doc='min unique active aclus per bin to keep bin for train/test split', label='min_num_unique_active_neurons_per_time_bin')
     # HDFMixin Conformances ______________________________________________________________________________________________ #
     def to_hdf(self, file_path, key: str, **kwargs):
         """ Saves the object to key in the hdf5 file specified by file_path"""
