@@ -4415,10 +4415,13 @@ def compute_and_figures_nwb_wmaze_maze_context_probabilities_completion_function
 @function_attributes(short_name=None, tags=['figure', 'batch', 'laps', 'posterior', 'four-decoder', 'groundtruth', 'Agg', 'headless'], input_requires=['DirectionalLaps', 'DirectionalDecodersEpochsEvaluations'], output_provides=[],
                       uses=['_display_laps_correct_decoder_side_by_side_posteriors'], used_by=[], creation_date='2026-11-12 00:00', related_items=[])
 def figures_export_laps_correct_decoder_side_by_side_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict,
-                                                                         max_subplots_per_page: int = 8, posterior_masking_value: float = 0.0, dpi: int = 150, fail_on_exception_for_debugging: bool = False, debug_print: bool = False, **kwargs) -> dict:
+                                                                         max_subplots_per_page: int = 8, posterior_masking_value: float = 0.0, dpi: int = 150,
+                                                                         should_dim_low_firing_bins: bool = True, min_num_spikes_per_bin_to_be_considered_active: int = 1, min_num_unique_active_neurons_per_time_bin: int = 3,
+                                                                         fail_on_exception_for_debugging: bool = False, debug_print: bool = False, **kwargs) -> dict:
     """Batch/SLURM headless Agg export: 4-decoder lap posteriors side-by-side with green ground-truth boxes; all pages stacked into one PNG under collected_outputs.
 
     `posterior_masking_value` default 0.0 (no under-threshold whitening); non-zero vmin + white under_color washes out low/high-P contrast.
+    Low-firing dimming defaults match ``export_train_test_pos_err`` (`min_num_unique_active_neurons_per_time_bin=3`).
     """
     import os
     os.environ.setdefault('MPLBACKEND', 'Agg')
@@ -4437,7 +4440,9 @@ def figures_export_laps_correct_decoder_side_by_side_completion_function(self, g
         combined_image_basename: str = f"{self.BATCH_DATE_TO_USE}-{session_name}_laps_4decoder_gt_boxed"
         _out = curr_active_pipeline.display('_display_laps_correct_decoder_side_by_side_posteriors', display_context, defer_render=True, save_figure=True,
                                             parent_output_folder=self.collected_outputs_path.resolve(), max_subplots_per_page=max_subplots_per_page, posterior_masking_value=posterior_masking_value,
-                                            dpi=dpi, combined_image_basename=combined_image_basename, debug_print=debug_print, **kwargs)
+                                            dpi=dpi, combined_image_basename=combined_image_basename, should_dim_low_firing_bins=should_dim_low_firing_bins,
+                                            min_num_spikes_per_bin_to_be_considered_active=min_num_spikes_per_bin_to_be_considered_active, min_num_unique_active_neurons_per_time_bin=min_num_unique_active_neurons_per_time_bin,
+                                            debug_print=debug_print, **kwargs)
         ## Unwrap {display_context: graphics_output_dict}
         graphics_output_dict = list(_out.values())[0] if isinstance(_out, dict) else _out
         callback_outputs.update(dict(combined_img_out_path=graphics_output_dict.get('combined_img_out_path'), page_png_paths=graphics_output_dict.get('page_png_paths'), n_pages=graphics_output_dict.get('n_pages'), n_laps=graphics_output_dict.get('n_laps'), output_dir=graphics_output_dict.get('output_dir')))

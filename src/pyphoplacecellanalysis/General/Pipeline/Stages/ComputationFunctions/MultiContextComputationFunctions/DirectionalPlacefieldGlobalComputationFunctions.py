@@ -10642,10 +10642,14 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
                           uses=['_subfn_export_laps_four_decoder_gt_boxed_combined_figure', 'plot_1D_most_likely_position_comparsions', 'add_laps_groundtruth_information_to_dataframe', 'vertical_image_stack'],
                           used_by=['figures_export_laps_correct_decoder_side_by_side_completion_function'], creation_date='2026-11-12 00:00', related_items=[], is_global=True)
     def _display_laps_correct_decoder_side_by_side_posteriors(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True, parent_output_folder: Optional[Path] = None,
-                                                             max_subplots_per_page: int = 8, variable_name: str = 'lin_pos', posterior_masking_value: float = 0.0, dpi: int = 150, combined_image_basename: Optional[str] = None, **kwargs):
+                                                             max_subplots_per_page: int = 8, variable_name: str = 'lin_pos', posterior_masking_value: float = 0.0, dpi: int = 150, combined_image_basename: Optional[str] = None,
+                                                             should_dim_low_firing_bins: bool = True, min_num_spikes_per_bin_to_be_considered_active: int = 1, min_num_unique_active_neurons_per_time_bin: int = 3, **kwargs):
         """Headless Agg export of all laps as 4-decoder side-by-side posteriors with a green axis box on the session-lap ground-truth decoder; pages are vertical-stacked into one PNG.
 
         `posterior_masking_value` is imshow `vmin` (default 0.0 = no under-threshold whitening). Non-zero values clip low-P to `under_color` and dominate low/high-P contrast.
+
+        Low-firing bin dimming (default on): same thresholds as ``export_train_test_pos_err`` / ``_do_custom_decode_epochs``
+        (`min_num_spikes_per_bin_to_be_considered_active=1`, `min_num_unique_active_neurons_per_time_bin=3`). Inactive bins get a semi-transparent black overlay.
 
         Usage (BATCH):
             ipython ProcessBatchOutputs_qclus1246789_Only.ipy -- --date 2026-11-23 --computer GL --tbin 0.075 --only figures_export_laps_correct_decoder_side_by_side
@@ -10700,21 +10704,46 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
                 spine.set_color(dim_color)
             ## END for spine in ax.spines.values()...
 
+
+        def _subfn_compute_low_firing_mask_rgba_for_time_bin_container(spikes_df: pd.DataFrame, time_bin_container, min_num_spikes_per_bin_to_be_considered_active: int, min_num_unique_active_neurons_per_time_bin: int) -> Tuple[NDArray, NDArray, float, float]:
+            """Same min-active-aclu gate as ``_do_custom_decode_epochs`` / train-test pos-err. Returns (mask_rgba, is_time_bin_active, xmin, xmax)."""
+            sliding_iv = time_bin_container.get_sliding_window_intervals()
+            if sliding_iv is not None:
+                w_st, w_en = sliding_iv
+                _counts, _units, (is_time_bin_active, _inactive_mask, mask_rgba) = spikes_df.spikes.compute_unit_time_binned_spike_counts_and_mask_from_window_intervals(window_start_edges=w_st, window_stop_edges=w_en, included_neuron_ids=None, min_num_spikes_per_bin_to_be_considered_active=min_num_spikes_per_bin_to_be_considered_active, min_num_unique_active_neurons_per_time_bin=min_num_unique_active_neurons_per_time_bin)
+                xmin, xmax = float(np.min(w_st)), float(np.max(w_en))
+            else:
+                time_bin_edges = np.asarray(time_bin_container.edges)
+                _counts, _units, (is_time_bin_active, _inactive_mask, mask_rgba) = spikes_df.spikes.compute_unit_time_binned_spike_counts_and_mask(time_bin_edges=time_bin_edges, included_neuron_ids=None, min_num_spikes_per_bin_to_be_considered_active=min_num_spikes_per_bin_to_be_considered_active, min_num_unique_active_neurons_per_time_bin=min_num_unique_active_neurons_per_time_bin)
+                xmin, xmax = float(time_bin_edges[0]), float(time_bin_edges[-1])
+            return mask_rgba, is_time_bin_active, xmin, xmax
+
+
+        def _subfn_overlay_low_firing_bins_dimming(ax, mask_rgba: NDArray, xmin: float, xmax: float, zorder: float = 11.0):
+            """Semi-transparent black overlay on inactive (low-firing) time bins — same visual as `_plot_low_firing_time_bins_overlay_image`."""
+            ymin, ymax = ax.get_ylim()
+            return ax.imshow(mask_rgba, origin='lower', aspect='auto', interpolation='nearest', extent=(xmin, xmax, ymin, ymax), animated=False, zorder=zorder)
+
+
         # @function_attributes(short_name=None, tags=['laps', 'posterior', 'four-decoder', 'matplotlib', 'Agg', 'headless'], input_requires=[], output_provides=[], uses=['plot_1D_most_likely_position_comparsions', '_subfn_draw_green_groundtruth_axis_box'], used_by=['_subfn_export_laps_four_decoder_gt_boxed_combined_figure'], creation_date='2026-11-12 00:00', related_items=[])
         def _subfn_plot_laps_four_decoder_posterior_page(decoder_laps_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult], decoder_xbin_dict: Dict[str, NDArray], global_pos_df: pd.DataFrame,
                                                          page_lap_indicies: NDArray, truth_decoder_names_for_page: NDArray, decoder_names: Optional[List[str]] = None, variable_name: str = 'lin_pos',
-                                                         posterior_masking_value: float = 0.0, figsize_per_row: float = 1.6, figsize_width: float = 16.0, dpi: int = 150, **kwargs) -> Tuple[plt.Figure, NDArray]:
+                                                         posterior_masking_value: float = 0.0, figsize_per_row: float = 1.6, figsize_width: float = 16.0, dpi: int = 150,
+                                                         spikes_df: Optional[pd.DataFrame] = None, should_dim_low_firing_bins: bool = True,
+                                                         min_num_spikes_per_bin_to_be_considered_active: int = 1, min_num_unique_active_neurons_per_time_bin: int = 3, **kwargs) -> Tuple[plt.Figure, NDArray]:
             """Plot one page: rows = laps on this page, columns = four directional decoders; green-box the ground-truth decoder per row.
 
             `page_lap_indicies`: positional indices into each decoder's DecodedFilterEpochsResult lists (shared lap order).
             `truth_decoder_names_for_page`: length == len(page_lap_indicies), values in decoder_names.
             `posterior_masking_value`: imshow vmin; keep 0.0 so low-P stays on the colormap (non-zero + under_color white washes out P contrast).
+            When `should_dim_low_firing_bins` and `spikes_df` are set, bins with fewer than `min_num_unique_active_neurons_per_time_bin` firing aclus are dimmed (same defaults as train-test pos-err).
             """
             if decoder_names is None:
                 decoder_names = list(TrackTemplates.get_decoder_names())
             n_rows: int = int(len(page_lap_indicies))
             n_cols: int = int(len(decoder_names))
             assert n_rows == len(truth_decoder_names_for_page)
+            enable_low_firing_dimming: bool = bool(should_dim_low_firing_bins) and (spikes_df is not None)
 
             # under/over still set for out-of-range; with vmin=0.0 low-P uses the Oranges floor instead of white clipping
             cmap = kwargs.pop('cmap', get_heatmap_cmap(cmap='Oranges', bad_color='white', under_color='white', over_color='red'))
@@ -10725,6 +10754,11 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
             fig, axs = plt.subplots(nrows=n_rows, ncols=n_cols, figsize=(figsize_width, max(figsize_per_row * float(n_rows), 2.0)), dpi=dpi, squeeze=False, sharex=False, sharey=False, constrained_layout=True)
             for row_i, lap_idx in enumerate(page_lap_indicies):
                 truth_name: str = str(truth_decoder_names_for_page[row_i])
+                ## Compute low-firing mask once per lap (shared time bins across the four directional decoders):
+                low_firing_mask_rgba, low_firing_xmin, low_firing_xmax = None, None, None
+                if enable_low_firing_dimming:
+                    ref_result: DecodedFilterEpochsResult = decoder_laps_filter_epochs_decoder_result_dict[decoder_names[0]]
+                    low_firing_mask_rgba, _is_active, low_firing_xmin, low_firing_xmax = _subfn_compute_low_firing_mask_rgba_for_time_bin_container(spikes_df=spikes_df, time_bin_container=ref_result.time_bin_containers[int(lap_idx)], min_num_spikes_per_bin_to_be_considered_active=min_num_spikes_per_bin_to_be_considered_active, min_num_unique_active_neurons_per_time_bin=min_num_unique_active_neurons_per_time_bin)
                 for col_i, a_decoder_name in enumerate(decoder_names):
                     ax = axs[row_i, col_i]
                     a_result: DecodedFilterEpochsResult = decoder_laps_filter_epochs_decoder_result_dict[a_decoder_name]
@@ -10753,6 +10787,8 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
                         _subfn_draw_green_groundtruth_axis_box(ax)
                     else:
                         _subfn_dim_non_groundtruth_axis(ax)
+                    if low_firing_mask_rgba is not None:
+                        _subfn_overlay_low_firing_bins_dimming(ax, mask_rgba=low_firing_mask_rgba, xmin=low_firing_xmin, xmax=low_firing_xmax, zorder=11.0)
                 ## END for col_i, a_decoder_name in enumerate(decoder_names)...
             ## END for row_i, lap_idx in enumerate(page_lap_indicies)...
             return fig, axs
@@ -10761,11 +10797,14 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
         #                       uses=['_subfn_build_laps_groundtruth_decoder_names_df', '_subfn_plot_laps_four_decoder_posterior_page', 'vertical_image_stack'], used_by=['_display_laps_correct_decoder_side_by_side_posteriors'], creation_date='2026-11-12 00:00', related_items=[])
         def _subfn_export_laps_four_decoder_gt_boxed_combined_figure(curr_active_pipeline, decoder_laps_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult], track_templates,
                                                                      output_dir, combined_image_basename: str = 'laps_4decoder_gt_boxed', max_subplots_per_page: int = 8, variable_name: str = 'lin_pos',
-                                                                     posterior_masking_value: float = 0.0, dpi: int = 150, write_png: bool = True, debug_print: bool = False, **kwargs) -> Dict[str, Any]:
+                                                                     posterior_masking_value: float = 0.0, dpi: int = 150, write_png: bool = True, debug_print: bool = False,
+                                                                     spikes_df: Optional[pd.DataFrame] = None, should_dim_low_firing_bins: bool = True,
+                                                                     min_num_spikes_per_bin_to_be_considered_active: int = 1, min_num_unique_active_neurons_per_time_bin: int = 3, **kwargs) -> Dict[str, Any]:
             """Headless Agg export: paginate all laps as 4-decoder side-by-side pages with GT green boxes, then vertical-stack PNGs into one combined figure.
 
             Returns dict with keys: `laps_epochs_df`, `page_png_paths`, `combined_img_out_path`, `n_pages`, `n_laps`.
             `posterior_masking_value` default 0.0 disables under-threshold whitening (pass >0 only if intentional clipping is desired).
+            Low-firing dimming defaults match ``export_train_test_pos_err`` (`min_num_unique_active_neurons_per_time_bin=3`).
             """
             output_dir = Path(output_dir).resolve()
             output_dir.mkdir(parents=True, exist_ok=True)
@@ -10786,14 +10825,15 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
             page_chunks = [all_lap_indicies[i:i + max_subplots_per_page] for i in range(0, n_laps, max_subplots_per_page)]
             n_pages: int = int(len(page_chunks))
             if debug_print:
-                print(f'_subfn_export_laps_four_decoder_gt_boxed_combined_figure: n_laps={n_laps}, n_pages={n_pages}, max_subplots_per_page={max_subplots_per_page}, output_dir={output_dir}')
+                print(f'_subfn_export_laps_four_decoder_gt_boxed_combined_figure: n_laps={n_laps}, n_pages={n_pages}, max_subplots_per_page={max_subplots_per_page}, output_dir={output_dir}, should_dim_low_firing_bins={should_dim_low_firing_bins}, min_num_unique_active_neurons_per_time_bin={min_num_unique_active_neurons_per_time_bin}')
 
             page_png_paths = []
             for page_idx, page_lap_indicies in enumerate(page_chunks):
                 truth_for_page = truth_names_all[page_lap_indicies]
                 fig, axs = _subfn_plot_laps_four_decoder_posterior_page(decoder_laps_filter_epochs_decoder_result_dict=decoder_laps_filter_epochs_decoder_result_dict, decoder_xbin_dict=decoder_xbin_dict, global_pos_df=global_pos_df,
                                                                        page_lap_indicies=page_lap_indicies, truth_decoder_names_for_page=truth_for_page, decoder_names=decoder_names, variable_name=variable_name,
-                                                                       posterior_masking_value=posterior_masking_value, dpi=dpi, **kwargs)
+                                                                       posterior_masking_value=posterior_masking_value, dpi=dpi, spikes_df=spikes_df, should_dim_low_firing_bins=should_dim_low_firing_bins,
+                                                                       min_num_spikes_per_bin_to_be_considered_active=min_num_spikes_per_bin_to_be_considered_active, min_num_unique_active_neurons_per_time_bin=min_num_unique_active_neurons_per_time_bin, **kwargs)
                 page_png_path = pages_dir.joinpath(f'{combined_image_basename}_page{page_idx:03d}_of{n_pages:03d}.png')
                 if write_png:
                     fig.savefig(page_png_path, dpi=dpi, bbox_inches='tight', facecolor='white')
@@ -10853,11 +10893,18 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
         if combined_image_basename is None:
             combined_image_basename = f'{session_key}_laps_4decoder_gt_boxed'
 
+        spikes_df_for_dimming: Optional[pd.DataFrame] = None
+        if should_dim_low_firing_bins:
+            spikes_df_for_dimming = deepcopy(get_proper_global_spikes_df(owning_pipeline_reference, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values))
+
         export_out = _subfn_export_laps_four_decoder_gt_boxed_combined_figure(curr_active_pipeline=owning_pipeline_reference, decoder_laps_filter_epochs_decoder_result_dict=decoder_laps_filter_epochs_decoder_result_dict, track_templates=track_templates,
                                                                               output_dir=output_dir, combined_image_basename=combined_image_basename, max_subplots_per_page=max_subplots_per_page, variable_name=variable_name,
-                                                                              posterior_masking_value=posterior_masking_value, dpi=dpi, write_png=bool(save_figure), debug_print=debug_print, **kwargs)
+                                                                              posterior_masking_value=posterior_masking_value, dpi=dpi, write_png=bool(save_figure), debug_print=debug_print,
+                                                                              spikes_df=spikes_df_for_dimming, should_dim_low_firing_bins=should_dim_low_firing_bins,
+                                                                              min_num_spikes_per_bin_to_be_considered_active=min_num_spikes_per_bin_to_be_considered_active, min_num_unique_active_neurons_per_time_bin=min_num_unique_active_neurons_per_time_bin, **kwargs)
 
-        graphics_output_dict = dict(display_context=display_context, output_dir=output_dir, combined_img_out_path=export_out.get('combined_img_out_path'), page_png_paths=export_out.get('page_png_paths'), n_pages=export_out.get('n_pages'), n_laps=export_out.get('n_laps'), laps_epochs_df=export_out.get('laps_epochs_df'), defer_render=defer_render)
+        graphics_output_dict = dict(display_context=display_context, output_dir=output_dir, combined_img_out_path=export_out.get('combined_img_out_path'), page_png_paths=export_out.get('page_png_paths'), n_pages=export_out.get('n_pages'), n_laps=export_out.get('n_laps'), laps_epochs_df=export_out.get('laps_epochs_df'), defer_render=defer_render,
+                                    should_dim_low_firing_bins=should_dim_low_firing_bins, min_num_unique_active_neurons_per_time_bin=min_num_unique_active_neurons_per_time_bin)
         return {display_context: graphics_output_dict}
 
 
