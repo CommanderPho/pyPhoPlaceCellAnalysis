@@ -4518,7 +4518,7 @@ def figures_export_laps_correct_decoder_side_by_side_completion_function(self, g
                 flat_combined_img_out_path = nested_combined_img_out_path.parent.parent.joinpath(nested_combined_img_out_path.name)
                 shutil.copy2(nested_combined_img_out_path, flat_combined_img_out_path)
                 combined_img_out_path = flat_combined_img_out_path
-                print(f'\tcopied merged PNG -> {flat_combined_img_out_path}', flush=True)
+                print(f'\tcopied merged PNG -> {Path(flat_combined_img_out_path).resolve().as_uri()}', flush=True)
                 ## Delete nested session folder (page PNGs + nested merged PNG) once flat copy is verified:
                 if bool(delete_temporary_outputs) and flat_combined_img_out_path.exists():
                     temp_output_dir = Path(output_dir).resolve() if (output_dir is not None) else nested_combined_img_out_path.parent
@@ -4527,9 +4527,10 @@ def figures_export_laps_correct_decoder_side_by_side_completion_function(self, g
                         deleted_temporary_outputs = True
                         page_png_paths = None
                         output_dir = None
-                        print(f'\tdeleted temporary outputs under: {temp_output_dir}', flush=True)
+                        print(f'\tdeleted temporary outputs under: {Path(temp_output_dir).resolve().as_uri()}', flush=True)
         callback_outputs.update(dict(combined_img_out_path=combined_img_out_path, page_png_paths=page_png_paths, n_pages=graphics_output_dict.get('n_pages'), n_laps=graphics_output_dict.get('n_laps'), output_dir=output_dir, deleted_temporary_outputs=deleted_temporary_outputs))
-        print(f'\tcombined_img_out_path: {callback_outputs["combined_img_out_path"]}', flush=True)
+        _combined_print = callback_outputs["combined_img_out_path"]
+        print(f'\tcombined_img_out_path: {Path(_combined_print).resolve().as_uri() if (_combined_print is not None) else None}', flush=True)
     except Exception as e:
         callback_outputs['error'] = str(e)
         print(f'WARN: figures_export_laps_correct_decoder_side_by_side_completion_function failed: {e}', flush=True)

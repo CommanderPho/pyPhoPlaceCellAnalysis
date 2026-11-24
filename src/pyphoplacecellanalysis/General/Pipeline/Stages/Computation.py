@@ -1992,6 +1992,32 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
             curr_global_param_typed_parameters: ComputationKWargParameters = self.global_computation_results.computation_config
             
 
+        ## Older pickled/in-memory ComputationKWargParameters can lack newly-added nested attrs fields (e.g. directional_train_test_split.laps_decoding_time_bin_size); fill defaults before asdict/to_dict:
+        if hasattr(curr_global_param_typed_parameters, 'adding_default_values_for_missing_fields'):
+            curr_global_param_typed_parameters.adding_default_values_for_missing_fields()
+            for _sub_attr in getattr(curr_global_param_typed_parameters, '__attrs_attrs__', ()) or ():
+                _sub_v = getattr(curr_global_param_typed_parameters, getattr(_sub_attr, 'name', _sub_attr), None)
+                if (_sub_v is not None) and hasattr(_sub_v, 'adding_default_values_for_missing_fields'):
+                    _sub_v.adding_default_values_for_missing_fields()
+                ## END if (_sub_v is not None) and hasattr(...)...
+            ## END for _sub_attr in ...
+        ## END if hasattr(...adding_default_values_for_missing_fields)...
+        ## Explicit backfill for directional_train_test_split fields added 2026-11-24 (active-bin-first split); covers class/instance autoreload mismatch where fields(type(inst)) may not match asdict's class:
+        _tt = getattr(curr_global_param_typed_parameters, 'directional_train_test_split', None)
+        if _tt is not None:
+            for _fname, _default in (
+                ('laps_decoding_time_bin_size', None),
+                ('should_filter_inactive_bins_before_split', True),
+                ('min_num_spikes_per_bin_to_be_considered_active', 1),
+                ('min_num_unique_active_neurons_per_time_bin', 1),
+                ('train_test_full_lap', False),
+            ):
+                if not hasattr(_tt, _fname):
+                    setattr(_tt, _fname, _default)
+                ## END if not hasattr(_tt, _fname)...
+            ## END for _fname, _default in (...)...
+        ## END if _tt is not None...
+
         _master_params_dict = {}
         _master_params_dict['preprocessing'] = preprocessing_parameters.to_dict()
         _master_params_dict.update(curr_global_param_typed_parameters.to_dict())

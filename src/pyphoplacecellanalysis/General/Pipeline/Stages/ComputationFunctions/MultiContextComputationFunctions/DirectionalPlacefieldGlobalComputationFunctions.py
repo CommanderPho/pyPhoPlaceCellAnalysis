@@ -11031,9 +11031,34 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
             ## END for t0, t1 in test_intervals...
 
 
+        def _subfn_resolve_decoded_positions_1d_for_lap(a_result: DecodedFilterEpochsResult, lap_idx: int) -> Optional[NDArray]:
+            """Prefer ``most_likely_positions_list`` (1D x); fall back to ``marginal_x.most_likely_positions_1D``."""
+            decoded_y = None
+            try:
+                raw = a_result.most_likely_positions_list[int(lap_idx)]
+                arr = np.asarray(raw, dtype=float)
+                if arr.ndim >= 2:
+                    decoded_y = np.asarray(arr[:, 0], dtype=float).reshape(-1)
+                else:
+                    decoded_y = np.asarray(arr, dtype=float).reshape(-1)
+            except Exception:
+                decoded_y = None
+            if decoded_y is None:
+                _marginal_x = a_result.marginal_x_list[int(lap_idx)]
+                decoded_y = getattr(_marginal_x, 'most_likely_positions_1D', None)
+                if decoded_y is None and isinstance(_marginal_x, dict):
+                    decoded_y = _marginal_x.get('most_likely_positions_1D', None)
+                if decoded_y is not None:
+                    decoded_y = np.asarray(decoded_y, dtype=float).reshape(-1)
+            return decoded_y
+
+
         def _subfn_draw_test_interval_measured_decoded_ibars(ax, time_bin_centers: NDArray, measured_y: NDArray, decoded_y: NDArray, test_intervals: List[Tuple[float, float]],
-                                                            color: str = '#ffffff', alpha: float = 0.40, linewidth: float = 0.35, cap_half_width_s: float = 0.006, zorder: float = 14.0):
-            """Draw very thin white I-bars (measured ↔ decoded) at time bins whose centers fall inside any test interval."""
+                                                            color: str = '#ffffff', alpha: float = 0.40, linewidth: float = 0.35, capsize_pts: float = 1.5, zorder: float = 14.0):
+            """Draw very thin white I-bars (measured ↔ decoded) at time bins inside any test interval.
+
+            Caps use ``errorbar`` ``capsize`` in **points** (not data-seconds) so they stay tiny across time scales.
+            """
             if (test_intervals is None) or (len(test_intervals) == 0):
                 return
             t = np.asarray(time_bin_centers, dtype=float).reshape(-1)
@@ -11051,10 +11076,10 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
             t_v = t[valid]
             y0 = y_meas[valid]
             y1 = y_dec[valid]
-            ax.vlines(t_v, y0, y1, colors=color, alpha=alpha, linewidth=linewidth, zorder=zorder, clip_on=True)
-            _cap = float(cap_half_width_s)
-            ax.hlines(y0, t_v - _cap, t_v + _cap, colors=color, alpha=alpha, linewidth=linewidth, zorder=zorder, clip_on=True)
-            ax.hlines(y1, t_v - _cap, t_v + _cap, colors=color, alpha=alpha, linewidth=linewidth, zorder=zorder, clip_on=True)
+            y_mid = 0.5 * (y0 + y1)
+            y_half = 0.5 * np.abs(y1 - y0)
+            ax.errorbar(t_v, y_mid, yerr=y_half, fmt='none', ecolor=color, elinewidth=float(linewidth),
+                        capsize=float(capsize_pts), capthick=float(linewidth), alpha=float(alpha), zorder=float(zorder), clip_on=True)
 
 
         def _subfn_pick_pos_err_metric_column(pos_err_df: Optional[pd.DataFrame]) -> Optional[str]:
@@ -11183,9 +11208,7 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
                     curr_time_bins = a_result.time_bin_containers[int(lap_idx)].centers
                     _marginal_x = a_result.marginal_x_list[int(lap_idx)]
                     curr_posterior = _marginal_x.p_x_given_n if hasattr(_marginal_x, 'p_x_given_n') else _marginal_x['p_x_given_n']
-                    decoded_y_for_ibars = getattr(_marginal_x, 'most_likely_positions_1D', None)
-                    if decoded_y_for_ibars is None and isinstance(_marginal_x, dict):
-                        decoded_y_for_ibars = _marginal_x.get('most_likely_positions_1D', None)
+                    decoded_y_for_ibars = _subfn_resolve_decoded_positions_1d_for_lap(a_result, int(lap_idx))
                     curr_most_likely_for_line = None if skip_plotting_most_likely_positions else decoded_y_for_ibars
                     _fig, _ax, _artists = plot_1D_most_likely_position_comparsions(global_pos_df, time_window_centers=curr_time_bins, xbin=decoder_xbin_dict[a_decoder_name], ax=ax, posterior=curr_posterior,
                                                             active_most_likely_positions_1D=curr_most_likely_for_line, variable_name=variable_name, enable_flat_line_drawing=False,
