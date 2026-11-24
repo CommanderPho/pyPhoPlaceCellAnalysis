@@ -404,10 +404,10 @@ class directional_decoders_epoch_heuristic_scoring_Parameters(HDF_SerializationM
 class directional_train_test_split_Parameters(HDF_SerializationMixin, AttrsBasedClassHelperMixin, BaseGlobalComputationParameters):
     """ Docstring for directional_train_test_split_Parameters. 
     """
-    training_data_portion: float = serialized_attribute_field(default=0.8333333333333334)
+    training_data_portion: float = serialized_attribute_field(default=0.9)
     debug_output_hdf5_file_path: Optional[pathlib.Path] = serialized_attribute_field(default=None)
     ## PARAMS - these are class properties
-    training_data_portion_PARAM = param.Number(default=0.8333333333333334, doc='training_data_portion param', label='training_data_portion')
+    training_data_portion_PARAM = param.Number(default=0.9, doc='training_data_portion param', label='training_data_portion')
     debug_output_hdf5_file_path_PARAM = param.Path(default=None, doc='debug_output_hdf5_file_path param', label='debug_output_hdf5_file_path')
     # HDFMixin Conformances ______________________________________________________________________________________________ #
     def to_hdf(self, file_path, key: str, **kwargs):
@@ -486,7 +486,7 @@ epoch_score_shuffle_analysis_Parameters = wcorr_shuffle_analysis_Parameters
 class non_PBE_epochs_results_Parameters(HDF_SerializationMixin, AttrsBasedClassHelperMixin, BaseGlobalComputationParameters):
     """ Docstring for non_PBE_epochs_results_Parameters. 
     """
-    training_data_portion: float = serialized_attribute_field(default=0.8333333333333334)
+    training_data_portion: float = serialized_attribute_field(default=0.9)
     epochs_decoding_time_bin_size: float = serialized_attribute_field(default=0.05)
     frame_divide_bin_size: float = serialized_attribute_field(default=10.0)
     compute_1D: bool = serialized_attribute_field(default=True)
@@ -496,7 +496,7 @@ class non_PBE_epochs_results_Parameters(HDF_SerializationMixin, AttrsBasedClassH
     debug_print_memory_breakdown: bool = serialized_attribute_field(default=False)
     IGNORE_MEMORY_ERROR_FOR_DEBUGGING: bool = serialized_attribute_field(default=False)
     ## PARAMS - these are class properties
-    training_data_portion_PARAM = param.Number(default=0.8333333333333334, doc='training_data_portion param', label='training_data_portion')
+    training_data_portion_PARAM = param.Number(default=0.9, doc='training_data_portion param', label='training_data_portion')
     epochs_decoding_time_bin_size_PARAM = param.Number(default=0.05, doc='epochs_decoding_time_bin_size param', label='epochs_decoding_time_bin_size')
     frame_divide_bin_size_PARAM = param.Number(default=10.0, doc='frame_divide_bin_size param', label='frame_divide_bin_size')
     compute_1D_PARAM = param.Boolean(default=True, doc='compute_1D param', label='compute_1D')

@@ -5850,7 +5850,7 @@ def _do_train_test_split_decode_and_evaluate(curr_active_pipeline, active_laps_d
 
 
 @function_attributes(short_name=None, tags=['TrainTestSplit', 'position', 'error', 'CSV', 'KDIBA'], input_requires=[], output_provides=[], uses=['_do_train_test_split_decode_and_evaluate'], used_by=['export_kdiba_train_test_position_error_csvs'], creation_date='2026-11-20 17:50', related_items=[])
-def compute_kdiba_train_test_position_error_dfs(curr_active_pipeline, active_laps_decoding_time_bin_size: float = 0.025, force_recompute_directional_train_test_split_result: bool = False, debug_print: bool = False) -> Tuple[pd.DataFrame, pd.DataFrame]:
+def compute_kdiba_train_test_position_error_dfs(curr_active_pipeline, active_laps_decoding_time_bin_size: float = 0.075, force_recompute_directional_train_test_split_result: bool = False, debug_print: bool = False) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """Ensure TrainTestSplit, decode held-out test lap segments, return (train_test_pos_err_df, train_test_pos_err_agg_df).
 
     ``train_test_pos_err_df``: per-epoch rows with ``decoder_name``, ``session_name``, ``time_bin_size``, ``t``, ``sq_err``, ``err_cm`` (+ optional ``*_1D``/``*_2D``).
@@ -6064,11 +6064,11 @@ class TrainTestLapsSplitting:
 
     @function_attributes(short_name=None, tags=['split', 'train-test'], input_requires=[], output_provides=[], uses=['split_laps_training_and_test'], used_by=['_split_train_test_laps_data'], creation_date='2024-03-29 22:14', related_items=[])
     @classmethod
-    def compute_train_test_split_laps_decoders(cls, directional_laps_results: DirectionalLapsResult, track_templates: TrackTemplates, training_data_portion: float=5.0/6.0,
+    def compute_train_test_split_laps_decoders(cls, directional_laps_results: DirectionalLapsResult, track_templates: TrackTemplates, training_data_portion: float=9.0/10.0,
                                             debug_output_hdf5_file_path=None, debug_plot: bool = False, debug_print: bool = False) -> TrainTestSplitResult: #Tuple[Tuple[Dict[str, pd.DataFrame], Dict[str, pd.DataFrame]], Dict[str, BasePositionDecoder], Dict[str, DynamicContainer]]:
         """ 
         ## Split the lap epochs into training and test periods.
-        ##### Ideally we could test the lap decoding error by sampling randomly from the time bins and omitting 1/6 of time bins from the placefield building (effectively the training data). These missing bins will be used as the "test data" and the decoding error will be computed by decoding them and subtracting the actual measured position during these bins.
+        ##### Ideally we could test the lap decoding error by sampling randomly from the time bins and omitting 1/10 of time bins from the placefield building (effectively the training data). These missing bins will be used as the "test data" and the decoding error will be computed by decoding them and subtracting the actual measured position during these bins.
 
         ## Get custom decoder that is only trained on a portion of the laps
         ## Build the `BasePositionDecoder` for each of the four templates analagous to what is done in `_long_short_decoding_analysis_from_decoders`:
@@ -6083,8 +6083,8 @@ class TrainTestLapsSplitting:
 
         Usage:
 
-            training_data_portion: float = 5.0/6.0
-            test_data_portion: float = 1.0 - training_data_portion # test data portion is 1/6 of the total duration
+            training_data_portion: float = 9.0/10.0
+            test_data_portion: float = 1.0 - training_data_portion # test data portion is 1/10 of the total duration
             print(f'training_data_portion: {training_data_portion}, test_data_portion: {test_data_portion}')
             decoders_dict = deepcopy(track_templates.get_decoders_dict())
             (train_test_split_laps_df_dict, train_test_split_laps_epoch_obj_dict), (split_train_test_lap_specific_pf1D_Decoder_dict, split_train_test_lap_specific_pf1D_dict, split_train_test_lap_specific_configs) = compute_train_test_split_laps_decoders(directional_laps_results, track_templates)
@@ -6110,7 +6110,7 @@ class TrainTestLapsSplitting:
         from neuropy.analyses.placefields import PfND
         from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder
 
-        test_data_portion: float = 1.0 - training_data_portion # test data portion is 1/6 of the total duration
+        test_data_portion: float = 1.0 - training_data_portion # test data portion is 1/10 of the total duration
 
         if debug_print:
             print(f'training_data_portion: {training_data_portion}, test_data_portion: {test_data_portion}')
@@ -9100,7 +9100,7 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
                         validate_computation_test=_workaround_validate_has_directional_train_test_split_result, 
                         is_global=True, computation_precidence=(1002.3))
     def _split_train_test_laps_data(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False,
-                                    training_data_portion: float = (5.0/6.0), debug_output_hdf5_file_path = None):
+                                    training_data_portion: float = (9.0/10.0), debug_output_hdf5_file_path = None):
         """ Using the four 1D decoders, performs 1D Bayesian decoding for each of the known epochs (Laps, Ripple) from the neural activity during these peirods.
         
         Requires:
@@ -9123,7 +9123,7 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
         # print(f'minimum_inclusion_fr_Hz: {minimum_inclusion_fr_Hz}')
         # print(f'included_qclu_values: {included_qclu_values}')
 
-        test_data_portion: float = 1.0 - training_data_portion # test data portion is 1/6 of the total duration
+        test_data_portion: float = 1.0 - training_data_portion # test data portion is 1/10 of the total duration
         print(f'training_data_portion: {training_data_portion}, test_data_portion: {test_data_portion}')
 
         # decoders_dict = deepcopy(track_templates.get_decoders_dict())

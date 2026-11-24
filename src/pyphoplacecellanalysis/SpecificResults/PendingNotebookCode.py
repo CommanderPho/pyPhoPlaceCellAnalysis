@@ -4526,7 +4526,7 @@ class BapunPositionDecodingPerformance:
         from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import compute_train_test_split_epochs_decoders
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import TrainTestLapsSplitting, get_proper_global_spikes_df, CustomDecodeEpochsResult
 
-        test_data_portion: float = 1.0 - training_data_portion # test data portion is 1/6 of the total duration
+        test_data_portion: float = 1.0 - training_data_portion # test data portion is 1/10 of the total duration
 
         print(f'training_data_portion: {training_data_portion}, test_data_portion: {test_data_portion}')
 
@@ -19275,7 +19275,7 @@ def _assemble_train_test_split_result(train_test_split_epochs_df_dict: Dict[str,
 
 
 @function_attributes(short_name=None, tags=['split', 'train-test', 'bapun'], input_requires=[], output_provides=[], uses=['split_laps_training_and_test'], used_by=['_split_train_test_laps_data'], creation_date='2025-01-27 22:14', related_items=[])
-def compute_train_test_split_epochs_decoders(directional_laps_results: Optional[DirectionalLapsResult] = None, track_templates: Optional[TrackTemplates] = None, curr_active_pipeline=None, maze_epoch_names: Optional[List[str]] = None, training_data_portion: float=5.0/6.0, include_lin_pos_decoder: bool = True, use_clusterless_decoders: Optional[bool] = None, use_spyglass_clusterless_decoders: Optional[bool] = None, debug_output_hdf5_file_path=None, debug_plot: bool = False, debug_print: bool = False) -> TrainTestSplitResult:
+def compute_train_test_split_epochs_decoders(directional_laps_results: Optional[DirectionalLapsResult] = None, track_templates: Optional[TrackTemplates] = None, curr_active_pipeline=None, maze_epoch_names: Optional[List[str]] = None, training_data_portion: float=9.0/10.0, include_lin_pos_decoder: bool = True, use_clusterless_decoders: Optional[bool] = None, use_spyglass_clusterless_decoders: Optional[bool] = None, debug_output_hdf5_file_path=None, debug_plot: bool = False, debug_print: bool = False) -> TrainTestSplitResult:
     """Split lap epochs into train/test periods and rebuild decoders on training data only.
 
     Supports two input modes:
@@ -19326,7 +19326,7 @@ def compute_train_test_split_epochs_decoders(directional_laps_results: Optional[
         train_test_result = compute_train_test_split_epochs_decoders(
             curr_active_pipeline=curr_active_pipeline,
             maze_epoch_names=['roam', 'sprinkle'],
-            training_data_portion=5.0/6.0,
+            training_data_portion=9.0/10.0,
             debug_print=True,
         )
 

@@ -2018,7 +2018,7 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
             #  'rank_order_shuffle_analysis': {'num_shuffles': 500, 'minimum_inclusion_fr_Hz': 5.0, 'included_qclu_values': [1, 2], 'skip_laps': False},
             #  'directional_decoders_decode_continuous': {'time_bin_size': None},
             #  'directional_decoders_evaluate_epochs': {'should_skip_radon_transform': False},
-            #  'directional_train_test_split': {'training_data_portion': 0.8333333333333334, 'debug_output_hdf5_file_path': None},
+            #  'directional_train_test_split': {'training_data_portion': 0.9, 'debug_output_hdf5_file_path': None},
             #  'long_short_decoding_analyses': {'decoding_time_bin_size': None, 'perform_cache_load': False, 'always_recompute_replays': False, 'override_long_epoch_name': None, 'override_short_epoch_name': None},
             #  'long_short_rate_remapping': {'decoding_time_bin_size': None, 'perform_cache_load': False, 'always_recompute_replays': False},
             #  'long_short_inst_spike_rate_groups': {'instantaneous_time_bin_size_seconds': 0.01},

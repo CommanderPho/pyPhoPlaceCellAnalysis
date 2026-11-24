@@ -689,7 +689,7 @@ class Compute_NonPBE_Epochs(ComputedResult):
 
     @function_attributes(short_name=None, tags=['epochs', 'non-PBE', 'session', 'metadata', 'hardcoded-LS'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-28 04:10', related_items=[]) 
     @classmethod
-    def _adding_global_non_PBE_epochs_to_sess(cls, sess, t_start:Optional[float]=None, t_delta:Optional[float]=None, t_end:Optional[float]=None, active_maze_epochs_df: Optional[pd.DataFrame]=None, training_data_portion: float = 5.0/6.0) -> Tuple[Dict[types.DecoderName, pd.DataFrame], Dict[types.DecoderName, pd.DataFrame]]:
+    def _adding_global_non_PBE_epochs_to_sess(cls, sess, t_start:Optional[float]=None, t_delta:Optional[float]=None, t_end:Optional[float]=None, active_maze_epochs_df: Optional[pd.DataFrame]=None, training_data_portion: float = 9.0/10.0) -> Tuple[Dict[types.DecoderName, pd.DataFrame], Dict[types.DecoderName, pd.DataFrame]]:
         """ Builds a dictionary of train/test-split epochs for ['long', 'short', 'global'] periods
         
         from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _adding_global_non_PBE_epochs
@@ -798,7 +798,7 @@ class Compute_NonPBE_Epochs(ComputedResult):
 
     @function_attributes(short_name=None, tags=['epochs', 'non-PBE', 'pipeline', 'hardcoded-LS'], input_requires=[], output_provides=[], uses=['cls._adding_global_non_PBE_epochs_to_sess(...)'], used_by=[], creation_date='2025-01-28 04:10', related_items=[]) 
     @classmethod
-    def _adding_global_non_PBE_epochs(cls, curr_active_pipeline, training_data_portion: float = 5.0/6.0) -> Tuple[Dict[types.DecoderName, pd.DataFrame], Dict[types.DecoderName, pd.DataFrame]]:
+    def _adding_global_non_PBE_epochs(cls, curr_active_pipeline, training_data_portion: float = 9.0/10.0) -> Tuple[Dict[types.DecoderName, pd.DataFrame], Dict[types.DecoderName, pd.DataFrame]]:
         """ Builds a dictionary of train/test-split epochs for ['long', 'short', 'global'] periods
         
         from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _adding_global_non_PBE_epochs
@@ -891,7 +891,7 @@ class Compute_NonPBE_Epochs(ComputedResult):
     
     @function_attributes(short_name=None, tags=['hardcoded-LS'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-09-23 06:06', related_items=[])
     @classmethod
-    def init_from_pipeline(cls, curr_active_pipeline, training_data_portion: float = 5.0/6.0, skip_training_test_split: bool=True):
+    def init_from_pipeline(cls, curr_active_pipeline, training_data_portion: float = 9.0/10.0, skip_training_test_split: bool=True):
         a_new_training_df_dict, a_new_test_df_dict, (global_epoch_only_non_PBE_epoch_df, a_new_global_training_df, a_new_global_test_df) = cls._adding_global_non_PBE_epochs(curr_active_pipeline, training_data_portion=training_data_portion)
 
         # Build an Epoch object containing a single epoch, corresponding to the global epoch for the entire session:
@@ -1276,7 +1276,7 @@ class EpochComputationsComputationsContainer(ComputedResult):
     """
     _VersionedResultMixin_version: str = "2025.03.09_0" # to be updated in your IMPLEMENTOR to indicate its version
     
-    training_data_portion: float = serialized_attribute_field(default=(5.0/6.0))
+    training_data_portion: float = serialized_attribute_field(default=(9.0/10.0))
     epochs_decoding_time_bin_size: float = serialized_attribute_field(default=0.020) 
     frame_divide_bin_size: float = serialized_attribute_field(default=10.0)
 
@@ -1915,7 +1915,7 @@ class EpochComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computati
         input_requires=[], output_provides=[], uses=['EpochComputationsComputationsContainer', 'Compute_NonPBE_Epochs'], used_by=[], creation_date='2025-02-18 09:45', related_items=[],
         requires_global_keys=[], provides_global_keys=['EpochComputations'],
         validate_computation_test=validate_has_non_PBE_epoch_results, is_global=True)
-    def perform_compute_non_PBE_epochs(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, training_data_portion: float=(5.0/6.0), epochs_decoding_time_bin_size: float = 0.050, frame_divide_bin_size:float=10.0,
+    def perform_compute_non_PBE_epochs(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, training_data_portion: float=(9.0/10.0), epochs_decoding_time_bin_size: float = 0.050, frame_divide_bin_size:float=10.0,
                                         compute_1D: bool = True, compute_2D: bool = True, drop_previous_result_and_compute_fresh:bool=False, skip_training_test_split: bool = True, debug_print_memory_breakdown: bool=False,
                                         IGNORE_MEMORY_ERROR_FOR_DEBUGGING: bool=False):
         """ Performs the computation of non-PBE epochs for the session and all filtered epochs. Stacks things up hardcore yeah.
