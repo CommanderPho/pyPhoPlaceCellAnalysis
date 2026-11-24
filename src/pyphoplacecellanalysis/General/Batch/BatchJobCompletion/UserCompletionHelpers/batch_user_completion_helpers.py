@@ -4464,6 +4464,7 @@ def figures_export_laps_correct_decoder_side_by_side_completion_function(self, g
     Low-firing dimming defaults match ``export_train_test_pos_err`` (`min_num_unique_active_neurons_per_time_bin=1`).
     """
     import os
+    import shutil
     os.environ.setdefault('MPLBACKEND', 'Agg')
     import matplotlib
     matplotlib.use('Agg', force=False)
