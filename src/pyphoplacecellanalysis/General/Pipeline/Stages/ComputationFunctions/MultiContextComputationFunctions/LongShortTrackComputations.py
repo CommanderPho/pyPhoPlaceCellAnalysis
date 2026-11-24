@@ -238,9 +238,54 @@ class JonathanFiringRateAnalysisResult(HDFMixin, AttrsBasedClassHelperMixin):
 
 
     # HDFMixin Conformances ______________________________________________________________________________________________ #
-    
-    def to_hdf(self, file_path, key: str, **kwargs):
-        """ Saves the object to key in the hdf5 file specified by file_path"""
+
+    @classmethod
+    def _write_epoch_stats_df_avoiding_object_pickle(cls, df: pd.DataFrame, file_path, key_prefix: str, stackable_object_cols: Optional[List[str]] = None, drop_object_cols: Optional[List[str]] = None) -> None:
+        """ Write epoch-stats DataFrame without PyTables pickling object columns (PerformanceWarning / slow writes).
+
+        Stackable list/array columns (e.g. firing_rates, is_neuron_active) are written as native HDF5 datasets via h5py.
+        Ragged/reconstructable columns (e.g. active_aclus from is_neuron_active + aclu_to_idx) are dropped from the table.
+        Remaining scalar columns use format='table'.
+        """
+        stackable_object_cols = list(stackable_object_cols) if (stackable_object_cols is not None) else ['firing_rates', 'is_neuron_active']
+        drop_object_cols = list(drop_object_cols) if (drop_object_cols is not None) else ['active_aclus']
+        _df = df.copy()
+        stacked_arrays: Dict[str, np.ndarray] = {}
+        for col in stackable_object_cols:
+            if col in _df.columns:
+                stacked_arrays[col] = np.vstack(_df[col].to_numpy())
+                _df = _df.drop(columns=[col])
+        ## END for col in stackable_object_cols...
+
+        for col in drop_object_cols:
+            if col in _df.columns:
+                _df = _df.drop(columns=[col])
+        ## END for col in drop_object_cols...
+
+        ## Any leftover object cols would still force pickling — coerce to string for table write
+        leftover_object_cols = [c for c in _df.columns if pd.api.types.is_object_dtype(_df[c])]
+        for col in leftover_object_cols:
+            _df[col] = _df[col].astype(str)
+        ## END for col in leftover_object_cols...
+
+        _df.to_hdf(file_path, key=f'{key_prefix}/df', format='table', data_columns=True)
+        if len(stacked_arrays) > 0:
+            with h5py.File(file_path, 'a') as f:
+                for col, arr in stacked_arrays.items():
+                    dset_path = f'{key_prefix}/{col}'
+                    if dset_path in f:
+                        del f[dset_path]
+                    f.create_dataset(dset_path, data=arr)
+                ## END for col, arr in stacked_arrays.items()...
+            ## END with h5py.File(file_path, 'a')...
+
+
+
+    def to_hdf(self, file_path, key: str, disable_object_pickle_items: bool = False, **kwargs):
+        """ Saves the object to key in the hdf5 file specified by file_path
+        
+        disable_object_pickle_items: if True, stack object cols (firing_rates / is_neuron_active) as native HDF5 datasets and drop reconstructable active_aclus (avoids PyTables PerformanceWarning). Default False keeps legacy pickled object-column writes.
+        """
         # super().to_hdf(file_path, key=key, **kwargs)
         # Finish for the custom properties
         
@@ -259,13 +304,19 @@ class JonathanFiringRateAnalysisResult(HDFMixin, AttrsBasedClassHelperMixin):
         except BaseException:
             raise
 
-        self.rdf.rdf.to_hdf(file_path, key=f'{key}/rdf/df') # , format='table', data_columns=True Can't do 'table' format because `TypeError: Cannot serialize the column [firing_rates] because its data contents are not [string] but [mixed] object dtype`
+        if disable_object_pickle_items:
+            ## Avoid PerformanceWarning from pickling object cols (firing_rates / is_neuron_active / active_aclus)
+            self._write_epoch_stats_df_avoiding_object_pickle(self.rdf.rdf, file_path, key_prefix=f'{key}/rdf')
+        else:
+            self.rdf.rdf.to_hdf(file_path, key=f'{key}/rdf/df') # , format='table', data_columns=True Can't do 'table' format because `TypeError: Cannot serialize the column [firing_rates] because its data contents are not [string] but [mixed] object dtype`
         aclu_to_idx: Dict = self.rdf.aclu_to_idx
         aclu_to_idx_df: pd.DataFrame = pd.DataFrame({'aclu': list(aclu_to_idx.keys()), 'fragile_linear_idx': list(aclu_to_idx.values())})
         aclu_to_idx_df.to_hdf(file_path, key=f'{key}/rdf/aclu_to_idx_df', format='table', data_columns=True)
 
-        # irdf_group[f'{outputs_local_key}/df'] = self.irdf.irdf
-        self.irdf.irdf.to_hdf(file_path, key=f'{key}/irdf/df') # , format='table', data_columns=True Can't do 'table' format because `TypeError: Cannot serialize the column [firing_rates] because its data contents are not [string] but [mixed] object dtype`
+        if disable_object_pickle_items:
+            self._write_epoch_stats_df_avoiding_object_pickle(self.irdf.irdf, file_path, key_prefix=f'{key}/irdf')
+        else:
+            self.irdf.irdf.to_hdf(file_path, key=f'{key}/irdf/df') # , format='table', data_columns=True Can't do 'table' format because `TypeError: Cannot serialize the column [firing_rates] because its data contents are not [string] but [mixed] object dtype`
         aclu_to_idx: Dict = self.irdf.aclu_to_idx
         aclu_to_idx_df: pd.DataFrame = pd.DataFrame({'aclu': list(aclu_to_idx.keys()), 'fragile_linear_idx': list(aclu_to_idx.values())})
         aclu_to_idx_df.to_hdf(file_path, key=f'{key}/irdf/aclu_to_idx_df', format='table', data_columns=True)
