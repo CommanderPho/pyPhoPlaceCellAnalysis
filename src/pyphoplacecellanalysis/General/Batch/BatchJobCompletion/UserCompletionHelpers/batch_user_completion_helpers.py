@@ -2541,8 +2541,9 @@ def save_custom_session_files_completion_function(self, global_data_root_parent_
 
     enable_save_pipeline_pkl defaults to False so the shared qclu/frate local loadedSessPickle is not rewritten (tbin goes on global pickle / h5 only). Pass True to opt in.
 
-    Session pipeline H5: via custom_save_pipeline_as(..., enable_save_h5=True) under session output/ with custom-suffix names.
+    Session pipeline H5: under self.collected_outputs_path via build_complete_session_identifier_filename_string (data_identifier_str='(pipeline_results)'); not session output/.
     Posteriors H5: PosteriorExporting under self.collected_outputs_path with data_identifier_str='(decoded_posteriors)'.
+    Pickles: via custom_save_pipeline_as(..., enable_save_h5=False) under session output/.
 
     from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import save_custom_session_files_completion_function
 
@@ -2574,17 +2575,13 @@ def save_custom_session_files_completion_function(self, global_data_root_parent_
     err = None
     hdf5_output_path: Path = None
     was_write_good: bool = False
-    should_save_any_session_files: bool = (enable_save_pipeline_pkl or enable_save_global_computations_pkl or enable_save_h5)
+    should_save_any_pkls: bool = (enable_save_pipeline_pkl or enable_save_global_computations_pkl)
 
-    if should_save_any_session_files:
+    if should_save_any_pkls:
         try:
-            custom_save_filepaths_dict, custom_suffix = curr_active_pipeline.custom_save_pipeline_as(enable_save_pipeline_pkl=enable_save_pipeline_pkl, enable_save_global_computations_pkl=enable_save_global_computations_pkl, enable_save_h5=enable_save_h5)
+            ## Pickles only under session output/; H5 is exported separately under collected_outputs below
+            custom_save_filepaths_dict, custom_suffix = curr_active_pipeline.custom_save_pipeline_as(enable_save_pipeline_pkl=enable_save_pipeline_pkl, enable_save_global_computations_pkl=enable_save_global_computations_pkl, enable_save_h5=False)
             was_write_good = True  # custom_save_pipeline_as returned without raising; H5 success is checked separately via Path
-            if enable_save_h5:
-                _candidate_h5 = custom_save_filepaths_dict.get('pipeline_h5', None)
-                if isinstance(_candidate_h5, Path):
-                    hdf5_output_path = _candidate_h5
-                    print(f'\tpipeline hdf5_output_path: "{hdf5_output_path}"')
 
         except Exception as e:
             exception_info = sys.exc_info()
@@ -2593,8 +2590,36 @@ def save_custom_session_files_completion_function(self, global_data_root_parent_
             if self.fail_on_exception:
                 raise err.exc
     else:
-        print(f'\tskipping custom_save_pipeline_as (all enable_save_* flags False)')
-    # END if should_save_any_session_files
+        print(f'\tskipping custom_save_pipeline_as (no enable_save_* pkl flags)')
+    # END if should_save_any_pkls
+
+    if enable_save_h5:
+        try:
+            assert self.collected_outputs_path.exists()
+            hdf5_output_path, _, _ = curr_active_pipeline.build_complete_session_identifier_filename_string(output_date_str=self.BATCH_DATE_TO_USE, data_identifier_str='(pipeline_results)', parent_output_path=self.collected_outputs_path.resolve(), out_extension='.h5')
+            _pipeline_h5_path, _HDF5_err = curr_active_pipeline.export_pipeline_to_h5(override_path=hdf5_output_path)
+            if (_HDF5_err is None) and isinstance(_pipeline_h5_path, Path):
+                hdf5_output_path = _pipeline_h5_path
+                custom_save_filepaths_dict['pipeline_h5'] = hdf5_output_path
+                was_write_good = True
+                print(f'\tpipeline hdf5_output_path: "{hdf5_output_path}"')
+            else:
+                custom_save_filepaths_dict.pop('pipeline_h5', None)
+                hdf5_output_path = None
+                if _HDF5_err is not None:
+                    print(f"ERROR: encountered exception {_HDF5_err} while trying to export pipeline HDF5 for {curr_session_context}")
+                    if self.fail_on_exception:
+                        raise _HDF5_err.exc
+
+        except Exception as e:
+            exception_info = sys.exc_info()
+            err = CapturedException(e, exception_info)
+            custom_save_filepaths_dict.pop('pipeline_h5', None)
+            hdf5_output_path = None
+            print(f"ERROR: encountered exception {err} while trying to export pipeline HDF5 for {curr_session_context}")
+            if self.fail_on_exception:
+                raise err.exc
+    # END if enable_save_h5
 
     callback_outputs = {
      'desired_suffix': custom_suffix,
