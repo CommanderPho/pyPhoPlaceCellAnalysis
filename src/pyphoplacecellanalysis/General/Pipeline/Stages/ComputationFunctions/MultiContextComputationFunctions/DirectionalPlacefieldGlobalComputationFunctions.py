@@ -5254,6 +5254,8 @@ class CustomDecodeEpochsResult(UnpackableMixin):
         When the decoder produces multi-dimensional positions (2D or higher, e.g. ``pf2D_Decoder``), adds ``sq_err_2D`` / ``err_cm_2D``: RMSE of Euclidean distance in ``(x, y)`` vs interpolated measured ``x`` and ``y``. ``sq_err`` / ``err_cm`` are x-marginal vs measured ``measured_pos_column_name`` (``x`` by default, for backward compatibility).
 
         When ``lin_pos`` is present and the decoder produces native 1D positions (e.g. ``pf1D_Decoder``), also compares decoded positions to measured ``lin_pos`` and adds ``sq_err_1D`` / ``err_cm_1D`` columns.
+
+        Also adds mean/median absolute decoding error (cm) over valid time bins: ``abs_err_cm_mean`` / ``abs_err_cm_median``, plus ``abs_err_cm_2D_*`` / ``abs_err_cm_1D_*`` when those comparisons are computed.
         
         """
         from sklearn.metrics import mean_squared_error
@@ -5318,6 +5320,8 @@ class CustomDecodeEpochsResult(UnpackableMixin):
                     ## have to fill with something!
                     test_decoded_measured_diff: float = np.nan
                     test_decoded_measured_diff_cm: float = np.nan
+                    abs_err_cm_mean: float = np.nan
+                    abs_err_cm_median: float = np.nan
                     
             else:
                 ## has some timebins that are valid:
@@ -5326,8 +5330,11 @@ class CustomDecodeEpochsResult(UnpackableMixin):
                 # test_decoded_measured_diff: float = mean_squared_error(interpolated_measured_df['x'].to_numpy(), decoded_positions) # single float error
                 test_decoded_measured_diff: float = mean_squared_error(a_valid_interpolated_measured_x, a_valid_decoded_positions) # single float error
                 test_decoded_measured_diff_cm: float = np.sqrt(test_decoded_measured_diff)
+                abs_errs = np.abs(a_valid_decoded_positions - a_valid_interpolated_measured_x)
+                abs_err_cm_mean = float(np.mean(abs_errs))
+                abs_err_cm_median = float(np.median(abs_errs))
 
-            diff_row = {'t': center_epoch_time, 'sq_err': test_decoded_measured_diff, 'err_cm': test_decoded_measured_diff_cm}
+            diff_row = {'t': center_epoch_time, 'sq_err': test_decoded_measured_diff, 'err_cm': test_decoded_measured_diff_cm, 'abs_err_cm_mean': abs_err_cm_mean, 'abs_err_cm_median': abs_err_cm_median}
             if is_multi_dimensional_decode:
                 decoded_xy = raw_decoded_positions_arr if raw_decoded_positions_arr.ndim >= 2 else raw_decoded_positions_arr.reshape(-1, 1)
                 if decoded_xy.shape[0] != len(a_sample_times) and decoded_xy.shape[1] == len(a_sample_times) and decoded_xy.shape[0] >= 2:
@@ -5340,13 +5347,18 @@ class CustomDecodeEpochsResult(UnpackableMixin):
                 if num_valid_timebins_2D == 0:
                     diff_row['sq_err_2D'] = np.nan
                     diff_row['err_cm_2D'] = np.nan
+                    diff_row['abs_err_cm_2D_mean'] = np.nan
+                    diff_row['abs_err_cm_2D_median'] = np.nan
                 else:
                     dx = decoded_xy[timebin_is_valid_for_2D, 0] - interpolated_measured_raw_x[timebin_is_valid_for_2D]
                     dy = decoded_xy[timebin_is_valid_for_2D, 1] - interpolated_measured_y[timebin_is_valid_for_2D]
                     sq_err_per_bin = dx ** 2 + dy ** 2
+                    abs_err_per_bin_2D = np.sqrt(sq_err_per_bin)
                     test_decoded_measured_diff_2D: float = float(np.mean(sq_err_per_bin))
                     diff_row['sq_err_2D'] = test_decoded_measured_diff_2D
                     diff_row['err_cm_2D'] = float(np.sqrt(test_decoded_measured_diff_2D))
+                    diff_row['abs_err_cm_2D_mean'] = float(np.mean(abs_err_per_bin_2D))
+                    diff_row['abs_err_cm_2D_median'] = float(np.median(abs_err_per_bin_2D))
             if should_compute_1D_lin_pos_comparison and is_native_1D_decode:
                 interpolated_measured_lin_pos = interpolated_measured_df['lin_pos'].to_numpy()
                 timebin_is_valid_for_both_1D: NDArray = np.logical_and(np.isfinite(decoded_positions), np.isfinite(interpolated_measured_lin_pos))
@@ -5354,12 +5366,17 @@ class CustomDecodeEpochsResult(UnpackableMixin):
                 if num_valid_timebins_1D == 0:
                     diff_row['sq_err_1D'] = np.nan
                     diff_row['err_cm_1D'] = np.nan
+                    diff_row['abs_err_cm_1D_mean'] = np.nan
+                    diff_row['abs_err_cm_1D_median'] = np.nan
                 else:
                     a_valid_interpolated_measured_lin_pos = interpolated_measured_lin_pos[timebin_is_valid_for_both_1D]
                     a_valid_decoded_positions_1D = decoded_positions[timebin_is_valid_for_both_1D]
                     test_decoded_measured_diff_1D: float = mean_squared_error(a_valid_interpolated_measured_lin_pos, a_valid_decoded_positions_1D)
+                    abs_errs_1D = np.abs(a_valid_decoded_positions_1D - a_valid_interpolated_measured_lin_pos)
                     diff_row['sq_err_1D'] = test_decoded_measured_diff_1D
                     diff_row['err_cm_1D'] = np.sqrt(test_decoded_measured_diff_1D)
+                    diff_row['abs_err_cm_1D_mean'] = float(np.mean(abs_errs_1D))
+                    diff_row['abs_err_cm_1D_median'] = float(np.median(abs_errs_1D))
             decoded_measured_diff_rows.append(diff_row)
 
             ## END FOR
@@ -5855,8 +5872,8 @@ def _do_train_test_split_decode_and_evaluate(curr_active_pipeline, active_laps_d
 def compute_kdiba_train_test_position_error_dfs(curr_active_pipeline, active_laps_decoding_time_bin_size: float = 0.075, force_recompute_directional_train_test_split_result: bool = False, debug_print: bool = False) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """Ensure TrainTestSplit, decode held-out test lap segments, return (train_test_pos_err_df, train_test_pos_err_agg_df).
 
-    ``train_test_pos_err_df``: per-epoch rows with ``decoder_name``, ``session_name``, ``time_bin_size``, ``t``, ``sq_err``, ``err_cm`` (+ optional ``*_1D``/``*_2D``).
-    ``train_test_pos_err_agg_df``: per-``decoder_name`` mean/median ``err_cm`` and counts for session QC.
+    ``train_test_pos_err_df``: per-epoch rows with ``decoder_name``, ``session_name``, ``time_bin_size``, ``t``, ``sq_err``, ``err_cm``, ``abs_err_cm_mean``, ``abs_err_cm_median`` (+ optional ``*_1D``/``*_2D``).
+    ``train_test_pos_err_agg_df``: per-``decoder_name`` mean/median of RMSE and abs-error columns and counts for session QC.
     """
     _out = _do_train_test_split_decode_and_evaluate(curr_active_pipeline=curr_active_pipeline, active_laps_decoding_time_bin_size=float(active_laps_decoding_time_bin_size), force_recompute_directional_train_test_split_result=force_recompute_directional_train_test_split_result, compute_separate_decoder_results=True, included_neuron_IDs=None, debug_print=debug_print)
     _out_separate_decoder_results = _out[-1]
@@ -5876,11 +5893,20 @@ def compute_kdiba_train_test_position_error_dfs(curr_active_pipeline, active_lap
     assert len(per_decoder_dfs) > 0, "train_decoded_measured_diff_df_dict was empty"
     train_test_pos_err_df: pd.DataFrame = pd.concat(per_decoder_dfs, axis='index', ignore_index=True)
 
-    agg_kwargs = dict(err_cm_mean=('err_cm', 'mean'), err_cm_median=('err_cm', 'median'), sq_err_mean=('sq_err', 'mean'), n_epochs=('err_cm', 'count'))
+    agg_kwargs = dict(err_cm_mean=('err_cm', 'mean'), err_cm_median=('err_cm', 'median'), sq_err_mean=('sq_err', 'mean'),
+                      abs_err_cm_mean_mean=('abs_err_cm_mean', 'mean'), abs_err_cm_mean_median=('abs_err_cm_mean', 'median'),
+                      abs_err_cm_median_mean=('abs_err_cm_median', 'mean'), abs_err_cm_median_median=('abs_err_cm_median', 'median'),
+                      n_epochs=('err_cm', 'count'))
     if 'err_cm_2D' in train_test_pos_err_df.columns:
         agg_kwargs.update(err_cm_2D_mean=('err_cm_2D', 'mean'), err_cm_2D_median=('err_cm_2D', 'median'))
+    if 'abs_err_cm_2D_mean' in train_test_pos_err_df.columns:
+        agg_kwargs.update(abs_err_cm_2D_mean_mean=('abs_err_cm_2D_mean', 'mean'), abs_err_cm_2D_mean_median=('abs_err_cm_2D_mean', 'median'),
+                          abs_err_cm_2D_median_mean=('abs_err_cm_2D_median', 'mean'), abs_err_cm_2D_median_median=('abs_err_cm_2D_median', 'median'))
     if 'err_cm_1D' in train_test_pos_err_df.columns:
         agg_kwargs.update(err_cm_1D_mean=('err_cm_1D', 'mean'), err_cm_1D_median=('err_cm_1D', 'median'))
+    if 'abs_err_cm_1D_mean' in train_test_pos_err_df.columns:
+        agg_kwargs.update(abs_err_cm_1D_mean_mean=('abs_err_cm_1D_mean', 'mean'), abs_err_cm_1D_mean_median=('abs_err_cm_1D_mean', 'median'),
+                          abs_err_cm_1D_median_mean=('abs_err_cm_1D_median', 'mean'), abs_err_cm_1D_median_median=('abs_err_cm_1D_median', 'median'))
     train_test_pos_err_agg_df: pd.DataFrame = train_test_pos_err_df.groupby(['decoder_name'], dropna=False).agg(**agg_kwargs).reset_index()
     train_test_pos_err_agg_df['session_name'] = session_name
     train_test_pos_err_agg_df['time_bin_size'] = tbin

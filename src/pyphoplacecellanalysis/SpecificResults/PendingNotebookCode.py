@@ -4559,20 +4559,34 @@ class BapunPositionDecodingPerformance:
             test_decode_results_lin_pos: Dict[str, DecodedFilterEpochsResult] = TrainTestLapsSplitting.decode_using_new_decoders(global_spikes_df, train_lap_specific_pf1D_Decoder_dict=train_test_result.train_lap_specific_lin_pos_Decoder_dict, test_epochs_dict=train_test_result.test_epochs_dict, laps_decoding_time_bin_size=laps_decoding_time_bin_size)
             _, _, test_err_df_dict_lin_pos = CustomDecodeEpochsResult.build_measured_decoded_position_comparison(test_decode_results_lin_pos, global_measured_position_df=global_measured_position_df)
             for maze_name, df_2d in test_err_df_dict.items():
-                df_lin = test_err_df_dict_lin_pos[maze_name][['t', 'sq_err_1D', 'err_cm_1D']]
+                _lin_cols = ['t', 'sq_err_1D', 'err_cm_1D']
+                for _c in ('abs_err_cm_1D_mean', 'abs_err_cm_1D_median'):
+                    if _c in test_err_df_dict_lin_pos[maze_name].columns:
+                        _lin_cols.append(_c)
+                ## END for _c in ('abs_err_cm_1D_mean', 'abs_err_cm_1D_median')...
+                df_lin = test_err_df_dict_lin_pos[maze_name][_lin_cols]
                 test_err_df_dict[maze_name] = df_2d.merge(df_lin, on='t', how='left')
+            ## END for maze_name, df_2d in test_err_df_dict.items()...
             if debug_print:
                 print(f'merged lin_pos decoder errors for mazes: {list(test_err_df_dict_lin_pos.keys())}')
         for k, df in test_err_df_dict.items():
             df['maze'] = k
         test_err_df: pd.DataFrame = pd.concat(list(test_err_df_dict.values()))
 
-        # Performed 2 aggregations grouped on column: 'maze'
-        agg_kwargs = dict(sq_err_mean=('sq_err', 'mean'), err_cm_mean=('err_cm', 'mean'))
+        # Performed aggregations grouped on column: 'maze'
+        agg_kwargs = dict(sq_err_mean=('sq_err', 'mean'), err_cm_mean=('err_cm', 'mean'),
+                          abs_err_cm_mean_mean=('abs_err_cm_mean', 'mean'), abs_err_cm_mean_median=('abs_err_cm_mean', 'median'),
+                          abs_err_cm_median_mean=('abs_err_cm_median', 'mean'), abs_err_cm_median_median=('abs_err_cm_median', 'median'))
         if 'err_cm_2D' in test_err_df.columns:
             agg_kwargs.update(sq_err_2D_mean=('sq_err_2D', 'mean'), err_cm_2D_mean=('err_cm_2D', 'mean'))
+        if 'abs_err_cm_2D_mean' in test_err_df.columns:
+            agg_kwargs.update(abs_err_cm_2D_mean_mean=('abs_err_cm_2D_mean', 'mean'), abs_err_cm_2D_mean_median=('abs_err_cm_2D_mean', 'median'),
+                              abs_err_cm_2D_median_mean=('abs_err_cm_2D_median', 'mean'), abs_err_cm_2D_median_median=('abs_err_cm_2D_median', 'median'))
         if 'err_cm_1D' in test_err_df.columns:
             agg_kwargs.update(sq_err_1D_mean=('sq_err_1D', 'mean'), err_cm_1D_mean=('err_cm_1D', 'mean'))
+        if 'abs_err_cm_1D_mean' in test_err_df.columns:
+            agg_kwargs.update(abs_err_cm_1D_mean_mean=('abs_err_cm_1D_mean', 'mean'), abs_err_cm_1D_mean_median=('abs_err_cm_1D_mean', 'median'),
+                              abs_err_cm_1D_median_mean=('abs_err_cm_1D_median', 'mean'), abs_err_cm_1D_median_median=('abs_err_cm_1D_median', 'median'))
         test_err_agg_df = test_err_df.groupby(['maze']).agg(**agg_kwargs).reset_index()
 
         # ## INPUTS: test_err_df_dict
