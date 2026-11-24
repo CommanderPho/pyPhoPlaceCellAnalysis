@@ -5219,14 +5219,16 @@ class CustomDecodeEpochsResult(UnpackableMixin):
     
 
     @classmethod
-    def init_from_single_decoder_decoding_result_and_measured_pos_df(cls, a_decoder_decoding_result: DecodedFilterEpochsResult, global_measured_position_df: pd.DataFrame, pfND_Decoder: Optional[BasePositionDecoder]=None, debug_print:bool=False, measured_pos_column_name: str = 'lin_pos') -> "CustomDecodeEpochsResult":
+    def init_from_single_decoder_decoding_result_and_measured_pos_df(cls, a_decoder_decoding_result: DecodedFilterEpochsResult, global_measured_position_df: pd.DataFrame, pfND_Decoder: Optional[BasePositionDecoder]=None, debug_print:bool=False, measured_pos_column_name: str = 'lin_pos', is_time_bin_active_list: Optional[List[NDArray]]=None) -> "CustomDecodeEpochsResult":
         """ compare the decoded most-likely-positions and the measured positions interpolated to the same time bins.
         
          all_directional_laps_filter_epochs_decoder_custom_result: CustomDecodeEpochsResult = CustomDecodeEpochsResult.init_from_single_decoder_decoding_result_and_measured_pos_df(a_decoder_decoding_result=deepcopy(all_directional_laps_filter_epochs_decoder_result), global_measured_position_df=deepcopy(curr_active_pipeline.sess.position.to_dataframe()).dropna(subset=['lap']))
          all_directional_laps_filter_epochs_decoder_custom_result
+
+        is_time_bin_active_list: optional per-epoch boolean masks from spike-count masking; when provided, only active (non-masked) bins enter ``sq_err`` / ``err_cm`` / abs-error terms.
         """
         # all_directional_laps_filter_epochs_decoder_custom_result: MeasuredDecodedPositionComparison = cls.build_single_measured_decoded_position_comparison(a_decoder_decoding_result=deepcopy(all_directional_laps_filter_epochs_decoder_result), global_measured_position_df=deepcopy(curr_active_pipeline.sess.position.to_dataframe()).dropna(subset=['lap']))
-        a_custom_decoder_decoding_result = cls(measured_decoded_position_comparion=cls.build_single_measured_decoded_position_comparison(a_decoder_decoding_result=a_decoder_decoding_result, global_measured_position_df=global_measured_position_df, measured_pos_column_name=measured_pos_column_name),
+        a_custom_decoder_decoding_result = cls(measured_decoded_position_comparion=cls.build_single_measured_decoded_position_comparison(a_decoder_decoding_result=a_decoder_decoding_result, global_measured_position_df=global_measured_position_df, measured_pos_column_name=measured_pos_column_name, is_time_bin_active_list=is_time_bin_active_list),
                                                                                                  decoder_result=a_decoder_decoding_result,
                                                                                                  epochs_bin_by_bin_performance_analysis_df=None,
         )
@@ -5246,7 +5248,7 @@ class CustomDecodeEpochsResult(UnpackableMixin):
         
 
     @classmethod
-    def build_single_measured_decoded_position_comparison(cls, a_decoder_decoding_result: DecodedFilterEpochsResult, global_measured_position_df: pd.DataFrame, should_drop_epochs_with_no_valid_timebins: bool = True, measured_pos_column_name: str = 'lin_pos') -> MeasuredDecodedPositionComparison:
+    def build_single_measured_decoded_position_comparison(cls, a_decoder_decoding_result: DecodedFilterEpochsResult, global_measured_position_df: pd.DataFrame, should_drop_epochs_with_no_valid_timebins: bool = True, measured_pos_column_name: str = 'lin_pos', is_time_bin_active_list: Optional[List[NDArray]]=None) -> MeasuredDecodedPositionComparison:
         """ compare the decoded most-likely-positions and the measured positions interpolated to the same time bins.
 
         measured_pos_column_name (str): measured 1D position column used for the primary ``sq_err`` / ``err_cm`` metrics (default ``'x'``). Pass ``'lin_pos'`` to compare against linearized position instead; falls back to ``'x'`` if the column is missing or all-NaN.
@@ -5256,6 +5258,8 @@ class CustomDecodeEpochsResult(UnpackableMixin):
         When ``lin_pos`` is present and the decoder produces native 1D positions (e.g. ``pf1D_Decoder``), also compares decoded positions to measured ``lin_pos`` and adds ``sq_err_1D`` / ``err_cm_1D`` columns.
 
         Also adds mean/median absolute decoding error (cm) over valid time bins: ``abs_err_cm_mean`` / ``abs_err_cm_median``, plus ``abs_err_cm_2D_*`` / ``abs_err_cm_1D_*`` when those comparisons are computed.
+
+        is_time_bin_active_list: optional per-epoch boolean masks (same convention as spike-count masking). Masked / inactive bins are excluded from all error terms — only non-masked bins with finite decoded+measured positions contribute to ``sq_err`` / ``err_cm`` / abs-error aggregates. Also writes ``n_valid_timebins`` / ``n_total_timebins`` on each epoch row.
         
         """
         from sklearn.metrics import mean_squared_error
@@ -5290,8 +5294,14 @@ class CustomDecodeEpochsResult(UnpackableMixin):
 
             interpolated_measured_x = interpolated_measured_df[measured_pos_column_name].to_numpy()
 
+            ## Only non-masked bins with finite decoded+measured positions enter error terms (same gate as PBE leave-one-out position performance):
             timebin_is_valid_for_both: NDArray = np.logical_and(np.isfinite(decoded_positions), np.isfinite(interpolated_measured_x)) # bool array of valid indicies for both
+            if is_time_bin_active_list is not None:
+                is_time_bin_active = np.asarray(is_time_bin_active_list[epoch_idx]).astype(bool)
+                assert len(is_time_bin_active) == len(a_sample_times), f"Epoch[{epoch_idx}]: len(is_time_bin_active): {len(is_time_bin_active)} != len(a_sample_times): {len(a_sample_times)}"
+                timebin_is_valid_for_both = np.logical_and(timebin_is_valid_for_both, is_time_bin_active)
             num_valid_timebins = np.sum(timebin_is_valid_for_both)
+            n_total_timebins: int = int(len(a_sample_times))
             
             a_valid_sample_times = a_sample_times[timebin_is_valid_for_both]
             a_valid_decoded_positions = decoded_positions[timebin_is_valid_for_both]
@@ -5334,7 +5344,7 @@ class CustomDecodeEpochsResult(UnpackableMixin):
                 abs_err_cm_mean = float(np.mean(abs_errs))
                 abs_err_cm_median = float(np.median(abs_errs))
 
-            diff_row = {'t': center_epoch_time, 'sq_err': test_decoded_measured_diff, 'err_cm': test_decoded_measured_diff_cm, 'abs_err_cm_mean': abs_err_cm_mean, 'abs_err_cm_median': abs_err_cm_median}
+            diff_row = {'t': center_epoch_time, 'sq_err': test_decoded_measured_diff, 'err_cm': test_decoded_measured_diff_cm, 'abs_err_cm_mean': abs_err_cm_mean, 'abs_err_cm_median': abs_err_cm_median, 'n_valid_timebins': int(num_valid_timebins), 'n_total_timebins': n_total_timebins}
             if is_multi_dimensional_decode:
                 decoded_xy = raw_decoded_positions_arr if raw_decoded_positions_arr.ndim >= 2 else raw_decoded_positions_arr.reshape(-1, 1)
                 if decoded_xy.shape[0] != len(a_sample_times) and decoded_xy.shape[1] == len(a_sample_times) and decoded_xy.shape[0] >= 2:
@@ -5343,6 +5353,8 @@ class CustomDecodeEpochsResult(UnpackableMixin):
                 interpolated_measured_y = interpolated_measured_df['y'].to_numpy()
                 n_spatial_dims = min(decoded_xy.shape[-1], 2)
                 timebin_is_valid_for_2D: NDArray = np.all(np.isfinite(decoded_xy[:, :n_spatial_dims]), axis=1) & np.isfinite(interpolated_measured_raw_x) & np.isfinite(interpolated_measured_y)
+                if is_time_bin_active_list is not None:
+                    timebin_is_valid_for_2D = np.logical_and(timebin_is_valid_for_2D, is_time_bin_active)
                 num_valid_timebins_2D = np.sum(timebin_is_valid_for_2D)
                 if num_valid_timebins_2D == 0:
                     diff_row['sq_err_2D'] = np.nan
@@ -5362,6 +5374,8 @@ class CustomDecodeEpochsResult(UnpackableMixin):
             if should_compute_1D_lin_pos_comparison and is_native_1D_decode:
                 interpolated_measured_lin_pos = interpolated_measured_df['lin_pos'].to_numpy()
                 timebin_is_valid_for_both_1D: NDArray = np.logical_and(np.isfinite(decoded_positions), np.isfinite(interpolated_measured_lin_pos))
+                if is_time_bin_active_list is not None:
+                    timebin_is_valid_for_both_1D = np.logical_and(timebin_is_valid_for_both_1D, is_time_bin_active)
                 num_valid_timebins_1D = np.sum(timebin_is_valid_for_both_1D)
                 if num_valid_timebins_1D == 0:
                     diff_row['sq_err_1D'] = np.nan
@@ -5661,16 +5675,19 @@ def _do_custom_decode_epochs(global_spikes_df: pd.DataFrame, global_measured_pos
     ## INPUTS: global_spikes_df, train_lap_specific_pf1D_Decoder_dict, test_epochs_dict, laps_decoding_time_bin_size
     decoder_result: DecodedFilterEpochsResult = pfND_Decoder.decode_specific_epochs(spikes_df=deepcopy(global_spikes_df), filter_epochs=deepcopy(epochs_to_decode_df), decoding_time_bin_size=decoding_time_bin_size, debug_print=debug_print)
     ## Mask low-firing bins (insufficient unique aclus / spikes) so they don't confound lap position-decoding performance — same gate as PBEs:
+    is_time_bin_active_list: Optional[List[NDArray]] = None
     if should_mask_by_required_spike_counts:
         decoder_result, _mask_index_tuple = decoder_result.mask_computed_DecodedFilterEpochsResult_by_required_spike_counts_per_time_bin(spikes_df=deepcopy(global_spikes_df),
                                                                                                                                          min_num_spikes_per_bin_to_be_considered_active=min_num_spikes_per_bin_to_be_considered_active,
                                                                                                                                          min_num_unique_active_neurons_per_time_bin=min_num_unique_active_neurons_per_time_bin,
                                                                                                                                          masked_bin_fill_mode=masked_bin_fill_mode)
+        is_time_bin_active_list, _inactive_mask_list, _all_time_bin_indicies_list, _last_valid_indices_list = _mask_index_tuple ## only non-masked bins should enter position-error terms
     # Interpolated measured position DataFrame - looks good
     ## INPUTS: test_all_directional_decoder_result, all_directional_pf1D_Decoder
     test_all_directional_decoder_result: CustomDecodeEpochsResult = CustomDecodeEpochsResult.init_from_single_decoder_decoding_result_and_measured_pos_df(decoder_result, global_measured_position_df=global_measured_position_df,
                                                                                                                                                             pfND_Decoder=deepcopy(pfND_Decoder), debug_print=debug_print,
                                                                                                                                                             measured_pos_column_name=measured_pos_column_name,
+                                                                                                                                                            is_time_bin_active_list=is_time_bin_active_list,
                                                                                                                                                           )
     # epochs_bin_by_bin_performance_analysis_df = test_all_directional_decoder_result.epochs_bin_by_bin_performance_analysis_df ## UNPACK WITH: 
     
