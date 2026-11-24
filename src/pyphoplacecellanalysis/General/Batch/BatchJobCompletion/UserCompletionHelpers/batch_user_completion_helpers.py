@@ -4485,7 +4485,17 @@ def figures_export_laps_correct_decoder_side_by_side_completion_function(self, g
                                             debug_print=debug_print, **kwargs)
         ## Unwrap {display_context: graphics_output_dict}
         graphics_output_dict = list(_out.values())[0] if isinstance(_out, dict) else _out
-        callback_outputs.update(dict(combined_img_out_path=graphics_output_dict.get('combined_img_out_path'), page_png_paths=graphics_output_dict.get('page_png_paths'), n_pages=graphics_output_dict.get('n_pages'), n_laps=graphics_output_dict.get('n_laps'), output_dir=graphics_output_dict.get('output_dir')))
+        nested_combined_img_out_path = graphics_output_dict.get('combined_img_out_path')
+        combined_img_out_path = nested_combined_img_out_path
+        ## Copy merged PNG one level up into laps_correct_decoder_side_by_side/ for flat browsing (pages stay nested):
+        if nested_combined_img_out_path is not None:
+            nested_combined_img_out_path = Path(nested_combined_img_out_path).resolve()
+            if nested_combined_img_out_path.exists():
+                flat_combined_img_out_path = nested_combined_img_out_path.parent.parent.joinpath(nested_combined_img_out_path.name)
+                shutil.copy2(nested_combined_img_out_path, flat_combined_img_out_path)
+                combined_img_out_path = flat_combined_img_out_path
+                print(f'\tcopied merged PNG -> {flat_combined_img_out_path}', flush=True)
+        callback_outputs.update(dict(combined_img_out_path=combined_img_out_path, page_png_paths=graphics_output_dict.get('page_png_paths'), n_pages=graphics_output_dict.get('n_pages'), n_laps=graphics_output_dict.get('n_laps'), output_dir=graphics_output_dict.get('output_dir')))
         print(f'\tcombined_img_out_path: {callback_outputs["combined_img_out_path"]}', flush=True)
     except Exception as e:
         callback_outputs['error'] = str(e)
