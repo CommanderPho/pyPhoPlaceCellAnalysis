@@ -5641,18 +5641,31 @@ class CustomDecodeEpochsResult(UnpackableMixin):
         
 
 
-@function_attributes(short_name='custom_decode_epochs', tags=['USEFUL', 'decode', 'pure'], input_requires=[], output_provides=[], uses=[], used_by=['_do_custom_decode_epochs_dict', '_do_train_test_split_decode_and_evaluate'], creation_date='2024-04-05 11:59', related_items=[])
-def _do_custom_decode_epochs(global_spikes_df: pd.DataFrame,  global_measured_position_df: pd.DataFrame, pfND_Decoder: BasePositionDecoder, epochs_to_decode_df: pd.DataFrame, decoding_time_bin_size: float, debug_print=False, measured_pos_column_name: str = 'lin_pos', **kwargs) -> CustomDecodeEpochsResult: #Tuple[MeasuredDecodedPositionComparison, DecodedFilterEpochsResult]:
+@function_attributes(short_name='custom_decode_epochs', tags=['USEFUL', 'decode', 'pure'], input_requires=[], output_provides=[], uses=['DecodedFilterEpochsResult.mask_computed_DecodedFilterEpochsResult_by_required_spike_counts_per_time_bin'], used_by=['_do_custom_decode_epochs_dict', '_do_train_test_split_decode_and_evaluate'], creation_date='2024-04-05 11:59', related_items=[])
+def _do_custom_decode_epochs(global_spikes_df: pd.DataFrame, global_measured_position_df: pd.DataFrame, pfND_Decoder: BasePositionDecoder, epochs_to_decode_df: pd.DataFrame, decoding_time_bin_size: float,
+                             debug_print=False, measured_pos_column_name: str = 'lin_pos',
+                             should_mask_by_required_spike_counts: bool = True, min_num_spikes_per_bin_to_be_considered_active: int = 1, min_num_unique_active_neurons_per_time_bin: int = 3, masked_bin_fill_mode: str = 'nan_filled',
+                             **kwargs) -> CustomDecodeEpochsResult: #Tuple[MeasuredDecodedPositionComparison, DecodedFilterEpochsResult]:
     """
     Do a single position decoding using a single decoder for a single set of epochs
 
     measured_pos_column_name (str): measured 1D position column used for the primary ``sq_err`` / ``err_cm`` comparison metrics (default ``'x'``; pass ``'lin_pos'`` for linearized position).
+
+    should_mask_by_required_spike_counts (bool): when True (default), low-firing time bins are masked the same way as PBE leave-one-out / directional decoder spike-count filtering
+        via ``mask_computed_DecodedFilterEpochsResult_by_required_spike_counts_per_time_bin``. ``min_num_unique_active_neurons_per_time_bin`` is the minimum number of firing aclus per bin.
+        ``masked_bin_fill_mode='nan_filled'`` so NaN bins drop out of position-error metrics.
     
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import _do_custom_decode_epochs
     
     """
     ## INPUTS: global_spikes_df, train_lap_specific_pf1D_Decoder_dict, test_epochs_dict, laps_decoding_time_bin_size
     decoder_result: DecodedFilterEpochsResult = pfND_Decoder.decode_specific_epochs(spikes_df=deepcopy(global_spikes_df), filter_epochs=deepcopy(epochs_to_decode_df), decoding_time_bin_size=decoding_time_bin_size, debug_print=debug_print)
+    ## Mask low-firing bins (insufficient unique aclus / spikes) so they don't confound lap position-decoding performance — same gate as PBEs:
+    if should_mask_by_required_spike_counts:
+        decoder_result, _mask_index_tuple = decoder_result.mask_computed_DecodedFilterEpochsResult_by_required_spike_counts_per_time_bin(spikes_df=deepcopy(global_spikes_df),
+                                                                                                                                         min_num_spikes_per_bin_to_be_considered_active=min_num_spikes_per_bin_to_be_considered_active,
+                                                                                                                                         min_num_unique_active_neurons_per_time_bin=min_num_unique_active_neurons_per_time_bin,
+                                                                                                                                         masked_bin_fill_mode=masked_bin_fill_mode)
     # Interpolated measured position DataFrame - looks good
     ## INPUTS: test_all_directional_decoder_result, all_directional_pf1D_Decoder
     test_all_directional_decoder_result: CustomDecodeEpochsResult = CustomDecodeEpochsResult.init_from_single_decoder_decoding_result_and_measured_pos_df(decoder_result, global_measured_position_df=global_measured_position_df,
