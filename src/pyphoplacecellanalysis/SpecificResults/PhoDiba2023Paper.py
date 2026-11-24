@@ -8633,6 +8633,11 @@ class Figure5:
                 measured_df = df_by_pre_post.get(pre_post, a_decoded_marginal_posterior_df.iloc[0:0])
                 measured_occ = _subfn_measured_occ_seconds(measured_df, xbin_bin_ids)
                 _subfn_append_source_rows(epoch_panel_name, pre_post, 'measured', measured_occ, xbin_bin_ids, xbin_centers)
+
+                ## Histogram of MAP 1D decoded position (one curve; not simultaneous 4-decoder posterior sums)
+                period_df = df_by_pre_post.get(pre_post, a_decoded_marginal_posterior_df.iloc[0:0])
+                ml_occ = cls.occupancy_seconds_from_most_likely_positions_1D(period_df, xbin_centers=xbin_centers, time_bin_size=float(time_bin_size))
+                _subfn_append_source_rows(epoch_panel_name, pre_post, 'most_likely_positions_1D', ml_occ, xbin_bin_ids, xbin_centers)
             ## END for pre_post in pre_post_all_epoch_names...
         ## END for epoch_query_name, epoch_panel_name in epoch_query_to_panel.items()...
 
@@ -8663,13 +8668,99 @@ class Figure5:
 
 
     @classmethod
-    def occupancy_long_df_to_session_nested_dicts(cls, occ_df: pd.DataFrame, decoder_names: Optional[Sequence[str]] = None, time_bin_size: Optional[float] = None) -> Tuple[Dict[str, Dict[str, Dict[str, Any]]], Dict[str, Dict[str, Dict[str, NDArray]]]]:
+    def occupancy_seconds_from_most_likely_positions_1D(cls, df: pd.DataFrame, xbin_centers: NDArray, time_bin_size: float, x_col: str = 'most_likely_positions_1D', binned_x_col: str = 'binned_x_decoded_most_likely') -> NDArray:
+        """Histogram MAP 1D decoded positions into an occupancy-seconds vector on the same grid as Figure 5 measured bins."""
+        xbin_centers = np.asarray(xbin_centers, dtype=float)
+        n_pos = int(len(xbin_centers))
+        xbin_bin_ids = np.arange(n_pos, dtype=int) + 1
+        if (df is None) or (len(df) == 0):
+            return np.zeros((n_pos,), dtype=float)
+
+        if (binned_x_col is not None) and (binned_x_col in df.columns):
+            sub = df.dropna(subset=[binned_x_col])
+            if len(sub) == 0:
+                return np.zeros((n_pos,), dtype=float)
+            bin_ids = sub[binned_x_col].astype(int)
+        else:
+            assert x_col in df.columns, f"need {x_col!r} or {binned_x_col!r} to build MAP occupancy (cols={list(df.columns)})"
+            sub = df.dropna(subset=[x_col])
+            if len(sub) == 0:
+                return np.zeros((n_pos,), dtype=float)
+            x = sub[x_col].to_numpy(dtype=float)
+            nearest = np.argmin(np.abs(x[:, None] - xbin_centers[None, :]), axis=1)
+            bin_ids = pd.Series(nearest + 1, index=sub.index)
+
+        if 'time_bin_size' in sub.columns:
+            occ_seconds = sub.assign(_pos_bin=bin_ids.to_numpy()).groupby('_pos_bin')['time_bin_size'].sum()
+        else:
+            occ_seconds = pd.Series(bin_ids).value_counts() * float(time_bin_size)
+        return occ_seconds.reindex(xbin_bin_ids, fill_value=0.0).to_numpy(dtype=float)
+
+
+    @classmethod
+    def xbin_centers_by_session_from_occupancy_df(cls, occ_df: pd.DataFrame) -> Dict[str, NDArray]:
+        """``{session_name: (n_pos,) xbin_center}`` from a ``fig5_occupancy`` long DataFrame."""
+        out: Dict[str, NDArray] = {}
+        for session_name, sess_df in occ_df.groupby('session_name', sort=False):
+            g = sess_df.drop_duplicates(subset=['pos_bin_idx']).sort_values('pos_bin_idx')
+            out[str(session_name)] = g['xbin_center'].to_numpy(dtype=float)
+        ## END for session_name, sess_df in occ_df.groupby('session_name', sort=False)...
+        return out
+
+
+    @classmethod
+    def rebuild_decoded_occupancy_from_most_likely_positions_1D(cls, measured_seconds_by_session: Dict[str, Dict[str, Dict[str, NDArray]]], laps_time_bin_df: pd.DataFrame, pbe_time_bin_df: Optional[pd.DataFrame], xbin_centers_by_session: Dict[str, NDArray], time_bin_size: float, x_col: str = 'most_likely_positions_1D', session_col: str = 'session_name', pre_post_col: str = 'pre_post_delta_category') -> Dict[str, Dict[str, Dict[str, NDArray]]]:
+        """Replace 4-decoder decoded leaves with a single MAP-position occupancy histogram per session/period/epoch.
+
+        Uses across-session time-bin DataFrames that already carry ``most_likely_positions_1D`` (or ``binned_x_decoded_most_likely``).
+        """
+        assert laps_time_bin_df is not None and len(laps_time_bin_df) > 0, "laps_time_bin_df is empty"
+        assert x_col in laps_time_bin_df.columns or 'binned_x_decoded_most_likely' in laps_time_bin_df.columns, f"laps_time_bin_df missing MAP columns (have={list(laps_time_bin_df.columns)})"
+        pre_post_all_epoch_names = ['pre-delta', 'post-delta', 'all']
+        epoch_df_map = {'laps': laps_time_bin_df, 'PBEs': pbe_time_bin_df}
+        decoded_seconds_by_session: Dict[str, Dict[str, Dict[str, NDArray]]] = {}
+
+        for session_name, sess_measured in measured_seconds_by_session.items():
+            xbin_centers = xbin_centers_by_session.get(session_name)
+            if xbin_centers is None:
+                n_pos = len(next(iter(next(iter(sess_measured.values())).values())))
+                xbin_centers = np.arange(n_pos, dtype=float) + 0.5
+            decoded_seconds_by_session[session_name] = {}
+            for pre_post in pre_post_all_epoch_names:
+                decoded_seconds_by_session[session_name][pre_post] = {}
+                for epoch_type, epoch_df in epoch_df_map.items():
+                    if (epoch_df is None) or (len(epoch_df) == 0) or (session_col not in epoch_df.columns):
+                        n_pos = len(xbin_centers)
+                        decoded_seconds_by_session[session_name][pre_post][epoch_type] = np.zeros((n_pos,), dtype=float)
+                        continue
+                    sess_df = epoch_df[epoch_df[session_col].astype(str) == str(session_name)]
+                    if pre_post == 'all':
+                        period_df = sess_df
+                    elif pre_post_col in sess_df.columns:
+                        period_df = sess_df[sess_df[pre_post_col] == pre_post]
+                    else:
+                        period_df = sess_df.iloc[0:0]
+                    decoded_seconds_by_session[session_name][pre_post][epoch_type] = cls.occupancy_seconds_from_most_likely_positions_1D(period_df, xbin_centers=xbin_centers, time_bin_size=float(time_bin_size), x_col=x_col)
+                ## END for epoch_type, epoch_df in epoch_df_map.items()...
+            ## END for pre_post in pre_post_all_epoch_names...
+        ## END for session_name, sess_measured in measured_seconds_by_session.items()...
+        return decoded_seconds_by_session
+
+
+    @classmethod
+    def occupancy_long_df_to_session_nested_dicts(cls, occ_df: pd.DataFrame, decoder_names: Optional[Sequence[str]] = None, time_bin_size: Optional[float] = None, decoded_occupancy_source: Optional[str] = None) -> Tuple[Dict[str, Dict[str, Dict[str, Any]]], Dict[str, Dict[str, Dict[str, NDArray]]]]:
         """Pivot a concatenated ``fig5_occupancy`` long DataFrame (from ``final_sessions_loaded_extra_dfs_dict['fig5_occupancy']`` or CSV concat) into session-nested dicts for ``Figure5.main(..., split_by_session=True)``.
+
+        Parameters
+        ----------
+        decoded_occupancy_source
+            ``None`` (default): leaf is ``{decoder_name: (n_pos,)}`` for the four simultaneous decoder posterior sums.
+            ``'most_likely_positions_1D'``: leaf is a single ``(n_pos,)`` MAP-position occupancy histogram (requires that source in the CSV).
 
         Returns
         -------
         decoded_seconds_by_session
-            ``{session_name: {pre-delta|post-delta|all: {laps|PBEs: {decoder_name: (n_pos,)}}}}``
+            ``{session_name: {pre-delta|post-delta|all: {laps|PBEs: leaf}}}``
         measured_seconds_by_session
             ``{session_name: {pre-delta|post-delta|all: {laps|PBEs: (n_pos,)}}}``
         """
@@ -8703,15 +8794,22 @@ class Figure5:
                 period_df = sess_df[sess_df['pre_post_delta'] == pre_post]
                 for epoch_type in ['laps', 'PBEs']:
                     epoch_df = period_df[period_df['epoch_type'] == epoch_type]
-                    decoder_dict: Dict[str, NDArray] = {}
-                    for decoder_name in decoder_names:
-                        src_df = epoch_df[epoch_df['source'] == decoder_name]
+                    if decoded_occupancy_source is not None:
+                        src_df = epoch_df[epoch_df['source'] == decoded_occupancy_source]
                         if len(src_df) == 0:
-                            decoder_dict[decoder_name] = np.zeros((n_pos,), dtype=float)
+                            decoded_seconds_by_session[session_name][pre_post][epoch_type] = np.zeros((n_pos,), dtype=float)
                         else:
-                            decoder_dict[decoder_name] = src_df.set_index('pos_bin_idx')['occupancy_seconds'].reindex(xbin_bin_ids, fill_value=0.0).to_numpy(dtype=float)
-                    ## END for decoder_name in decoder_names...
-                    decoded_seconds_by_session[session_name][pre_post][epoch_type] = decoder_dict
+                            decoded_seconds_by_session[session_name][pre_post][epoch_type] = src_df.set_index('pos_bin_idx')['occupancy_seconds'].reindex(xbin_bin_ids, fill_value=0.0).to_numpy(dtype=float)
+                    else:
+                        decoder_dict: Dict[str, NDArray] = {}
+                        for decoder_name in decoder_names:
+                            src_df = epoch_df[epoch_df['source'] == decoder_name]
+                            if len(src_df) == 0:
+                                decoder_dict[decoder_name] = np.zeros((n_pos,), dtype=float)
+                            else:
+                                decoder_dict[decoder_name] = src_df.set_index('pos_bin_idx')['occupancy_seconds'].reindex(xbin_bin_ids, fill_value=0.0).to_numpy(dtype=float)
+                        ## END for decoder_name in decoder_names...
+                        decoded_seconds_by_session[session_name][pre_post][epoch_type] = decoder_dict
 
                     meas_df = epoch_df[epoch_df['source'] == 'measured']
                     if len(meas_df) == 0:
@@ -8726,7 +8824,7 @@ class Figure5:
 
 
     @classmethod
-    def load_occupancy_long_csvs_to_session_nested_dicts(cls, csv_paths: Sequence[Union[str, Path]], decoder_names: Optional[Sequence[str]] = None, time_bin_size: Optional[float] = None) -> Tuple[Dict[str, Dict[str, Dict[str, Any]]], Dict[str, Dict[str, Dict[str, NDArray]]]]:
+    def load_occupancy_long_csvs_to_session_nested_dicts(cls, csv_paths: Sequence[Union[str, Path]], decoder_names: Optional[Sequence[str]] = None, time_bin_size: Optional[float] = None, decoded_occupancy_source: Optional[str] = None) -> Tuple[Dict[str, Dict[str, Dict[str, Any]]], Dict[str, Dict[str, Dict[str, NDArray]]]]:
         """Load one-or-more ``(fig5_occupancy)`` long CSVs into session-nested dicts for ``Figure5.main(..., split_by_session=True)``."""
         frames: List[pd.DataFrame] = []
         for csv_path in csv_paths:
@@ -8734,7 +8832,7 @@ class Figure5:
         ## END for csv_path in csv_paths...
 
         assert len(frames) > 0, "no csv_paths provided"
-        return cls.occupancy_long_df_to_session_nested_dicts(pd.concat(frames, ignore_index=True), decoder_names=decoder_names, time_bin_size=time_bin_size)
+        return cls.occupancy_long_df_to_session_nested_dicts(pd.concat(frames, ignore_index=True), decoder_names=decoder_names, time_bin_size=time_bin_size, decoded_occupancy_source=decoded_occupancy_source)
 
 
     @classmethod
