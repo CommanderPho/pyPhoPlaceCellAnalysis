@@ -3152,8 +3152,9 @@ def generalized_decode_epochs_dict_and_export_results_completion_function(self, 
     # TrainTestSplit held-out lap position error (alongside perfmnc context metrics)
     _tt_tbin: float = float(train_test_laps_decoding_time_bin_size) if (train_test_laps_decoding_time_bin_size is not None) else float(decoding_time_bin_size)
     try:
-        train_test_pos_err_csv_paths = export_kdiba_train_test_position_error_csvs(curr_active_pipeline=curr_active_pipeline, parent_output_path=active_export_parent_output_path, active_laps_decoding_time_bin_size=_tt_tbin, output_date_str=getattr(self, 'BATCH_DATE_TO_USE', None), force_recompute_directional_train_test_split_result=False, debug_print=bool(debug_print))
+        train_test_pos_err_csv_paths, _train_test_pos_err_df, _train_test_pos_err_agg_df = export_kdiba_train_test_position_error_csvs(curr_active_pipeline=curr_active_pipeline, parent_output_path=active_export_parent_output_path, active_laps_decoding_time_bin_size=_tt_tbin, output_date_str=getattr(self, 'BATCH_DATE_TO_USE', None), force_recompute_directional_train_test_split_result=False, debug_print=bool(debug_print))
         across_session_results_extended_dict['generalized_decode_epochs_dict_and_export_results_completion_function']['train_test_pos_err_csv_paths'] = deepcopy(train_test_pos_err_csv_paths)
+        across_session_results_extended_dict['generalized_decode_epochs_dict_and_export_results_completion_function']['train_test_pos_err_df'] = _train_test_pos_err_df
         across_session_results_extended_dict['generalized_decode_epochs_dict_and_export_results_completion_function']['train_test_pos_err_error'] = None
         csv_save_paths_dict = {**csv_save_paths_dict, **{f'train_test_{k}': v for k, v in train_test_pos_err_csv_paths.items()}}
         across_session_results_extended_dict['generalized_decode_epochs_dict_and_export_results_completion_function']['csv_save_paths_dict'] = deepcopy(csv_save_paths_dict)
@@ -3282,7 +3283,7 @@ def export_decoded_variables_evaluation_completion_function(self, global_data_ro
     return across_session_results_extended_dict
 
 
-@function_attributes(short_name=None, tags=['TrainTestSplit', 'position', 'error', 'CSV', 'KDIBA', 'batch', 'export', 'shuffles-indep', 'pure'], input_requires=[], output_provides=['compute_and_export_kdiba_train_test_position_error_completion_function'], uses=['export_kdiba_train_test_position_error_csvs'], used_by=[], creation_date='2026-11-20 18:00', related_items=['generalized_decode_epochs_dict_and_export_results_completion_function', 'export_kdiba_train_test_position_error_csvs'])
+@function_attributes(short_name=None, tags=['TrainTestSplit', 'position', 'error', 'CSV', 'KDIBA', 'batch', 'export', 'shuffles-indep', 'pure'], input_requires=[], output_provides=['compute_and_export_kdiba_train_test_position_error_completion_function'], uses=['export_kdiba_train_test_position_error_csvs'], used_by=['figures_export_laps_correct_decoder_side_by_side_completion_function'], creation_date='2026-11-20 18:00', related_items=['generalized_decode_epochs_dict_and_export_results_completion_function', 'export_kdiba_train_test_position_error_csvs', 'figures_export_laps_correct_decoder_side_by_side_completion_function'])
 def compute_and_export_kdiba_train_test_position_error_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict,
         active_laps_decoding_time_bin_size: float = 0.025, force_recompute_directional_train_test_split_result: bool = False,
         should_mask_by_required_spike_counts: bool = True, min_num_spikes_per_bin_to_be_considered_active: int = 1, min_num_unique_active_neurons_per_time_bin: Optional[int] = 1, masked_bin_fill_mode: str = 'nan_filled',
@@ -3293,6 +3294,7 @@ def compute_and_export_kdiba_train_test_position_error_completion_function(self,
       ``*(train_test_pos_err)_tbin-{size}.csv``
       ``*(train_test_pos_err_agg)_tbin-{size}.csv``
 
+    Stashes in-memory ``train_test_pos_err_df`` / ``train_test_pos_err_agg_df`` on callback_outputs for figure joins.
     Low-firing masking kwargs (default ``min_num_unique_active_neurons_per_time_bin=1``) are forwarded to ``export_kdiba_train_test_position_error_csvs``.
 
     from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import compute_and_export_kdiba_train_test_position_error_completion_function
@@ -3308,17 +3310,21 @@ def compute_and_export_kdiba_train_test_position_error_completion_function(self,
     assert self.collected_outputs_path.exists()
     apply_export_filename_extra_suffix_parts_to_pipeline(curr_active_pipeline, export_filename_extra_suffix_parts=export_filename_extra_suffix_parts)
 
-    callback_outputs = {'train_test_pos_err_csv_paths': None, 'active_laps_decoding_time_bin_size': float(active_laps_decoding_time_bin_size), 'min_num_unique_active_neurons_per_time_bin': min_num_unique_active_neurons_per_time_bin, 'error': None}
+    callback_outputs = {'train_test_pos_err_csv_paths': None, 'train_test_pos_err_df': None, 'train_test_pos_err_agg_df': None, 'active_laps_decoding_time_bin_size': float(active_laps_decoding_time_bin_size), 'min_num_unique_active_neurons_per_time_bin': min_num_unique_active_neurons_per_time_bin, 'error': None}
     try:
-        train_test_pos_err_csv_paths = export_kdiba_train_test_position_error_csvs(curr_active_pipeline=curr_active_pipeline, parent_output_path=self.collected_outputs_path.resolve(), active_laps_decoding_time_bin_size=float(active_laps_decoding_time_bin_size), output_date_str=getattr(self, 'BATCH_DATE_TO_USE', None), force_recompute_directional_train_test_split_result=bool(force_recompute_directional_train_test_split_result),
+        train_test_pos_err_csv_paths, train_test_pos_err_df, train_test_pos_err_agg_df = export_kdiba_train_test_position_error_csvs(curr_active_pipeline=curr_active_pipeline, parent_output_path=self.collected_outputs_path.resolve(), active_laps_decoding_time_bin_size=float(active_laps_decoding_time_bin_size), output_date_str=getattr(self, 'BATCH_DATE_TO_USE', None), force_recompute_directional_train_test_split_result=bool(force_recompute_directional_train_test_split_result),
                                                                                    should_mask_by_required_spike_counts=bool(should_mask_by_required_spike_counts), min_num_spikes_per_bin_to_be_considered_active=int(min_num_spikes_per_bin_to_be_considered_active),
                                                                                    min_num_unique_active_neurons_per_time_bin=min_num_unique_active_neurons_per_time_bin, masked_bin_fill_mode=str(masked_bin_fill_mode), debug_print=bool(debug_print))
         callback_outputs['train_test_pos_err_csv_paths'] = train_test_pos_err_csv_paths
+        callback_outputs['train_test_pos_err_df'] = train_test_pos_err_df
+        callback_outputs['train_test_pos_err_agg_df'] = train_test_pos_err_agg_df
         callback_outputs['error'] = None
         print(f'train_test_pos_err_csv_paths: {train_test_pos_err_csv_paths}')
     except Exception as e:
         print(f'WARN: compute_and_export_kdiba_train_test_position_error_completion_function failed for {curr_session_context}: {e}')
         callback_outputs['train_test_pos_err_csv_paths'] = None
+        callback_outputs['train_test_pos_err_df'] = None
+        callback_outputs['train_test_pos_err_agg_df'] = None
         callback_outputs['error'] = repr(e)
         across_session_results_extended_dict[_callback_key] = callback_outputs
         if getattr(self, 'fail_on_exception', False):
@@ -4452,30 +4458,43 @@ def compute_and_figures_nwb_wmaze_maze_context_probabilities_completion_function
     return across_session_results_extended_dict
 
 
-@function_attributes(short_name=None, tags=['figure', 'batch', 'laps', 'posterior', 'four-decoder', 'groundtruth', 'Agg', 'headless'], input_requires=['DirectionalLaps', 'DirectionalDecodersEpochsEvaluations'], output_provides=[],
-                      uses=['_display_laps_correct_decoder_side_by_side_posteriors'], used_by=[], creation_date='2026-11-12 00:00', related_items=[])
+@function_attributes(short_name=None, tags=['figure', 'batch', 'laps', 'posterior', 'four-decoder', 'groundtruth', 'Agg', 'headless'], input_requires=['DirectionalLaps', 'DirectionalDecodersEpochsEvaluations', 'TrainTestSplit'], output_provides=[],
+                      uses=['_display_laps_correct_decoder_side_by_side_posteriors', 'compute_and_export_kdiba_train_test_position_error_completion_function'], used_by=[], creation_date='2026-11-12 00:00', related_items=['compute_and_export_kdiba_train_test_position_error_completion_function'])
 def figures_export_laps_correct_decoder_side_by_side_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict,
                                                                          max_subplots_per_page: int = 8, posterior_masking_value: float = 0.0, dpi: int = 150,
                                                                          should_dim_low_firing_bins: bool = True, min_num_spikes_per_bin_to_be_considered_active: int = 1, min_num_unique_active_neurons_per_time_bin: Optional[int] = 1,
-                                                                         delete_temporary_outputs: bool = True, fail_on_exception_for_debugging: bool = False, debug_print: bool = False, **kwargs) -> dict:
-    """Batch/SLURM headless Agg export: 4-decoder lap posteriors side-by-side with green ground-truth boxes; all pages stacked into one PNG under collected_outputs.
+                                                                         delete_temporary_outputs: bool = True, active_laps_decoding_time_bin_size: float = 0.025,
+                                                                         fail_on_exception_for_debugging: bool = False, debug_print: bool = False, **kwargs) -> dict:
+    """Batch/SLURM headless Agg export: left GT test-err metrics column + 4-decoder lap posteriors with green ground-truth boxes; pages stacked into one PNG under collected_outputs.
 
+    Runs ``compute_and_export_kdiba_train_test_position_error_completion_function`` first (dependency) and passes ``train_test_pos_err_df`` into the display for the left GT test-error metrics column.
     `posterior_masking_value` default 0.0 (no under-threshold whitening); non-zero vmin + white under_color washes out low/high-P contrast.
     Low-firing dimming defaults match ``export_train_test_pos_err`` (`min_num_unique_active_neurons_per_time_bin=1`).
     After a successful flat copy of the merged PNG into ``laps_correct_decoder_side_by_side/``, ``delete_temporary_outputs=True`` removes the nested session folder (page PNGs + nested merged PNG).
     """
+    ## Local imports required: this fn is `inspect.getsource`-embedded into GL batch scripts (module-level imports are NOT available).
     import os
     import shutil
+    from pathlib import Path
+    from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import compute_and_export_kdiba_train_test_position_error_completion_function
     os.environ.setdefault('MPLBACKEND', 'Agg')
     import matplotlib
     matplotlib.use('Agg', force=False)
 
     print(f'figures_export_laps_correct_decoder_side_by_side_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, delete_temporary_outputs={delete_temporary_outputs}, ...)', flush=True)
-    callback_outputs = {'combined_img_out_path': None, 'page_png_paths': None, 'n_pages': None, 'n_laps': None, 'output_dir': None, 'deleted_temporary_outputs': False, 'error': None}
+    callback_outputs = {'combined_img_out_path': None, 'page_png_paths': None, 'n_pages': None, 'n_laps': None, 'output_dir': None, 'deleted_temporary_outputs': False, 'train_test_pos_err_df': None, 'error': None}
     across_session_results_extended_dict['figures_export_laps_correct_decoder_side_by_side_completion_function'] = callback_outputs
 
     try:
         assert self.collected_outputs_path.exists(), f"collected_outputs_path: '{self.collected_outputs_path}' does not exist!"
+        ## Dependency: held-out test-segment position errors (CSV + in-memory DF for left metrics column):
+        across_session_results_extended_dict = compute_and_export_kdiba_train_test_position_error_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict,
+                                                                                                                      active_laps_decoding_time_bin_size=float(active_laps_decoding_time_bin_size), force_recompute_directional_train_test_split_result=False,
+                                                                                                                      should_mask_by_required_spike_counts=True, min_num_spikes_per_bin_to_be_considered_active=int(min_num_spikes_per_bin_to_be_considered_active),
+                                                                                                                      min_num_unique_active_neurons_per_time_bin=min_num_unique_active_neurons_per_time_bin, debug_print=bool(debug_print))
+        train_test_pos_err_df = across_session_results_extended_dict.get('compute_and_export_kdiba_train_test_position_error_completion_function', {}).get('train_test_pos_err_df', None)
+        callback_outputs['train_test_pos_err_df'] = train_test_pos_err_df
+
         curr_active_pipeline.reload_default_display_functions()
         display_context = curr_active_pipeline.build_display_context_for_session(display_fn_name='laps_correct_decoder_side_by_side_posteriors')
         session_name: str = curr_active_pipeline.session_name
@@ -4484,7 +4503,7 @@ def figures_export_laps_correct_decoder_side_by_side_completion_function(self, g
                                             parent_output_folder=self.collected_outputs_path.resolve(), max_subplots_per_page=max_subplots_per_page, posterior_masking_value=posterior_masking_value,
                                             dpi=dpi, combined_image_basename=combined_image_basename, should_dim_low_firing_bins=should_dim_low_firing_bins,
                                             min_num_spikes_per_bin_to_be_considered_active=min_num_spikes_per_bin_to_be_considered_active, min_num_unique_active_neurons_per_time_bin=min_num_unique_active_neurons_per_time_bin,
-                                            debug_print=debug_print, **kwargs)
+                                            train_test_pos_err_df=train_test_pos_err_df, debug_print=debug_print, **kwargs)
         ## Unwrap {display_context: graphics_output_dict}
         graphics_output_dict = list(_out.values())[0] if isinstance(_out, dict) else _out
         nested_combined_img_out_path = graphics_output_dict.get('combined_img_out_path')
@@ -5327,6 +5346,9 @@ _pre_user_completion_functions_header_template_str: str = f"""
 # ==================================================================================================================== #
 from copy import deepcopy
 import traceback
+from pathlib import Path
+from typing import Dict, List, Tuple, Optional, Callable, Union, Any
+from pyphocorehelpers.function_helpers import function_attributes
 
 
 custom_user_completion_functions = []

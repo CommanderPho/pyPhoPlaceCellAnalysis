@@ -5345,6 +5345,23 @@ class CustomDecodeEpochsResult(UnpackableMixin):
                 abs_err_cm_median = float(np.median(abs_errs))
 
             diff_row = {'t': center_epoch_time, 'sq_err': test_decoded_measured_diff, 'err_cm': test_decoded_measured_diff_cm, 'abs_err_cm_mean': abs_err_cm_mean, 'abs_err_cm_median': abs_err_cm_median, 'n_valid_timebins': int(num_valid_timebins), 'n_total_timebins': n_total_timebins}
+            ## Copy epoch identity (lap_id / start / stop) when present on active_filter_epochs for figure joins:
+            try:
+                _epochs_df = ensure_dataframe(a_decoder_decoding_result.active_filter_epochs)
+                if (0 <= int(epoch_idx) < len(_epochs_df)):
+                    _epoch_row = _epochs_df.iloc[int(epoch_idx)]
+                    if 'lap_id' in _epochs_df.columns:
+                        diff_row['lap_id'] = _epoch_row['lap_id']
+                    elif 'lap_idx' in _epochs_df.columns:
+                        diff_row['lap_id'] = int(_epoch_row['lap_idx']) + 1
+                    if 'start' in _epochs_df.columns:
+                        diff_row['start'] = float(_epoch_row['start'])
+                    if 'stop' in _epochs_df.columns:
+                        diff_row['stop'] = float(_epoch_row['stop'])
+                    elif 'end' in _epochs_df.columns:
+                        diff_row['stop'] = float(_epoch_row['end'])
+            except Exception:
+                pass
             if is_multi_dimensional_decode:
                 decoded_xy = raw_decoded_positions_arr if raw_decoded_positions_arr.ndim >= 2 else raw_decoded_positions_arr.reshape(-1, 1)
                 if decoded_xy.shape[0] != len(a_sample_times) and decoded_xy.shape[1] == len(a_sample_times) and decoded_xy.shape[0] >= 2:
@@ -5911,7 +5928,7 @@ def compute_kdiba_train_test_position_error_dfs(curr_active_pipeline, active_lap
                                                 debug_print: bool = False) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """Ensure TrainTestSplit, decode held-out test lap segments, return (train_test_pos_err_df, train_test_pos_err_agg_df).
 
-    ``train_test_pos_err_df``: per-epoch rows with ``decoder_name``, ``session_name``, ``time_bin_size``, ``t``, ``sq_err``, ``err_cm``, ``abs_err_cm_mean``, ``abs_err_cm_median`` (+ optional ``*_1D``/``*_2D``).
+    ``train_test_pos_err_df``: per-epoch rows with ``decoder_name``, ``session_name``, ``time_bin_size``, ``t``, ``sq_err``, ``err_cm``, ``abs_err_cm_mean``, ``abs_err_cm_median`` (+ optional ``*_1D``/``*_2D``; ``lap_id``/``start``/``stop`` when present on test epochs).
     ``train_test_pos_err_agg_df``: per-``decoder_name`` mean/median of RMSE and abs-error columns and counts for session QC.
     Low-firing masking kwargs are forwarded to ``_do_train_test_split_decode_and_evaluate`` (default ``min_num_unique_active_neurons_per_time_bin=1``).
     """
@@ -5959,11 +5976,13 @@ def compute_kdiba_train_test_position_error_dfs(curr_active_pipeline, active_lap
 @function_attributes(short_name=None, tags=['TrainTestSplit', 'position', 'error', 'CSV', 'KDIBA', 'export'], input_requires=[], output_provides=[], uses=['compute_kdiba_train_test_position_error_dfs', 'build_complete_session_identifier_filename_string'], used_by=['generalized_decode_epochs_dict_and_export_results_completion_function'], creation_date='2026-11-20 17:50', related_items=[])
 def export_kdiba_train_test_position_error_csvs(curr_active_pipeline, parent_output_path: Path, active_laps_decoding_time_bin_size: float = 0.025, output_date_str: Optional[str] = None, force_recompute_directional_train_test_split_result: bool = False,
                                                 should_mask_by_required_spike_counts: bool = True, min_num_spikes_per_bin_to_be_considered_active: int = 1, min_num_unique_active_neurons_per_time_bin: Optional[int] = 1, masked_bin_fill_mode: str = 'nan_filled',
-                                                debug_print: bool = False) -> Dict[str, Path]:
+                                                debug_print: bool = False) -> Tuple[Dict[str, Path], pd.DataFrame, pd.DataFrame]:
     """Compute held-out lap position errors and write parseable collected_outputs CSVs.
 
     Filenames: ``*(train_test_pos_err)_tbin-{size}.csv`` and ``*(train_test_pos_err_agg)_tbin-{size}.csv``.
     Low-firing masking kwargs are forwarded to ``compute_kdiba_train_test_position_error_dfs`` (default ``min_num_unique_active_neurons_per_time_bin=1``).
+
+    Returns ``(out_paths, train_test_pos_err_df, train_test_pos_err_agg_df)``.
     """
     parent_output_path = Path(parent_output_path).resolve()
     parent_output_path.mkdir(parents=True, exist_ok=True)
@@ -5986,7 +6005,7 @@ def export_kdiba_train_test_position_error_csvs(curr_active_pipeline, parent_out
             print(f'WARN: register_output_file failed for {out_paths[file_type_key]}: {e}')
     ## END for file_type_key, export_df in (('train_test_pos_err', train_test_pos_err_df), ('train_test_pos_err_agg', train_test_pos_err_agg_df))...
 
-    return out_paths
+    return out_paths, train_test_pos_err_df, train_test_pos_err_agg_df
 
 
 
@@ -10657,7 +10676,7 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
     @function_attributes(short_name='laps_correct_decoder_side_by_side_posteriors', tags=['laps', 'posterior', 'four-decoder', 'groundtruth', 'export', 'Agg', 'headless', 'NON-VISUAL', 'NO-DISPLAY', 'batch'],
                           conforms_to=['output_registering', 'figure_saving'], input_requires=['DirectionalLaps', 'DirectionalDecodersEpochsEvaluations'], output_provides=[],
                           uses=['_subfn_export_laps_four_decoder_gt_boxed_combined_figure', 'plot_1D_most_likely_position_comparsions', 'add_laps_groundtruth_information_to_dataframe', 'vertical_image_stack'],
-                          used_by=['figures_export_laps_correct_decoder_side_by_side_completion_function'], creation_date='2026-11-12 00:00', related_items=[], is_global=True)
+                          used_by=['figures_export_laps_correct_decoder_side_by_side_completion_function'], creation_date='2026-11-12 00:00', related_items=['train_test_pos_err_df'], is_global=True)
     def _display_laps_correct_decoder_side_by_side_posteriors(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True, parent_output_folder: Optional[Path] = None,
                                                              max_subplots_per_page: int = 8, variable_name: str = 'lin_pos', posterior_masking_value: float = 0.0, dpi: int = 150, combined_image_basename: Optional[str] = None,
                                                              should_dim_low_firing_bins: bool = True, min_num_spikes_per_bin_to_be_considered_active: int = 1, min_num_unique_active_neurons_per_time_bin: Optional[int] = 1, **kwargs):
@@ -10667,6 +10686,7 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
 
         Defaults for measured-traj contrast: posterior cmap ``viridis`` (black under/bad, white over) + thin red measured line ``#ff0000`` @ 0.45, linewidth 0.8.
         Within-lap TrainTestSplit: train = yellow / test = orange hard brackets just above the axes top (tips down); zorder above GT green box.
+        Optional ``train_test_pos_err_df`` kwarg: left column viridis_r color cell for GT-decoder held-out test-segment error (joined on lap_id + truth_decoder_name).
 
         Low-firing bin dimming (default on): same thresholds as ``export_train_test_pos_err`` / ``_do_custom_decode_epochs``
         (`min_num_spikes_per_bin_to_be_considered_active=1`, `min_num_unique_active_neurons_per_time_bin=1`). Inactive bins get a semi-transparent black overlay.
@@ -10690,6 +10710,8 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
         from pyphocorehelpers.plotting.media_output_helpers import vertical_image_stack
         from pyphoplacecellanalysis.General.Mixins.ExportHelpers import try_discover_default_collected_outputs_dir
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_1D_most_likely_position_comparsions
+
+        train_test_pos_err_df: Optional[pd.DataFrame] = kwargs.pop('train_test_pos_err_df', None)
 
         # @function_attributes(short_name=None, tags=['laps', 'groundtruth', 'decoder', 'headless', 'Agg'], input_requires=[], output_provides=[], uses=['add_laps_groundtruth_information_to_dataframe', 'TrackTemplates.get_decoder_names'], used_by=['_subfn_plot_laps_four_decoder_posterior_page', '_subfn_export_laps_four_decoder_gt_boxed_combined_figure'], creation_date='2026-11-12 00:00', related_items=[])
         def _subfn_build_laps_groundtruth_decoder_names_df(curr_active_pipeline, decoder_laps_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult], decoder_names: Optional[List[str]] = None) -> pd.DataFrame:
@@ -10830,26 +10852,78 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
             ## END for t0, t1 in test_intervals...
 
 
+        def _subfn_pick_pos_err_metric_column(pos_err_df: Optional[pd.DataFrame]) -> Optional[str]:
+            """Prefer abs_err_cm_1D_median → abs_err_cm_median → err_cm_1D → err_cm (paper-notebook order)."""
+            if pos_err_df is None or len(pos_err_df) == 0:
+                return None
+            for _candidate in ('abs_err_cm_1D_median', 'abs_err_cm_median', 'err_cm_1D', 'err_cm'):
+                if _candidate in pos_err_df.columns:
+                    return _candidate
+            ## END for _candidate in (...)...
+            return None
+
+
+        def _subfn_lookup_gt_pos_err_value(pos_err_df: Optional[pd.DataFrame], lap_id, truth_decoder_name: str, metric_col: str) -> Optional[float]:
+            """Join held-out test-segment error for (lap_id, truth_decoder_name)."""
+            if (pos_err_df is None) or (metric_col is None) or (lap_id is None) or ('decoder_name' not in getattr(pos_err_df, 'columns', [])):
+                return None
+            rows = pos_err_df[pos_err_df['decoder_name'].astype(str) == str(truth_decoder_name)]
+            if 'lap_id' in rows.columns:
+                try:
+                    lap_id_key = int(lap_id)
+                    rows = rows[pd.to_numeric(rows['lap_id'], errors='coerce').astype('Int64') == lap_id_key]
+                except Exception:
+                    rows = rows[rows['lap_id'].to_numpy() == lap_id]
+            if len(rows) == 0:
+                return None
+            vals = pd.to_numeric(rows[metric_col], errors='coerce').to_numpy(dtype=float)
+            vals = vals[np.isfinite(vals)]
+            if len(vals) == 0:
+                return None
+            return float(np.nanmean(vals))
+
+
+        def _subfn_draw_pos_err_metrics_cell(ax, lap_id, err_value: Optional[float], vmin: float, vmax: float, metric_col: str):
+            """viridis_r color cell + annotated value with notebook-style contrast text."""
+            ax.set_xticks([])
+            ax.set_yticks([])
+            for spine in ax.spines.values():
+                spine.set_visible(False)
+            ## END for spine in ax.spines.values()...
+            if err_value is None or (not np.isfinite(err_value)):
+                ax.set_facecolor('#bdbdbd')
+                ax.text(0.5, 0.55, '—', ha='center', va='center', fontsize=11, color='black', transform=ax.transAxes)
+            else:
+                _norm = 0.0 if (vmax <= vmin) else float((err_value - vmin) / (vmax - vmin))
+                _norm = float(np.clip(_norm, 0.0, 1.0))
+                _rgba = plt.get_cmap('viridis_r')(_norm)
+                ax.set_facecolor(_rgba)
+                _txt_color = 'white' if (_norm > 0.55) else 'black'
+                ax.text(0.5, 0.55, f'{err_value:.1f}', ha='center', va='center', fontsize=11, color=_txt_color, transform=ax.transAxes, fontweight='bold')
+            _lap_label = f'Lap {lap_id}' if (lap_id is not None) else 'Lap'
+            ax.text(0.5, 0.92, _lap_label, ha='center', va='top', fontsize=8, color='black', transform=ax.transAxes)
+            ax.text(0.5, 0.08, 'test', ha='center', va='bottom', fontsize=7, color='black', transform=ax.transAxes, style='italic')
+
+
         # @function_attributes(short_name=None, tags=['laps', 'posterior', 'four-decoder', 'matplotlib', 'Agg', 'headless'], input_requires=[], output_provides=[], uses=['plot_1D_most_likely_position_comparsions', '_subfn_draw_green_groundtruth_axis_box'], used_by=['_subfn_export_laps_four_decoder_gt_boxed_combined_figure'], creation_date='2026-11-12 00:00', related_items=[])
         def _subfn_plot_laps_four_decoder_posterior_page(decoder_laps_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult], decoder_xbin_dict: Dict[str, NDArray], global_pos_df: pd.DataFrame,
                                                          page_lap_indicies: NDArray, truth_decoder_names_for_page: NDArray, decoder_names: Optional[List[str]] = None, variable_name: str = 'lin_pos',
-                                                         posterior_masking_value: float = 0.0, figsize_per_row: float = 1.6, figsize_width: float = 16.0, dpi: int = 150,
+                                                         posterior_masking_value: float = 0.0, figsize_per_row: float = 1.6, figsize_width: float = 17.5, dpi: int = 150,
                                                          spikes_df: Optional[pd.DataFrame] = None, should_dim_low_firing_bins: bool = True,
                                                          min_num_spikes_per_bin_to_be_considered_active: int = 1, min_num_unique_active_neurons_per_time_bin: Optional[int] = 1,
-                                                         page_lap_ids: Optional[NDArray] = None, train_epochs_dict: Optional[Dict[str, pd.DataFrame]] = None, test_epochs_dict: Optional[Dict[str, pd.DataFrame]] = None, **kwargs) -> Tuple[plt.Figure, NDArray]:
-            """Plot one page: rows = laps on this page, columns = four directional decoders; green-box the ground-truth decoder per row.
+                                                         page_lap_ids: Optional[NDArray] = None, train_epochs_dict: Optional[Dict[str, pd.DataFrame]] = None, test_epochs_dict: Optional[Dict[str, pd.DataFrame]] = None,
+                                                         train_test_pos_err_df: Optional[pd.DataFrame] = None, **kwargs) -> Tuple[plt.Figure, NDArray]:
+            """Plot one page: left GT test-error color cell + four directional decoder posteriors; green-box the ground-truth decoder per row.
 
             `page_lap_indicies`: positional indices into each decoder's DecodedFilterEpochsResult lists (shared lap order).
             `truth_decoder_names_for_page`: length == len(page_lap_indicies), values in decoder_names.
-            `posterior_masking_value`: imshow vmin; keep 0.0 so low-P stays on the colormap (non-zero + under_color white washes out P contrast).
-            Default cmap is ``viridis`` with red measured traj for decode–trajectory contrast; override via `cmap` / post-style.
-            When `train_epochs_dict`/`test_epochs_dict` are provided: train = yellow / test = orange brackets just above axes (tips down); zorder above GT green box.
-            When `should_dim_low_firing_bins` and `spikes_df` are set, bins with fewer than `min_num_unique_active_neurons_per_time_bin` firing aclus are dimmed (same defaults as train-test pos-err; default 1).
+            Col 0: viridis_r color cell for held-out test-segment GT-decoder error (joined on lap_id + truth_decoder_name).
             """
             if decoder_names is None:
                 decoder_names = list(TrackTemplates.get_decoder_names())
             n_rows: int = int(len(page_lap_indicies))
-            n_cols: int = int(len(decoder_names))
+            n_decoder_cols: int = int(len(decoder_names))
+            n_cols: int = 1 + n_decoder_cols
             assert n_rows == len(truth_decoder_names_for_page)
             enable_low_firing_dimming: bool = bool(should_dim_low_firing_bins) and (spikes_df is not None)
             enable_train_test_spans: bool = (train_epochs_dict is not None) and (test_epochs_dict is not None)
@@ -10863,7 +10937,19 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
             measured_line_alpha: float = float(kwargs.pop('measured_line_alpha', 0.45))
             measured_line_linewidth: float = float(kwargs.pop('measured_line_linewidth', 0.8))
 
-            fig, axs = plt.subplots(nrows=n_rows, ncols=n_cols, figsize=(figsize_width, max(figsize_per_row * float(n_rows), 2.0)), dpi=dpi, squeeze=False, sharex=False, sharey=False, constrained_layout=True)
+            metric_col: Optional[str] = _subfn_pick_pos_err_metric_column(train_test_pos_err_df)
+            page_err_values: List[Optional[float]] = []
+            for row_i in range(n_rows):
+                _truth = str(truth_decoder_names_for_page[row_i])
+                _lap_id = page_lap_ids[row_i] if (page_lap_ids is not None) else None
+                page_err_values.append(_subfn_lookup_gt_pos_err_value(train_test_pos_err_df, lap_id=_lap_id, truth_decoder_name=_truth, metric_col=metric_col) if metric_col else None)
+            ## END for row_i in range(n_rows)...
+            _finite_page_errs = [float(v) for v in page_err_values if (v is not None) and np.isfinite(v)]
+            page_err_vmin: float = float(np.nanmin(_finite_page_errs)) if (len(_finite_page_errs) > 0) else 0.0
+            page_err_vmax: float = float(np.nanmax(_finite_page_errs)) if (len(_finite_page_errs) > 0) else 1.0
+
+            fig, axs = plt.subplots(nrows=n_rows, ncols=n_cols, figsize=(figsize_width, max(figsize_per_row * float(n_rows), 2.0)), dpi=dpi, squeeze=False, sharex=False, sharey=False, constrained_layout=True,
+                                    gridspec_kw={'width_ratios': [0.55] + ([1.0] * n_decoder_cols)})
             n_rows_with_train_test_spans: int = 0
             ref_result_for_epochs: DecodedFilterEpochsResult = decoder_laps_filter_epochs_decoder_result_dict[decoder_names[0]]
             ref_laps_epochs_df = ensure_dataframe(ref_result_for_epochs.active_filter_epochs)
@@ -10877,12 +10963,16 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
                     train_intervals, test_intervals = _subfn_resolve_train_test_intervals_for_lap(train_epochs_dict, test_epochs_dict, truth_name=truth_name, lap_id=lap_id, lap_t_start=float(lap_t_start), lap_t_stop=float(lap_t_stop))
                     if (len(train_intervals) + len(test_intervals)) > 0:
                         n_rows_with_train_test_spans += 1
+                ## Left metrics column (GT decoder held-out test error):
+                _subfn_draw_pos_err_metrics_cell(axs[row_i, 0], lap_id=lap_id, err_value=page_err_values[row_i], vmin=page_err_vmin, vmax=page_err_vmax, metric_col=metric_col or 'err_cm')
+                if row_i == 0:
+                    axs[row_i, 0].set_title('GT test err', fontsize=9)
                 ## Compute low-firing mask once per lap (shared time bins across the four directional decoders):
                 low_firing_mask_rgba, low_firing_xmin, low_firing_xmax = None, None, None
                 if enable_low_firing_dimming:
                     low_firing_mask_rgba, _is_active, low_firing_xmin, low_firing_xmax = _subfn_compute_low_firing_mask_rgba_for_time_bin_container(spikes_df=spikes_df, time_bin_container=ref_result_for_epochs.time_bin_containers[int(lap_idx)], min_num_spikes_per_bin_to_be_considered_active=min_num_spikes_per_bin_to_be_considered_active, min_num_unique_active_neurons_per_time_bin=min_num_unique_active_neurons_per_time_bin)
                 for col_i, a_decoder_name in enumerate(decoder_names):
-                    ax = axs[row_i, col_i]
+                    ax = axs[row_i, col_i + 1]
                     a_result: DecodedFilterEpochsResult = decoder_laps_filter_epochs_decoder_result_dict[a_decoder_name]
                     curr_time_bins = a_result.time_bin_containers[int(lap_idx)].centers
                     curr_posterior = a_result.marginal_x_list[int(lap_idx)].p_x_given_n
@@ -10904,12 +10994,9 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
                     epoch_slice = ensure_dataframe(a_result.active_filter_epochs).iloc[int(lap_idx)][['start', 'stop']].to_numpy()
                     ax.set_xlim(*epoch_slice)
                     ax.set_title(f'{a_decoder_name}' if row_i == 0 else '')
-                    if col_i == 0:
-                        if lap_id is not None:
-                            ax.set_ylabel(f'Lap {lap_id}')
-                    else:
-                        ax.set_ylabel('')
-                        ax.tick_params(axis='y', labelleft=False)  # y labels only on leftmost column
+                    ax.set_ylabel('')
+                    if col_i != 0:
+                        ax.tick_params(axis='y', labelleft=False)
                     if a_decoder_name == truth_name:
                         _subfn_draw_green_groundtruth_axis_box(ax)
                     else:
@@ -10933,13 +11020,15 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
                                                                      posterior_masking_value: float = 0.0, dpi: int = 150, write_png: bool = True, debug_print: bool = False,
                                                                      spikes_df: Optional[pd.DataFrame] = None, should_dim_low_firing_bins: bool = True,
                                                                      min_num_spikes_per_bin_to_be_considered_active: int = 1, min_num_unique_active_neurons_per_time_bin: Optional[int] = 1,
-                                                                     train_epochs_dict: Optional[Dict[str, pd.DataFrame]] = None, test_epochs_dict: Optional[Dict[str, pd.DataFrame]] = None, **kwargs) -> Dict[str, Any]:
-            """Headless Agg export: paginate all laps as 4-decoder side-by-side pages with GT green boxes, then vertical-stack PNGs into one combined figure.
+                                                                     train_epochs_dict: Optional[Dict[str, pd.DataFrame]] = None, test_epochs_dict: Optional[Dict[str, pd.DataFrame]] = None,
+                                                                     train_test_pos_err_df: Optional[pd.DataFrame] = None, **kwargs) -> Dict[str, Any]:
+            """Headless Agg export: paginate all laps as left metrics + 4-decoder side-by-side pages with GT green boxes, then vertical-stack PNGs into one combined figure.
 
             Returns dict with keys: `laps_epochs_df`, `page_png_paths`, `combined_img_out_path`, `n_pages`, `n_laps`.
             `posterior_masking_value` default 0.0 disables under-threshold whitening (pass >0 only if intentional clipping is desired).
             Low-firing dimming defaults match ``export_train_test_pos_err`` (`min_num_unique_active_neurons_per_time_bin=1`).
             When `train_epochs_dict`/`test_epochs_dict` are provided, draws train/test top brackets (yellow/orange; above GT green box; viridis + red measured traj by default).
+            When `train_test_pos_err_df` is provided, left column shows GT-decoder held-out test error (viridis_r).
             """
             output_dir = Path(output_dir).resolve()
             output_dir.mkdir(parents=True, exist_ok=True)
@@ -10966,7 +11055,7 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
             page_chunks = [all_lap_indicies[i:i + max_subplots_per_page] for i in range(0, n_laps, max_subplots_per_page)]
             n_pages: int = int(len(page_chunks))
             if debug_print:
-                print(f'_subfn_export_laps_four_decoder_gt_boxed_combined_figure: n_laps={n_laps}, n_pages={n_pages}, max_subplots_per_page={max_subplots_per_page}, output_dir={output_dir}, should_dim_low_firing_bins={should_dim_low_firing_bins}, min_num_unique_active_neurons_per_time_bin={min_num_unique_active_neurons_per_time_bin}, has_train_test={(train_epochs_dict is not None) and (test_epochs_dict is not None)}')
+                print(f'_subfn_export_laps_four_decoder_gt_boxed_combined_figure: n_laps={n_laps}, n_pages={n_pages}, max_subplots_per_page={max_subplots_per_page}, output_dir={output_dir}, should_dim_low_firing_bins={should_dim_low_firing_bins}, min_num_unique_active_neurons_per_time_bin={min_num_unique_active_neurons_per_time_bin}, has_train_test={(train_epochs_dict is not None) and (test_epochs_dict is not None)}, has_pos_err_df={(train_test_pos_err_df is not None)}')
 
             page_png_paths = []
             for page_idx, page_lap_indicies in enumerate(page_chunks):
@@ -10976,7 +11065,7 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
                                                                        page_lap_indicies=page_lap_indicies, truth_decoder_names_for_page=truth_for_page, decoder_names=decoder_names, variable_name=variable_name,
                                                                        posterior_masking_value=posterior_masking_value, dpi=dpi, spikes_df=spikes_df, should_dim_low_firing_bins=should_dim_low_firing_bins,
                                                                        min_num_spikes_per_bin_to_be_considered_active=min_num_spikes_per_bin_to_be_considered_active, min_num_unique_active_neurons_per_time_bin=min_num_unique_active_neurons_per_time_bin,
-                                                                       page_lap_ids=page_lap_ids, train_epochs_dict=train_epochs_dict, test_epochs_dict=test_epochs_dict, **kwargs)
+                                                                       page_lap_ids=page_lap_ids, train_epochs_dict=train_epochs_dict, test_epochs_dict=test_epochs_dict, train_test_pos_err_df=train_test_pos_err_df, **kwargs)
                 page_png_path = pages_dir.joinpath(f'{combined_image_basename}_page{page_idx:03d}_of{n_pages:03d}.png')
                 if write_png:
                     fig.savefig(page_png_path, dpi=dpi, bbox_inches='tight', facecolor='white')
@@ -11055,7 +11144,7 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
                                                                               posterior_masking_value=posterior_masking_value, dpi=dpi, write_png=bool(save_figure), debug_print=debug_print,
                                                                               spikes_df=spikes_df_for_dimming, should_dim_low_firing_bins=should_dim_low_firing_bins,
                                                                               min_num_spikes_per_bin_to_be_considered_active=min_num_spikes_per_bin_to_be_considered_active, min_num_unique_active_neurons_per_time_bin=min_num_unique_active_neurons_per_time_bin,
-                                                                              train_epochs_dict=train_epochs_dict, test_epochs_dict=test_epochs_dict, **kwargs)
+                                                                              train_epochs_dict=train_epochs_dict, test_epochs_dict=test_epochs_dict, train_test_pos_err_df=train_test_pos_err_df, **kwargs)
 
         graphics_output_dict = dict(display_context=display_context, output_dir=output_dir, combined_img_out_path=export_out.get('combined_img_out_path'), page_png_paths=export_out.get('page_png_paths'), n_pages=export_out.get('n_pages'), n_laps=export_out.get('n_laps'), laps_epochs_df=export_out.get('laps_epochs_df'), defer_render=defer_render,
                                     should_dim_low_firing_bins=should_dim_low_firing_bins, min_num_unique_active_neurons_per_time_bin=min_num_unique_active_neurons_per_time_bin)
