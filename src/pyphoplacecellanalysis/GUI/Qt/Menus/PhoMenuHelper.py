@@ -12,12 +12,30 @@ from nptyping import NDArray
 from neuropy.utils.indexing_helpers import convert_to_dictlike
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
-from pyphocorehelpers.programming_helpers import VariableNameCaseFormat   
+from pyphocorehelpers.programming_helpers import VariableNameCaseFormat, copy_to_clipboard
+
+
+class MenuActionCopyCodeEventFilter(QtCore.QObject):
+    """RMB on a leaf QMenu action copies its notebook-equivalent programmatic code (like Launcher "Copy Display Code")."""
+
+    def eventFilter(self, watched, event):
+        if (event.type() == QtCore.QEvent.MouseButtonPress) and (event.button() == QtCore.Qt.RightButton) and isinstance(watched, QtWidgets.QMenu):
+            action = watched.actionAt(event.pos())
+            if (action is not None) and action.isEnabled() and (action.menu() is None) and (not action.isSeparator()):
+                code_str: Optional[str] = PhoMenuHelper.get_action_programmatic_run_code(action)
+                if code_str:
+                    copy_to_clipboard(code_str=code_str, message_print=True)
+                    return True  # consume — do not trigger the action
+        return super().eventFilter(watched, event)
 
 
 class PhoMenuHelper(object):
     """ A static helper for building QMenu items, QActions and adding them to a window """
-    
+
+    _MENU_COMMAND_ATTR: str = '_pho_menu_command'
+    _PROGRAMMATIC_RUN_CODE_ATTR: str = '_pho_programmatic_run_code'
+    _RMB_COPY_FILTER_ATTR: str = '_pho_rmb_copy_code_event_filter'
+
     @staticmethod
     def try_get_menu_object_name_from_text(menu_text):
         # Remove all non-word characters (everything except numbers and letters)
@@ -115,6 +133,76 @@ class PhoMenuHelper(object):
                 )
 
         return action.triggered.connect(_safe_callback)
+
+
+    @classmethod
+    def set_action_programmatic_run_code(cls, action: QtWidgets.QAction, code_str: str):
+        """Attach notebook-ready code string copied on RMB."""
+        setattr(action, cls._PROGRAMMATIC_RUN_CODE_ATTR, code_str)
+
+
+    @classmethod
+    def get_action_programmatic_run_code(cls, action: QtWidgets.QAction) -> Optional[str]:
+        code_str = getattr(action, cls._PROGRAMMATIC_RUN_CODE_ATTR, None)
+        if code_str:
+            return code_str
+        cmd = getattr(action, cls._MENU_COMMAND_ATTR, None)
+        if cmd is not None and hasattr(cmd, 'build_programmatic_run_code'):
+            return cmd.build_programmatic_run_code()
+        return None
+
+
+    @classmethod
+    def attach_menu_command(cls, action: QtWidgets.QAction, cmd, *, connect_triggered: bool = True, spike_raster_window=None):
+        """Store command on action for RMB copy-code, optionally connect triggered → cmd()."""
+        setattr(action, cls._MENU_COMMAND_ATTR, cmd)
+        if hasattr(cmd, 'build_programmatic_run_code'):
+            cls.set_action_programmatic_run_code(action, cmd.build_programmatic_run_code())
+        if connect_triggered:
+            error_context = getattr(cmd, 'command_identifier', None) or getattr(cmd, 'action_identifier', None) or action.objectName()
+            cls.connect_action_safe(action, cmd, error_context=error_context, spike_raster_window=spike_raster_window)
+        return action
+
+
+    @classmethod
+    def install_rmb_copy_programmatic_code(cls, menu_or_menubar, parent: Optional[QtCore.QObject] = None):
+        """Install RMB copy-code event filter on a QMenu / QMenuBar and nested QMenus. Keeps filter alive on the root widget."""
+        if menu_or_menubar is None:
+            return None
+
+        root = menu_or_menubar
+        filter_parent = parent or root
+        event_filter = getattr(root, cls._RMB_COPY_FILTER_ATTR, None)
+        if event_filter is None:
+            event_filter = MenuActionCopyCodeEventFilter(filter_parent)
+            setattr(root, cls._RMB_COPY_FILTER_ATTR, event_filter)
+
+        menus_to_wire: List[QtWidgets.QMenu] = []
+        if isinstance(root, QtWidgets.QMenuBar):
+            menus_to_wire.extend([a.menu() for a in root.actions() if a.menu() is not None])
+        elif isinstance(root, QtWidgets.QMenu):
+            menus_to_wire.append(root)
+        else:
+            return event_filter
+
+        seen = set()
+        while menus_to_wire:
+            menu = menus_to_wire.pop()
+            if menu is None:
+                continue
+            menu_id = id(menu)
+            if menu_id in seen:
+                continue
+            seen.add(menu_id)
+            menu.installEventFilter(event_filter)
+            for an_action in menu.actions():
+                submenu = an_action.menu()
+                if submenu is not None:
+                    menus_to_wire.append(submenu)
+            ## END for an_action in menu.actions()...
+        ## END while menus_to_wire...
+
+        return event_filter
     
     @classmethod
     def set_menu_default_stylesheet(cls, root_menu_bar):

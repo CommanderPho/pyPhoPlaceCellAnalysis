@@ -1644,6 +1644,12 @@ def _build_additional_window_menus(spike_raster_window: Spike3DRasterWindowWidge
         _createLinkedWidget_menu_provider = None
 
     
+    ## RMB on menu items that wrap display/commands copies notebook-equivalent code (Launcher "Copy Display Code"):
+    try:
+        PhoMenuHelper.install_rmb_copy_programmatic_code(spike_raster_window.main_menu_window.menuBar(), parent=spike_raster_window.main_menu_window)
+    except Exception as e:
+        print(f'WARN: failed to install RMB copy-programmatic-code on SpikeRasterWindow menubar: {e}')
+
     output_references.extend([curr_main_menu_window, menuConnections, connections_actions_dict, # note .extend(...) function works in-place and does not return a result, which is why this function was returning None originally.
         curr_main_menu_window, menuCreateNewConnectedWidget, createNewConnected_actions_dict,
         _debug_menu_provider,

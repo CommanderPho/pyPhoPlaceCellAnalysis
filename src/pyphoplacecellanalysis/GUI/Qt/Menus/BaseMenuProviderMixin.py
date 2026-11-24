@@ -25,6 +25,11 @@ class BaseMenuCommand:
 
     """
     action_identifier: str = field(default=None, kw_only=True, metadata={'desc':'the string identifier used to reverse-identifier the action.'})
+    programmatic_menu_group: Optional[str] = field(default=None, kw_only=True, metadata={'desc':'e.g. DockedWidgets / CreateNewConnectedWidget — used when building notebook trigger() code'})
+    programmatic_actions_dict_path: Optional[str] = field(default=None, kw_only=True, metadata={'desc':'Python attr path to the actions_dict containing this action, for reliable notebook trigger() code'})
+    display_function_name: Optional[str] = field(default=None, kw_only=True, metadata={'desc':'If this menu wraps a pipeline.display(...) function, its registered name (Launcher-style copy code)'})
+    display_function_is_global: bool = field(default=False, kw_only=True, metadata={'desc':'Whether display_function_name is a global display function'})
+    display_function_active_config_name: Optional[str] = field(default=None, kw_only=True, metadata={'desc':'Optional filter/config name for non-global display wrappers'})
     
     # def __init__(self) -> None:
     #     pass
@@ -46,6 +51,38 @@ class BaseMenuCommand:
     def command_identifier(self) -> str:
         return self.action_identifier.removeprefix('action')
         # return PhoMenuHelper.parse_leaf_action_name_for_menu_path(self.action_identifier)
+
+
+    @property
+    def programmatic_action_key(self) -> str:
+        """Key used with `spike_raster_window.build_all_menus_actions_dict()` flat dict, e.g. `DockedWidgets.Pseudo2DDecodedEpochsDockedMatplotlibView`."""
+        leaf: str = self.command_identifier
+        if self.programmatic_menu_group:
+            return f'{self.programmatic_menu_group}.{leaf}'
+        return leaf
+
+
+    def build_programmatic_run_code(self, include_setup: bool = True) -> str:
+        """Notebook-ready code equivalent to activating this menu item (RMB "Copy Display Code")."""
+        if self.display_function_name is not None:
+            code_out: str = ''
+            if include_setup:
+                code_out = f'{code_out}_out = dict()\n'
+            if self.display_function_is_global:
+                code_out = f"{code_out}_out['{self.display_function_name}'] = curr_active_pipeline.display(display_function='{self.display_function_name}', active_session_configuration_context=None) # {self.display_function_name}\n"
+            elif self.display_function_active_config_name is not None:
+                code_out = f"{code_out}_out['{self.display_function_name}'] = curr_active_pipeline.display('{self.display_function_name}', '{self.display_function_active_config_name}') # {self.display_function_name}\n"
+            else:
+                code_out = f"{code_out}_out['{self.display_function_name}'] = curr_active_pipeline.display(display_function='{self.display_function_name}', active_session_configuration_context=None) # {self.display_function_name}\n"
+            return code_out
+
+        if self.programmatic_actions_dict_path is not None:
+            return f"{self.programmatic_actions_dict_path}['{self.action_identifier}'].trigger()\n"
+
+        code_out: str = ''
+        if include_setup:
+            code_out = f'{code_out}_, global_flat_action_dict = spike_raster_window.build_all_menus_actions_dict()\n'
+        return f"{code_out}global_flat_action_dict['{self.programmatic_action_key}'].trigger()\n"
 
     def log_command(self, *args, **kwargs):
         """ adds this command to the `menu_action_history_list` """

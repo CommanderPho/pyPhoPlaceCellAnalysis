@@ -132,12 +132,13 @@ class DockedWidgets_MenuProvider(BaseMenuProviderMixin):
         addSubmenuActionKeys.append(curr_action_key)
 
 
+        _docked_programmatic_kwargs = dict(programmatic_menu_group='DockedWidgets', programmatic_actions_dict_path="spike_raster_window.main_menu_window.ui.menus.global_window_menus.docked_widgets.actions_dict")
         action_command_map = {
-            'actionNewDockedMatplotlibView': AddNewDecodedPosition_MatplotlibPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name, display_output, action_identifier='actionNewDockedMatplotlibView'),
-            # 'actionNewDockedContextNested': CreateNewContextNestedDocksCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, active_context=active_context, display_output=display_output, action_identifier='actionNewDockedContextNested'),
-            'actionLongShortDecodedEpochsDockedMatplotlibView': AddNewLongShortDecodedEpochSlices_MatplotlibPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, active_context=active_context, display_output=display_output, action_identifier='actionLongShortDecodedEpochsDockedMatplotlibView'),
-            'actionDirectionalDecodedEpochsDockedMatplotlibView': AddNewDirectionalDecodedEpochs_MatplotlibPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, active_context=active_context, display_output=display_output, action_identifier='actionDirectionalDecodedEpochsDockedMatplotlibView'), ## BROKEN, Not aligned with positions also plotted
-            'actionTrackTemplatesDecodedEpochsDockedMatplotlibView': AddNewTrackTemplatesDecodedEpochSlicesRows_MatplotlibPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, active_context=active_context, display_output=display_output, action_identifier='actionTrackTemplatesDecodedEpochsDockedMatplotlibView'),
+            'actionNewDockedMatplotlibView': AddNewDecodedPosition_MatplotlibPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name, display_output, action_identifier='actionNewDockedMatplotlibView', **_docked_programmatic_kwargs),
+            # 'actionNewDockedContextNested': CreateNewContextNestedDocksCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, active_context=active_context, display_output=display_output, action_identifier='actionNewDockedContextNested', **_docked_programmatic_kwargs),
+            'actionLongShortDecodedEpochsDockedMatplotlibView': AddNewLongShortDecodedEpochSlices_MatplotlibPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, active_context=active_context, display_output=display_output, action_identifier='actionLongShortDecodedEpochsDockedMatplotlibView', **_docked_programmatic_kwargs),
+            'actionDirectionalDecodedEpochsDockedMatplotlibView': AddNewDirectionalDecodedEpochs_MatplotlibPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, active_context=active_context, display_output=display_output, action_identifier='actionDirectionalDecodedEpochsDockedMatplotlibView', **_docked_programmatic_kwargs), ## BROKEN, Not aligned with positions also plotted
+            'actionTrackTemplatesDecodedEpochsDockedMatplotlibView': AddNewTrackTemplatesDecodedEpochSlicesRows_MatplotlibPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, active_context=active_context, display_output=display_output, action_identifier='actionTrackTemplatesDecodedEpochsDockedMatplotlibView', **_docked_programmatic_kwargs),
         }
 
 
@@ -158,13 +159,13 @@ class DockedWidgets_MenuProvider(BaseMenuProviderMixin):
                     curr_action_name: str = f"actionPseudo2DDecodedEpochsDockedMatplotlibView_tbin_{a_time_bin_size}"
                     curr_action_key = PhoMenuHelper.add_action_item(self.root_window, f"Pseudo2D Positions {a_time_bin_size}", name=curr_action_name, tooltip="", icon_path=":/Graphics/Icons/graphics/ic_multiline_chart_48px.png", actions_dict=curr_time_bin_specific_submenu_actions_dict)
                     curr_time_bin_specific_addPositionsSubmenuActionKeys.append(curr_action_key)
-                    action_command_map[curr_action_name] = AddNewDecodedPosteriors_MatplotlibPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, active_context=active_context, display_output=display_output, active_time_bin_sizes_whitelist=[a_time_bin_size], action_identifier=curr_action_name)
+                    action_command_map[curr_action_name] = AddNewDecodedPosteriors_MatplotlibPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, active_context=active_context, display_output=display_output, active_time_bin_sizes_whitelist=[a_time_bin_size], action_identifier=curr_action_name, **_docked_programmatic_kwargs)
                     
 
                     curr_action_name: str = f"actionPseudo2DDecodedMarginalsDockedMatplotlibView_tbin_{a_time_bin_size}"
                     curr_action_key = PhoMenuHelper.add_action_item(self.root_window, f"Pseudo2D Marginals {a_time_bin_size}", name=curr_action_name, tooltip="", icon_path=":/Graphics/Icons/graphics/ic_multiline_chart_48px.png", actions_dict=curr_time_bin_specific_submenu_actions_dict)
                     curr_time_bin_specific_addMarginalsSubmenuActionKeys.append(curr_action_key)
-                    action_command_map[curr_action_name] = AddNewDecodedEpochMarginal_MatplotlibPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, active_context=active_context, display_output=display_output, active_time_bin_sizes_whitelist=[a_time_bin_size], action_identifier=curr_action_name)
+                    action_command_map[curr_action_name] = AddNewDecodedEpochMarginal_MatplotlibPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, active_context=active_context, display_output=display_output, active_time_bin_sizes_whitelist=[a_time_bin_size], action_identifier=curr_action_name, **_docked_programmatic_kwargs)
 
                 ## END for a_time_bin_size in time_bin_size_list...
                 ## OUTPUTS: curr_time_bin_specific_addSubmenuActionKeys, curr_time_bin_specific_submenu_actions_dict
@@ -180,8 +181,8 @@ class DockedWidgets_MenuProvider(BaseMenuProviderMixin):
             addSubmenuActionKeys.append(curr_action_key)
 
             action_command_map.update({
-                'actionPseudo2DDecodedEpochsDockedMatplotlibView': AddNewDecodedPosteriors_MatplotlibPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, active_context=active_context, display_output=display_output, active_time_bin_sizes_whitelist=None, action_identifier='actionPseudo2DDecodedEpochsDockedMatplotlibView'),
-                'actionContinuousPseudo2DDecodedMarginalsDockedMatplotlibView': AddNewDecodedEpochMarginal_MatplotlibPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, active_context=active_context, display_output=display_output, active_time_bin_sizes_whitelist=None, action_identifier='actionContinuousPseudo2DDecodedMarginalsDockedMatplotlibView'),
+                'actionPseudo2DDecodedEpochsDockedMatplotlibView': AddNewDecodedPosteriors_MatplotlibPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, active_context=active_context, display_output=display_output, active_time_bin_sizes_whitelist=None, action_identifier='actionPseudo2DDecodedEpochsDockedMatplotlibView', **_docked_programmatic_kwargs),
+                'actionContinuousPseudo2DDecodedMarginalsDockedMatplotlibView': AddNewDecodedEpochMarginal_MatplotlibPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, active_context=active_context, display_output=display_output, active_time_bin_sizes_whitelist=None, action_identifier='actionContinuousPseudo2DDecodedMarginalsDockedMatplotlibView', **_docked_programmatic_kwargs),
             })
 
 
@@ -190,9 +191,10 @@ class DockedWidgets_MenuProvider(BaseMenuProviderMixin):
         addSubmenuActionKeys.append(curr_action_key)
 
         # ==================================================================================================================== #
-        # Connect the relevent actions to each action:
+        # Connect the relevent actions to each action (and attach RMB copy-code metadata):
         for a_name, a_build_command in action_command_map.items():
-            curr_actions_dict[a_name].triggered.connect(lambda checked=False, cmd=a_build_command: _run_docked_widget_menu_command(cmd))
+            PhoMenuHelper.attach_menu_command(curr_actions_dict[a_name], a_build_command, connect_triggered=True, spike_raster_window=spike_raster_window)
+        ## END for a_name, a_build_command in action_command_map.items()...
             
         # curr_actions_dict['actionNewDockedCustom'].triggered.connect(CreateNewTimeSynchronizedPlotterCommand(spike_raster_window, active_pf_2D_dt, plotter_type='decoder', active_context=active_context, display_output=display_output))
                 
@@ -221,6 +223,8 @@ class DockedWidgets_MenuProvider(BaseMenuProviderMixin):
             self.activeMenuReference.pseudo2D_positions_time_bin_sizes_menu.addActions([curr_actions_dict[a_key] for a_key in curr_time_bin_specific_addPositionsSubmenuActionKeys])
             self.activeMenuReference.pseudo2D_marginals_time_bin_sizes_menu.addActions([curr_actions_dict[a_key] for a_key in curr_time_bin_specific_addMarginalsSubmenuActionKeys])
 
+        ## RMB on leaf items copies notebook-equivalent trigger()/display() code:
+        PhoMenuHelper.install_rmb_copy_programmatic_code(self.activeMenuReference.top_level_menu, parent=curr_window)
 
         # Save references in the curr_window
         self.activeMenuReference.actions_dict['actionMenuDockedWidgets'] = curr_window.ui.actionMenuDockedWidgets

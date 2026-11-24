@@ -108,6 +108,7 @@ class CreateLinkedWidget_MenuProvider(BaseMenuProviderMixin):
         
         self.activeMenuReference.top_level_menu.setObjectName("menuCreateLinkedWidget")
         
+        _linked_programmatic_actions_dict_path = "spike_raster_window.main_menu_window.ui.menus.global_window_menus.create_linked_widget.actions_dict"
         action_command_map = {
             'actionTimeSynchronizedOccupancyPlotter': CreateNewTimeSynchronizedPlotterCommand(spike_raster_window, active_pf_2D_dt, plotter_type='occupancy', curr_active_pipeline=None, active_context=active_context, display_output=display_output, action_identifier='actionTimeSynchronizedOccupancyPlotter'),
             'actionTimeSynchronizedPlacefieldsPlotter': CreateNewTimeSynchronizedPlotterCommand(spike_raster_window, active_pf_2D_dt, plotter_type='placefields', curr_active_pipeline=None, active_context=active_context, display_output=display_output, action_identifier='actionTimeSynchronizedPlacefieldsPlotter'),
@@ -115,9 +116,13 @@ class CreateLinkedWidget_MenuProvider(BaseMenuProviderMixin):
             'actionCombineTimeSynchronizedPlotterWindow': CreateNewTimeSynchronizedCombinedPlotterCommand(spike_raster_window, active_pf_2D_dt, active_context=active_context, display_output=display_output, action_identifier='actionCombineTimeSynchronizedPlotterWindow')
         }
         for a_name, a_build_command in action_command_map.items():
-            curr_actions_dict[a_name].triggered.connect(a_build_command)
+            a_build_command.programmatic_menu_group = 'CreateLinkedWidget'
+            a_build_command.programmatic_actions_dict_path = _linked_programmatic_actions_dict_path
+            PhoMenuHelper.attach_menu_command(curr_actions_dict[a_name], a_build_command, connect_triggered=True, spike_raster_window=spike_raster_window)
+        ## END for a_name, a_build_command in action_command_map.items()...
 
         curr_window.ui.actionMenuCreateLinkedWidget = curr_menubar.addMenu(self.activeMenuReference.top_level_menu)  # add it to the menubar
+        PhoMenuHelper.install_rmb_copy_programmatic_code(self.activeMenuReference.top_level_menu, parent=curr_window)
 
         # Save references in the curr_window
         self.activeMenuReference.actions_dict['actionMenuCreateLinkedWidget'] = curr_window.ui.actionMenuCreateLinkedWidget 

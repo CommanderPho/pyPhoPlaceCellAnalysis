@@ -125,6 +125,7 @@ class LocalMenus_AddRenderable(QtWidgets.QMainWindow):
             )
             submenu_addTimeIntervals_Connections.append(_curr_conn)
             widget.programmatic_actions_dict[error_context] = an_action # have to use a string keypath because `out_command_dict[*extracted_menu_path]` is not allowed
+            PhoMenuHelper.set_action_programmatic_run_code(an_action, f"active_2d_plot.ui.menus.custom_context_menus.add_renderables[0].programmatic_actions_dict['{error_context}'].trigger()\n")
 
         # Set enabled state
         # widget.ui.actionAddTimeIntervals_PBEs.setEnabled(sess.pbe is not None)
@@ -165,6 +166,7 @@ class LocalMenus_AddRenderable(QtWidgets.QMainWindow):
             )
             submenu_addTimeCurves_Connections.append(_curr_conn)
             widget.programmatic_actions_dict[error_context] = an_action # have to use a string keypath because `out_command_dict[*extracted_menu_path]` is not allowed
+            PhoMenuHelper.set_action_programmatic_run_code(an_action, f"active_2d_plot.ui.menus.custom_context_menus.add_renderables[0].programmatic_actions_dict['{error_context}'].trigger()\n")
         
         # Matplotlib Plots: __________________________________________________________________________________________________ #
         # self.ui.menuAddRenderable_Matplotlib_Plot        
@@ -183,6 +185,7 @@ class LocalMenus_AddRenderable(QtWidgets.QMainWindow):
             )
             submenu_addMatplotlibPlot_Connections.append(_curr_conn)
             widget.programmatic_actions_dict[error_context] = an_action # have to use a string keypath because `out_command_dict[*extracted_menu_path]` is not allowed
+            PhoMenuHelper.set_action_programmatic_run_code(an_action, f"active_2d_plot.ui.menus.custom_context_menus.add_renderables[0].programmatic_actions_dict['{error_context}'].trigger()\n")
         
         # Connect Clear actions:
         clear_actions = [widget.ui.actionClear_all_Time_Curves, widget.ui.actionClear_all_Time_Intervals, widget.ui.actionClear_all_Matplotlib_Plots, widget.ui.actionClear_all_Renderables]
@@ -219,7 +222,13 @@ class LocalMenus_AddRenderable(QtWidgets.QMainWindow):
         )
 
         for an_action in clear_actions:
-            widget.programmatic_actions_dict['.'.join(PhoMenuHelper.parse_QAction_for_menu_path(an_action))] = an_action # have to use a string keypath because `out_command_dict[*extracted_menu_path]` is not allowed
+            error_context = '.'.join(PhoMenuHelper.parse_QAction_for_menu_path(an_action))
+            widget.programmatic_actions_dict[error_context] = an_action # have to use a string keypath because `out_command_dict[*extracted_menu_path]` is not allowed
+            PhoMenuHelper.set_action_programmatic_run_code(an_action, f"active_2d_plot.ui.menus.custom_context_menus.add_renderables[0].programmatic_actions_dict['{error_context}'].trigger()\n")
+        ## END for an_action in clear_actions...
+
+        ## RMB on leaf Add-Renderable items copies notebook-equivalent trigger() code:
+        PhoMenuHelper.install_rmb_copy_programmatic_code(renderable_menu, parent=widget)
         
         return widget, renderable_menu, (submenu_addTimeIntervals, submenu_addTimeIntervalCallbacks, submenu_addTimeIntervals_Connections), (submenu_addTimeCurves, submenu_addTimeCurvesCallbacks, submenu_addTimeCurves_Connections), (submenu_addMatplotlibPlot, submenu_addMatplotlibPlotCallbacks, submenu_addMatplotlibPlot_Connections)
 

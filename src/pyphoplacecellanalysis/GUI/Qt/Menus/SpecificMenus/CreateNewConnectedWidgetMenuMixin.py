@@ -68,40 +68,40 @@ class CreateNewConnectedWidgetMenuHelper(object):
         curr_window = PhoMenuHelper.try_get_menu_window(spike_raster_window)
         curr_actions_dict = curr_window.ui.menus.global_window_menus.create_new_connected_widget.actions_dict
 
+        _connected_programmatic_actions_dict_path = "spike_raster_window.main_menu_window.ui.menus.global_window_menus.create_new_connected_widget.actions_dict"
         action_command_map = {
-            'actionNewConnected2DRaster': CreateNewPyQtGraphPlotterCommand(spike_raster_window, type_of_connected_plotter='pyqtgraph2D'),
-            'actionNewConnected3DRaster_PyQtGraph': CreateNewPyQtGraphPlotterCommand(spike_raster_window, type_of_connected_plotter='pyqtgraph'),
-            'actionNewConnected3DRaster_Vedo': CreateNewVedoPlotterCommand(spike_raster_window),
-            'actionNewConnectedDataExplorer_ipc': CreateNewDataExplorer_ipc_PlotterCommand(spike_raster_window, curr_active_pipeline, active_config_name, display_output),
-            'actionNewConnectedDataExplorer_ipspikes': CreateNewDataExplorer_ipspikes_PlotterCommand(spike_raster_window, curr_active_pipeline, active_config_name, display_output),
-            'actionAddMatplotlibPlot_DecodedPosition': AddNewDecodedPosition_MatplotlibPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name, display_output),
-            'actionDecoded_Epoch_Slices_Laps': CreateNewStackedDecodedEpochSlicesPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, filter_epochs='lap', display_output=display_output), ## MUST MATCH THE VALUES IN `KnownFilterEpochs` Launches in an external window
-            'actionDecoded_Epoch_Slices_PBEs': CreateNewStackedDecodedEpochSlicesPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, filter_epochs='pbe', display_output=display_output), ## Launches in an external window
-            'actionDecoded_Epoch_Slices_Ripple': CreateNewStackedDecodedEpochSlicesPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, filter_epochs='ripple', display_output=display_output), ## Launches in an external window
-            'actionDecoded_Epoch_Slices_Replay': CreateNewStackedDecodedEpochSlicesPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, filter_epochs='replay', display_output=display_output), ## Launches in an external window
-            'actionDecoded_Epoch_Slices_NonPBEs': CreateNewStackedDecodedEpochSlicesPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, filter_epochs='non_pbe', display_output=display_output), ## Launches in an external window
-            'actionDecoded_Epoch_Slices_NonPBE_Endcaps': CreateNewStackedDecodedEpochSlicesPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, filter_epochs='non_pbe_endcaps', display_output=display_output)
+            'actionNewConnected2DRaster': CreateNewPyQtGraphPlotterCommand(spike_raster_window, type_of_connected_plotter='pyqtgraph2D', action_identifier='actionNewConnected2DRaster'),
+            'actionNewConnected3DRaster_PyQtGraph': CreateNewPyQtGraphPlotterCommand(spike_raster_window, type_of_connected_plotter='pyqtgraph', action_identifier='actionNewConnected3DRaster_PyQtGraph'),
+            'actionNewConnected3DRaster_Vedo': CreateNewVedoPlotterCommand(spike_raster_window, action_identifier='actionNewConnected3DRaster_Vedo'),
+            'actionNewConnectedDataExplorer_ipc': CreateNewDataExplorer_ipc_PlotterCommand(spike_raster_window, curr_active_pipeline, active_config_name, display_output, action_identifier='actionNewConnectedDataExplorer_ipc'),
+            'actionNewConnectedDataExplorer_ipspikes': CreateNewDataExplorer_ipspikes_PlotterCommand(spike_raster_window, curr_active_pipeline, active_config_name, display_output, action_identifier='actionNewConnectedDataExplorer_ipspikes'),
+            'actionAddMatplotlibPlot_DecodedPosition': AddNewDecodedPosition_MatplotlibPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name, display_output, action_identifier='actionAddMatplotlibPlot_DecodedPosition'),
+            'actionDecoded_Epoch_Slices_Laps': CreateNewStackedDecodedEpochSlicesPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, filter_epochs='lap', display_output=display_output, action_identifier='actionDecoded_Epoch_Slices_Laps'), ## MUST MATCH THE VALUES IN `KnownFilterEpochs` Launches in an external window
+            'actionDecoded_Epoch_Slices_PBEs': CreateNewStackedDecodedEpochSlicesPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, filter_epochs='pbe', display_output=display_output, action_identifier='actionDecoded_Epoch_Slices_PBEs'), ## Launches in an external window
+            'actionDecoded_Epoch_Slices_Ripple': CreateNewStackedDecodedEpochSlicesPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, filter_epochs='ripple', display_output=display_output, action_identifier='actionDecoded_Epoch_Slices_Ripple'), ## Launches in an external window
+            'actionDecoded_Epoch_Slices_Replay': CreateNewStackedDecodedEpochSlicesPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, filter_epochs='replay', display_output=display_output, action_identifier='actionDecoded_Epoch_Slices_Replay'), ## Launches in an external window
+            'actionDecoded_Epoch_Slices_NonPBEs': CreateNewStackedDecodedEpochSlicesPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, filter_epochs='non_pbe', display_output=display_output, action_identifier='actionDecoded_Epoch_Slices_NonPBEs'), ## Launches in an external window
+            'actionDecoded_Epoch_Slices_NonPBE_Endcaps': CreateNewStackedDecodedEpochSlicesPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, filter_epochs='non_pbe_endcaps', display_output=display_output, action_identifier='actionDecoded_Epoch_Slices_NonPBE_Endcaps')
         }
+
+        ## Display-function wrappers: copy Launcher-style curr_active_pipeline.display(...) code on RMB
+        action_command_map['actionNewConnectedDataExplorer_ipc'].display_function_name = '_display_3d_interactive_tuning_curves_plotter'
+        action_command_map['actionNewConnectedDataExplorer_ipc'].display_function_active_config_name = active_config_name
+        action_command_map['actionNewConnectedDataExplorer_ipspikes'].display_function_name = '_display_3d_interactive_spike_and_behavior_browser'
+        action_command_map['actionNewConnectedDataExplorer_ipspikes'].display_function_active_config_name = active_config_name
+        for a_epoch_action_name in ('actionDecoded_Epoch_Slices_Laps', 'actionDecoded_Epoch_Slices_PBEs', 'actionDecoded_Epoch_Slices_Ripple', 'actionDecoded_Epoch_Slices_Replay', 'actionDecoded_Epoch_Slices_NonPBEs', 'actionDecoded_Epoch_Slices_NonPBE_Endcaps'):
+            action_command_map[a_epoch_action_name].display_function_name = '_display_plot_decoded_epoch_slices'
+            action_command_map[a_epoch_action_name].display_function_active_config_name = active_config_name
+        ## END for a_epoch_action_name in (...)...
         
         for a_name, a_build_command in action_command_map.items():
-            curr_actions_dict[a_name].triggered.connect(a_build_command)
-        
-        
-        # curr_window.ui.menus.global_window_menus.create_new_connected_widget.actions_dict['actionNewConnected2DRaster'].triggered.connect(CreateNewPyQtGraphPlotterCommand(spike_raster_window, type_of_connected_plotter='pyqtgraph2D', action_identifier='actionNewConnected2DRaster'))
-        # curr_window.ui.menus.global_window_menus.create_new_connected_widget.actions_dict['actionNewConnected3DRaster_PyQtGraph'].triggered.connect(CreateNewPyQtGraphPlotterCommand(spike_raster_window, type_of_connected_plotter='pyqtgraph', action_identifier='actionNewConnected3DRaster_PyQtGraph'))
-        # curr_window.ui.menus.global_window_menus.create_new_connected_widget.actions_dict['actionNewConnected3DRaster_Vedo'].triggered.connect(CreateNewVedoPlotterCommand(spike_raster_window, action_identifier='actionNewConnected3DRaster_Vedo'))
-        # curr_window.ui.menus.global_window_menus.create_new_connected_widget.actions_dict['actionNewConnectedDataExplorer_ipc'].triggered.connect(CreateNewDataExplorer_ipc_PlotterCommand(spike_raster_window, curr_active_pipeline, active_config_name, display_output, action_identifier='actionNewConnectedDataExplorer_ipc'))
-        # curr_window.ui.menus.global_window_menus.create_new_connected_widget.actions_dict['actionNewConnectedDataExplorer_ipspikes'].triggered.connect(CreateNewDataExplorer_ipspikes_PlotterCommand(spike_raster_window, curr_active_pipeline, active_config_name, display_output, action_identifier='actionNewConnectedDataExplorer_ipspikes'))
-        # curr_window.ui.menus.global_window_menus.create_new_connected_widget.actions_dict['actionAddMatplotlibPlot_DecodedPosition'].triggered.connect(AddNewDecodedPosition_MatplotlibPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name, display_output, action_identifier='actionAddMatplotlibPlot_DecodedPosition'))
-        
-        
-        # curr_window.ui.menus.global_window_menus.create_new_connected_widget.actions_dict['actionDecoded_Epoch_Slices_Laps'].triggered.connect(CreateNewStackedDecodedEpochSlicesPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, filter_epochs='laps', display_output=display_output, action_identifier='actionDecoded_Epoch_Slices_Laps'))
-        # curr_window.ui.menus.global_window_menus.create_new_connected_widget.actions_dict['actionDecoded_Epoch_Slices_PBEs'].triggered.connect(CreateNewStackedDecodedEpochSlicesPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, filter_epochs='pbe', display_output=display_output, action_identifier='actionDecoded_Epoch_Slices_PBEs'))
-        # curr_window.ui.menus.global_window_menus.create_new_connected_widget.actions_dict['actionDecoded_Epoch_Slices_Ripple'].triggered.connect(CreateNewStackedDecodedEpochSlicesPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, filter_epochs='ripple', display_output=display_output, action_identifier='actionDecoded_Epoch_Slices_Ripple'))
-        # curr_window.ui.menus.global_window_menus.create_new_connected_widget.actions_dict['actionDecoded_Epoch_Slices_Replay'].triggered.connect(CreateNewStackedDecodedEpochSlicesPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, filter_epochs='replay', display_output=display_output, action_identifier='actionDecoded_Epoch_Slices_Replay'))
-        # curr_window.ui.menus.global_window_menus.create_new_connected_widget.actions_dict['actionDecoded_Epoch_Slices_Custom'].triggered.connect(CreateNewStackedDecodedEpochSlicesPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, filter_epochs='custom', display_output=display_output))        
+            a_build_command.programmatic_menu_group = 'CreateNewConnectedWidget'
+            a_build_command.programmatic_actions_dict_path = _connected_programmatic_actions_dict_path
+            PhoMenuHelper.attach_menu_command(curr_actions_dict[a_name], a_build_command, connect_triggered=True, spike_raster_window=spike_raster_window)
+        ## END for a_name, a_build_command in action_command_map.items()...
 
-        # {'actionNewConnected2DRaster':'CreateNewPyQtGraphPlotterCommand', 'actionNewConnected3DRaster_PyQtGraph':'CreateNewPyQtGraphPlotterCommand', 'actionNewConnected2DRaster':'actionNewConnected2DRaster'}
+        top_level_menu = curr_window.ui.menus.global_window_menus.create_new_connected_widget.top_level_menu
+        PhoMenuHelper.install_rmb_copy_programmatic_code(top_level_menu, parent=curr_window)
             
     @classmethod
     def _build_create_new_connected_widget_menu(cls, a_main_window, debug_print=False):
