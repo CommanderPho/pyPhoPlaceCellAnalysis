@@ -5711,8 +5711,8 @@ def _do_custom_decode_epochs_dict(global_spikes_df: pd.DataFrame, global_measure
 
 @function_attributes(short_name=None, tags=['TrainTestSplit', 'decode'], input_requires=[], output_provides=[],
                       uses=['_do_custom_decode_epochs', 'get_proper_global_spikes_df', '_check_result_laps_epochs_df_performance', 'DirectionalPseudo2DDecodersResult'], used_by=['_perform_run_rigorous_decoder_performance_assessment'], creation_date='2024-10-08 02:35', related_items=[])
-def _do_train_test_split_decode_and_evaluate(curr_active_pipeline, active_laps_decoding_time_bin_size: float=1.5, force_recompute_directional_train_test_split_result: bool=False, compute_separate_decoder_results: bool=True, included_neuron_IDs=None, measured_pos_column_name: str = 'x', debug_print=False):
-    """ 
+def _do_train_test_split_decode_and_evaluate(curr_active_pipeline, active_laps_decoding_time_bin_size: float=1.5, force_recompute_directional_train_test_split_result: bool=False, compute_separate_decoder_results: bool=True, included_neuron_IDs=None, measured_pos_column_name: str = 'lin_pos', debug_print=False):
+    """
     measured_pos_column_name (str): measured 1D position column used for the primary ``sq_err`` / ``err_cm`` comparison metrics (default ``'x'``; pass ``'lin_pos'`` for linearized position).
 
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import _do_train_test_split_decode_and_evaluate
@@ -5832,7 +5832,7 @@ def _do_train_test_split_decode_and_evaluate(curr_active_pipeline, active_laps_d
         laps_marginals_df['is_most_likely_direction_LR'] = (laps_marginals_df['P_LR'] >= 0.5)
 
     ## Uses only 'result_laps_epochs_df'
-    complete_decoded_context_correctness_tuple = LapDecodingGroundTruth._check_result_laps_epochs_df_performance(laps_marginals_df)
+    complete_decoded_context_correctness_tuple = LapDecodingGroundTruth._check_result_laps_epochs_df_performance(laps_marginals_df) ## #TODO 2026-11-23 19:47: - [ ] this is only context-decoding performance, we also need position decoding performance given the correct context.
 
     ## reverse update:
     # test_all_directional_decoder_result.decoder_result = all_directional_laps_filter_epochs_decoder_result
@@ -10584,6 +10584,9 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
         """Headless Agg export of all laps as 4-decoder side-by-side posteriors with a green axis box on the session-lap ground-truth decoder; pages are vertical-stacked into one PNG.
 
         `posterior_masking_value` is imshow `vmin` (default 0.0 = no under-threshold whitening). Non-zero values clip low-P to `under_color` and dominate low/high-P contrast.
+
+        Usage (BATCH):
+            ipython ProcessBatchOutputs_qclus1246789_Only.ipy -- --date 2026-11-23 --computer GL --tbin 0.075 --only figures_export_laps_correct_decoder_side_by_side
 
         Usage:
             curr_active_pipeline.reload_default_display_functions()

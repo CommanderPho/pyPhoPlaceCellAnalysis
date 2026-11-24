@@ -4453,6 +4453,51 @@ def figures_export_laps_correct_decoder_side_by_side_completion_function(self, g
     return across_session_results_extended_dict
 
 
+@function_attributes(short_name=None, tags=['figure', 'batch', 'position', '2D', 'trajectory', 'time-gradient', 'Agg', 'shuffles-indep', 'pure'], input_requires=[], output_provides=['figures_export_2d_position_over_time_completion_function'], uses=['plot_2d_xy_position_over_time'], used_by=[], creation_date='2026-11-23 20:15', related_items=['figures_export_laps_correct_decoder_side_by_side_completion_function'])
+def figures_export_2d_position_over_time_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, dpi: int = 150, max_points: Optional[int] = 50000, figsize=(10, 8), cmap: str = 'viridis', fail_on_exception_for_debugging: bool = False, debug_print: bool = False, **kwargs) -> dict:
+    """Batch/SLURM headless Agg export: maze-plane (x, y) trajectory colored by time → collected_outputs PNG."""
+    import os
+    os.environ.setdefault('MPLBACKEND', 'Agg')
+    import matplotlib
+    matplotlib.use('Agg', force=False)
+    import matplotlib.pyplot as plt
+    from pyphoplacecellanalysis.PhoPositionalData.plotting.laps import plot_2d_xy_position_over_time
+
+    print(f'figures_export_2d_position_over_time_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...)', flush=True)
+    callback_outputs = {'out_path': None, 'n_points_plotted': None, 'n_points_source': None, 'error': None}
+    across_session_results_extended_dict['figures_export_2d_position_over_time_completion_function'] = callback_outputs
+
+    try:
+        assert self.collected_outputs_path.exists(), f"collected_outputs_path: '{self.collected_outputs_path}' does not exist!"
+        try:
+            global_epoch_name: str = curr_active_pipeline.find_Global_epoch_name()
+            active_session = curr_active_pipeline.filtered_sessions[global_epoch_name]
+        except Exception:
+            active_session = curr_active_pipeline.sess
+        position_obj = active_session.position
+        session_name: str = curr_active_pipeline.session_name
+        title: str = f'{session_name} | 2D (x, y) position over time'
+        fig, ax, artists = plot_2d_xy_position_over_time(position_obj, figsize=figsize, cmap=cmap, max_points=max_points, add_colorbar=True, title=title, **kwargs)
+        out_path: Path = self.collected_outputs_path.resolve().joinpath(f'{self.BATCH_DATE_TO_USE}-{session_name}_2d_xy_position_over_time.png')
+        fig.savefig(out_path, dpi=dpi, bbox_inches='tight')
+        plt.close(fig)
+        plt.close('all')
+        callback_outputs.update(dict(out_path=out_path, n_points_plotted=artists.get('n_points_plotted'), n_points_source=artists.get('n_points_source')))
+        print(f'\tout_path: {out_path}', flush=True)
+        if debug_print:
+            print(f'\tn_points_source={callback_outputs["n_points_source"]}, n_points_plotted={callback_outputs["n_points_plotted"]}', flush=True)
+    except Exception as e:
+        callback_outputs['error'] = str(e)
+        print(f'WARN: figures_export_2d_position_over_time_completion_function failed: {e}', flush=True)
+        print(traceback.format_exc(), flush=True)
+        if fail_on_exception_for_debugging or getattr(self, 'fail_on_exception', False):
+            raise
+    ## END try...
+
+    across_session_results_extended_dict['figures_export_2d_position_over_time_completion_function'] = callback_outputs
+    return across_session_results_extended_dict
+
+
 # ==================================================================================================================== #
 # NWB W-maze Display/Figures Export                                                                                    #
 # ==================================================================================================================== #
@@ -5267,6 +5312,7 @@ def MAIN_get_template_string(BATCH_DATE_TO_USE: str, collected_outputs_path:Path
                                     'compute_and_export_kdiba_train_test_position_error_completion_function': compute_and_export_kdiba_train_test_position_error_completion_function,
                                     'figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function': figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function,
                                     'figures_export_laps_correct_decoder_side_by_side_completion_function': figures_export_laps_correct_decoder_side_by_side_completion_function,
+                                    'figures_export_2d_position_over_time_completion_function': figures_export_2d_position_over_time_completion_function,
                                     # 'generalized_export_figures_customizazble_completion_function': generalized_export_figures_customizazble_completion_function,
                                     'compute_and_export_bapun_train_test_decoder_error_distance_completion_function': compute_and_export_bapun_train_test_decoder_error_distance_completion_function,
                                     'figures_plot_bapun_train_test_decoder_error_distance_completion_function': figures_plot_bapun_train_test_decoder_error_distance_completion_function,

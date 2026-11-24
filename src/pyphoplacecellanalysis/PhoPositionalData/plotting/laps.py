@@ -5,10 +5,14 @@
 """
 from copy import deepcopy
 from itertools import islice # for Pagination class
+from typing import Optional, Tuple, Any, Dict
 import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.collections import LineCollection, BrokenBarHCollection
 from matplotlib.colors import ListedColormap, BoundaryNorm
+from matplotlib.figure import Figure
+from matplotlib.axes import Axes
 import pyvista as pv
 import pyvistaqt as pvqt
 
@@ -291,6 +295,68 @@ def plot_laps_2d(sess, legacy_plotting_mode=True, **kwargs):
     fig.canvas.manager.set_window_title('Laps')
     # fig.suptitle('Laps', fontsize=22)
     return fig, out_axes_list
+
+
+@function_attributes(short_name=None, tags=['matplotlib', 'position', '2D', 'trajectory', 'time-gradient', 'batch'], input_requires=[], output_provides=[], uses=['DecodedTrajectoryMatplotlibPlotter._helper_add_gradient_line'], used_by=['figures_export_2d_position_over_time_completion_function'], creation_date='2026-11-23 20:15', related_items=['plot_laps_2d', 'plot_lap_trajectories_2d'])
+def plot_2d_xy_position_over_time(position_or_df, *, ax=None, figsize=(10, 8), cmap: str = 'viridis', max_points: Optional[int] = 50000, add_colorbar: bool = True, title: Optional[str] = None, line_start_lw: float = 0.4, line_end_lw: float = 1.2) -> Tuple[Figure, Axes, Dict[str, Any]]:
+    """Plot measured maze-plane trajectory (x vs y) with time encoded as line color.
+
+    from pyphoplacecellanalysis.PhoPositionalData.plotting.laps import plot_2d_xy_position_over_time
+    fig, ax, artists = plot_2d_xy_position_over_time(sess.position)
+    """
+    from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.decoder_plotting_mixins import DecodedTrajectoryMatplotlibPlotter
+
+    def _subfn_extract_txy(_position_or_df) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+        if isinstance(_position_or_df, pd.DataFrame):
+            _df = _position_or_df
+            if 't' in _df.columns:
+                _t = _df['t'].to_numpy()
+            else:
+                _t = np.asarray(_df.index.to_numpy(), dtype=float)
+            _x = _df['x'].to_numpy()
+            _y = _df['y'].to_numpy()
+            return _t, _x, _y
+        if hasattr(_position_or_df, 'to_dataframe'):
+            return _subfn_extract_txy(_position_or_df.to_dataframe())
+        _t = np.asarray(_position_or_df.time, dtype=float)
+        _x = np.asarray(_position_or_df.x, dtype=float)
+        _y = np.asarray(_position_or_df.y, dtype=float)
+        return _t, _x, _y
+
+
+    t, x, y = _subfn_extract_txy(position_or_df)
+    n_points: int = int(len(t))
+    assert n_points >= 2, f'Need at least 2 position samples; got n_points={n_points}'
+    assert len(x) == n_points and len(y) == n_points, f't/x/y length mismatch: {len(t)}, {len(x)}, {len(y)}'
+
+    if (max_points is not None) and (n_points > int(max_points)):
+        stride: int = int(np.ceil(n_points / float(max_points)))
+        t = t[::stride]
+        x = x[::stride]
+        y = y[::stride]
+
+    if ax is None:
+        fig, ax = plt.subplots(figsize=figsize, clear=True)
+    else:
+        fig = ax.figure
+
+    line, markers = DecodedTrajectoryMatplotlibPlotter._helper_add_gradient_line(ax=ax, t=t, x=x, y=y, add_markers=False, cmap=cmap, line_start_lw=line_start_lw, line_end_lw=line_end_lw)
+    ax.autoscale()
+    ax.set_aspect('equal', adjustable='box')
+    ax.set_xlabel('x')
+    ax.set_ylabel('y')
+    if title is not None:
+        ax.set_title(title)
+    else:
+        ax.set_title('2D (x, y) position over time')
+
+    artists: Dict[str, Any] = {'line': line, 'markers': markers, 'colorbar': None, 'n_points_plotted': int(len(t)), 'n_points_source': n_points}
+    if add_colorbar:
+        cbar = fig.colorbar(line, ax=ax)
+        cbar.set_label('t')
+        artists['colorbar'] = cbar
+
+    return fig, ax, artists
 
 
 #TODO 2026-02-05 18:13: - [ ] Note that there are general trajectory (not lap specific) versions at `plot_decoded_trajectories_2d`
