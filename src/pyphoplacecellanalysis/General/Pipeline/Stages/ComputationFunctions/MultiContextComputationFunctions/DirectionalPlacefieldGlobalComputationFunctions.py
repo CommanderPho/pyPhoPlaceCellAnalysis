@@ -10666,7 +10666,7 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
         `posterior_masking_value` is imshow `vmin` (default 0.0 = no under-threshold whitening). Non-zero values clip low-P to `under_color` and dominate low/high-P contrast.
 
         Defaults for measured-traj contrast: posterior cmap ``viridis`` (black under/bad, white over) + thin red measured line ``#ff0000`` @ 0.45, linewidth 0.8.
-        Within-lap TrainTestSplit: train = thin purple top bracket (tips down); test = magenta hatch; left ylabel is ``Lap {lap_id}``.
+        Within-lap TrainTestSplit: train = yellow / test = orange hard brackets just above the axes top (tips down); zorder above GT green box.
 
         Low-firing bin dimming (default on): same thresholds as ``export_train_test_pos_err`` / ``_do_custom_decode_epochs``
         (`min_num_spikes_per_bin_to_be_considered_active=1`, `min_num_unique_active_neurons_per_time_bin=1`). Inactive bins get a semi-transparent black overlay.
@@ -10803,25 +10803,30 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
             return [], []
 
 
-        def _subfn_draw_train_interval_top_bracket(ax, t0: float, t1: float, color: str = 'purple', linewidth: float = 1.25, tip_fraction: float = 0.07, zorder: float = 14.0):
-            """Thin hard bracket along the top of the axes spanning [t0, t1], vertical tips pointing down into the posterior."""
+        def _subfn_draw_interval_top_bracket(ax, t0: float, t1: float, color: str = 'purple', linewidth: float = 1.5, above_axes_fraction: float = 0.03, tip_fraction: float = 0.04, zorder: float = 2000.0):
+            """Thin hard bracket just above the axes top spanning [t0, t1], vertical tips pointing down to the axis edge.
+
+            Horizontal bar sits ``above_axes_fraction`` of the y-range above ``ymax`` (outside the axes; ``clip_on=False``).
+            `zorder` defaults above the GT green FancyBboxPatch (zorder=1000).
+            """
             ymin, ymax = ax.get_ylim()
-            tip_len: float = float(ymax - ymin) * float(tip_fraction)
-            y_top: float = float(ymax)
-            y_tip: float = float(ymax - tip_len)
+            y_span: float = float(ymax - ymin)
+            y_top: float = float(ymax) + (float(above_axes_fraction) * y_span)
+            tip_len: float = float(tip_fraction) * y_span
+            y_tip: float = max(float(ymax) - (0.01 * y_span), y_top - tip_len)  # tips point down toward / just into the axis top
             bracket_kwargs = dict(color=color, linewidth=linewidth, solid_capstyle='butt', solid_joinstyle='miter', clip_on=False, zorder=zorder, alpha=1.0)
-            ax.plot([t0, t1], [y_top, y_top], **bracket_kwargs)  # top bar
+            ax.plot([t0, t1], [y_top, y_top], **bracket_kwargs)  # top bar (outside axes)
             ax.plot([t0, t0], [y_top, y_tip], **bracket_kwargs)  # left tip down
             ax.plot([t1, t1], [y_top, y_tip], **bracket_kwargs)  # right tip down
 
 
-        def _subfn_shade_train_test_intervals(ax, train_intervals: List[Tuple[float, float]], test_intervals: List[Tuple[float, float]], test_facecolor: str = '#ff00ff', test_alpha: float = 0.28, zorder: float = 12.0):
-            """Train: purple top hard-bracket (tips down). Test: magenta hatch band above the posterior."""
+        def _subfn_shade_train_test_intervals(ax, train_intervals: List[Tuple[float, float]], test_intervals: List[Tuple[float, float]], train_bracket_color: str = 'yellow', test_bracket_color: str = 'orange', linewidth: float = 1.5, above_axes_fraction: float = 0.03, tip_fraction: float = 0.04, zorder: float = 2000.0):
+            """Train: yellow top hard-bracket (tips down). Test: orange top hard-bracket (tips down). Outside axes, above GT green box."""
             for t0, t1 in train_intervals:
-                _subfn_draw_train_interval_top_bracket(ax, t0=float(t0), t1=float(t1), color='purple', linewidth=1.25, tip_fraction=0.07, zorder=max(float(zorder), 14.0))
+                _subfn_draw_interval_top_bracket(ax, t0=float(t0), t1=float(t1), color=train_bracket_color, linewidth=linewidth, above_axes_fraction=above_axes_fraction, tip_fraction=tip_fraction, zorder=zorder)
             ## END for t0, t1 in train_intervals...
             for t0, t1 in test_intervals:
-                ax.axvspan(t0, t1, facecolor=test_facecolor, alpha=test_alpha, edgecolor='magenta', linewidth=1.5, hatch='///', zorder=zorder)
+                _subfn_draw_interval_top_bracket(ax, t0=float(t0), t1=float(t1), color=test_bracket_color, linewidth=linewidth, above_axes_fraction=above_axes_fraction, tip_fraction=tip_fraction, zorder=zorder)
             ## END for t0, t1 in test_intervals...
 
 
@@ -10838,7 +10843,7 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
             `truth_decoder_names_for_page`: length == len(page_lap_indicies), values in decoder_names.
             `posterior_masking_value`: imshow vmin; keep 0.0 so low-P stays on the colormap (non-zero + under_color white washes out P contrast).
             Default cmap is ``viridis`` with red measured traj for decode–trajectory contrast; override via `cmap` / post-style.
-            When `train_epochs_dict`/`test_epochs_dict` are provided: train = purple top bracket (tips down); test = magenta hatch; on every column.
+            When `train_epochs_dict`/`test_epochs_dict` are provided: train = yellow / test = orange brackets just above axes (tips down); zorder above GT green box.
             When `should_dim_low_firing_bins` and `spikes_df` are set, bins with fewer than `min_num_unique_active_neurons_per_time_bin` firing aclus are dimmed (same defaults as train-test pos-err; default 1).
             """
             if decoder_names is None:
@@ -10905,14 +10910,16 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
                     else:
                         ax.set_ylabel('')
                         ax.tick_params(axis='y', labelleft=False)  # y labels only on leftmost column
-                    if enable_train_test_spans and ((len(train_intervals) + len(test_intervals)) > 0):
-                        _subfn_shade_train_test_intervals(ax, train_intervals=train_intervals, test_intervals=test_intervals)
                     if a_decoder_name == truth_name:
                         _subfn_draw_green_groundtruth_axis_box(ax)
                     else:
                         _subfn_dim_non_groundtruth_axis(ax)
                     if low_firing_mask_rgba is not None:
                         _subfn_overlay_low_firing_bins_dimming(ax, mask_rgba=low_firing_mask_rgba, xmin=low_firing_xmin, xmax=low_firing_xmax, zorder=11.0)
+                    ## Brackets after GT green box so they paint on top (also zorder=1100 > FancyBboxPatch 1000):
+                    if enable_train_test_spans and ((len(train_intervals) + len(test_intervals)) > 0):
+                        _subfn_shade_train_test_intervals(ax, train_intervals=train_intervals, test_intervals=test_intervals)
+
                 ## END for col_i, a_decoder_name in enumerate(decoder_names)...
             ## END for row_i, lap_idx in enumerate(page_lap_indicies)...
             if enable_train_test_spans:
@@ -10932,7 +10939,7 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
             Returns dict with keys: `laps_epochs_df`, `page_png_paths`, `combined_img_out_path`, `n_pages`, `n_laps`.
             `posterior_masking_value` default 0.0 disables under-threshold whitening (pass >0 only if intentional clipping is desired).
             Low-firing dimming defaults match ``export_train_test_pos_err`` (`min_num_unique_active_neurons_per_time_bin=1`).
-            When `train_epochs_dict`/`test_epochs_dict` are provided, shades within-lap train/test intervals (viridis + red measured traj by default).
+            When `train_epochs_dict`/`test_epochs_dict` are provided, draws train/test top brackets (yellow/orange; above GT green box; viridis + red measured traj by default).
             """
             output_dir = Path(output_dir).resolve()
             output_dir.mkdir(parents=True, exist_ok=True)
