@@ -405,9 +405,11 @@ class directional_train_test_split_Parameters(HDF_SerializationMixin, AttrsBased
     """ Docstring for directional_train_test_split_Parameters. 
     """
     training_data_portion: float = serialized_attribute_field(default=0.9)
+    train_test_full_lap: bool = serialized_attribute_field(default=True)
     debug_output_hdf5_file_path: Optional[pathlib.Path] = serialized_attribute_field(default=None)
     ## PARAMS - these are class properties
     training_data_portion_PARAM = param.Number(default=0.9, doc='training_data_portion param', label='training_data_portion')
+    train_test_full_lap_PARAM = param.Boolean(default=True, doc='hold out whole laps as test (vs temporal fraction within each lap)', label='train_test_full_lap')
     debug_output_hdf5_file_path_PARAM = param.Path(default=None, doc='debug_output_hdf5_file_path param', label='debug_output_hdf5_file_path')
     # HDFMixin Conformances ______________________________________________________________________________________________ #
     def to_hdf(self, file_path, key: str, **kwargs):

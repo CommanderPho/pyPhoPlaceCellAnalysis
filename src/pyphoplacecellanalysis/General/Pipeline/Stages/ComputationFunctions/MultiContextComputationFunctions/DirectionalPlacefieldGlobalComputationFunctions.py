@@ -6067,10 +6067,12 @@ class TrainTestLapsSplitting:
     @function_attributes(short_name=None, tags=['split', 'train-test'], input_requires=[], output_provides=[], uses=['split_laps_training_and_test'], used_by=['_split_train_test_laps_data'], creation_date='2024-03-29 22:14', related_items=[])
     @classmethod
     def compute_train_test_split_laps_decoders(cls, directional_laps_results: DirectionalLapsResult, track_templates: TrackTemplates, training_data_portion: float=9.0/10.0,
-                                            debug_output_hdf5_file_path=None, debug_plot: bool = False, debug_print: bool = False) -> TrainTestSplitResult: #Tuple[Tuple[Dict[str, pd.DataFrame], Dict[str, pd.DataFrame]], Dict[str, BasePositionDecoder], Dict[str, DynamicContainer]]:
+                                            train_test_full_lap: bool = True, debug_output_hdf5_file_path=None, debug_plot: bool = False, debug_print: bool = False) -> TrainTestSplitResult: #Tuple[Tuple[Dict[str, pd.DataFrame], Dict[str, pd.DataFrame]], Dict[str, BasePositionDecoder], Dict[str, DynamicContainer]]:
         """ 
         ## Split the lap epochs into training and test periods.
         ##### Ideally we could test the lap decoding error by sampling randomly from the time bins and omitting 1/10 of time bins from the placefield building (effectively the training data). These missing bins will be used as the "test data" and the decoding error will be computed by decoding them and subtracting the actual measured position during these bins.
+
+        train_test_full_lap (bool): if True (default), hold out whole laps as test (~``1 - training_data_portion`` of lap count); if False, leave out a temporal fraction within each lap.
 
         ## Get custom decoder that is only trained on a portion of the laps
         ## Build the `BasePositionDecoder` for each of the four templates analagous to what is done in `_long_short_decoding_analysis_from_decoders`:
@@ -6160,7 +6162,7 @@ class TrainTestLapsSplitting:
             # a_config['pf_params'].computation_epochs
             a_laps_df: pd.DataFrame = ensure_dataframe(deepcopy(a_config['pf_params'].computation_epochs))
             # ensure non-overlapping first:
-            a_laps_training_df, a_laps_test_df = a_laps_df.epochs.split_into_training_and_test(training_data_portion=training_data_portion, group_column_name ='lap_id', additional_epoch_identity_column_names=['label', 'lap_id', 'lap_dir'], skip_get_non_overlapping=False, debug_print=False) # a_laps_training_df, a_laps_test_df both comeback good here.
+            a_laps_training_df, a_laps_test_df = a_laps_df.epochs.split_into_training_and_test(training_data_portion=training_data_portion, group_column_name ='lap_id', additional_epoch_identity_column_names=['label', 'lap_id', 'lap_dir'], skip_get_non_overlapping=False, train_test_full_lap=train_test_full_lap, debug_print=False) # a_laps_training_df, a_laps_test_df both comeback good here.
             
             if debug_output_hdf5_file_path is not None:
                 # Write out to HDF5 file:
@@ -9102,7 +9104,7 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
                         validate_computation_test=_workaround_validate_has_directional_train_test_split_result, 
                         is_global=True, computation_precidence=(1002.3))
     def _split_train_test_laps_data(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False,
-                                    training_data_portion: float = (9.0/10.0), debug_output_hdf5_file_path = None):
+                                    training_data_portion: float = (9.0/10.0), train_test_full_lap: bool = True, debug_output_hdf5_file_path = None):
         """ Using the four 1D decoders, performs 1D Bayesian decoding for each of the known epochs (Laps, Ripple) from the neural activity during these peirods.
         
         Requires:
@@ -9113,6 +9115,8 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
                 ['DirectionalDecodersEpochsEvaluations']['directional_lap_specific_configs']
                 ['DirectionalDecodersEpochsEvaluations']['continuously_decoded_result_cache_dict']
                 a_train_test_result = global_computation_results.computed_data['TrainTestSplit']
+
+        train_test_full_lap: if True (default), hold out whole laps as test; if False, leave out a temporal fraction within each lap.
         """
         if global_computation_results.computation_config is None:
             raise NotImplementedError(f'global_computation_results.computation_config is None!')
@@ -9126,14 +9130,14 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
         # print(f'included_qclu_values: {included_qclu_values}')
 
         test_data_portion: float = 1.0 - training_data_portion # test data portion is 1/10 of the total duration
-        print(f'training_data_portion: {training_data_portion}, test_data_portion: {test_data_portion}')
+        print(f'training_data_portion: {training_data_portion}, test_data_portion: {test_data_portion}, train_test_full_lap: {train_test_full_lap}')
 
         # decoders_dict = deepcopy(track_templates.get_decoders_dict())
 
         # debug_output_hdf5_file_path = Path('output', 'laps_train_test_split.h5').resolve()
         debug_output_hdf5_file_path = None
         a_train_test_result: TrainTestSplitResult = TrainTestLapsSplitting.compute_train_test_split_laps_decoders(directional_laps_results=directional_laps_results, track_templates=track_templates, training_data_portion=training_data_portion,
-                                                                                                                                    debug_output_hdf5_file_path=debug_output_hdf5_file_path, debug_plot=False, debug_print=debug_print)  # type: Tuple[Tuple[Dict[str, Any], Dict[str, Any]], Dict[str, BasePositionDecoder], Any]
+                                                                                                                                    train_test_full_lap=train_test_full_lap, debug_output_hdf5_file_path=debug_output_hdf5_file_path, debug_plot=False, debug_print=debug_print)  # type: Tuple[Tuple[Dict[str, Any], Dict[str, Any]], Dict[str, BasePositionDecoder], Any]
 
         global_computation_results.computed_data['TrainTestSplit'] = a_train_test_result
         
