@@ -10665,8 +10665,8 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
 
         `posterior_masking_value` is imshow `vmin` (default 0.0 = no under-threshold whitening). Non-zero values clip low-P to `under_color` and dominate low/high-P contrast.
 
-        Defaults for measured-traj contrast: posterior cmap ``viridis`` (black under/bad, white over) + cyan measured line ``#00e5ff`` @ 0.85.
-        Within-lap TrainTestSplit intervals are shaded when available (train=light green, test=purple); left ylabel is ``Lap {lap_id}``.
+        Defaults for measured-traj contrast: posterior cmap ``viridis`` (black under/bad, white over) + thin red measured line ``#ff0000`` @ 0.45, linewidth 0.8.
+        Within-lap TrainTestSplit: train = thin purple top bracket (tips down); test = magenta hatch; left ylabel is ``Lap {lap_id}``.
 
         Low-firing bin dimming (default on): same thresholds as ``export_train_test_pos_err`` / ``_do_custom_decode_epochs``
         (`min_num_spikes_per_bin_to_be_considered_active=1`, `min_num_unique_active_neurons_per_time_bin=1`). Inactive bins get a semi-transparent black overlay.
@@ -10745,24 +10745,83 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
             return ax.imshow(mask_rgba, origin='lower', aspect='auto', interpolation='nearest', extent=(xmin, xmax, ymin, ymax), animated=False, zorder=zorder)
 
 
+        def _subfn_epoch_rows_as_intervals(epochs_df: pd.DataFrame) -> List[Tuple[float, float]]:
+            stop_col: str = 'stop' if ('stop' in epochs_df.columns) else 'end'
+            return [(float(st), float(en)) for st, en in zip(epochs_df['start'].to_numpy(), epochs_df[stop_col].to_numpy())]
+
+
         def _subfn_train_test_intervals_for_lap(epochs_df: Optional[pd.DataFrame], lap_id) -> List[Tuple[float, float]]:
             """Return (start, stop) intervals for `lap_id` from a TrainTestSplit train/test epochs df."""
             if (epochs_df is None) or (lap_id is None) or ('lap_id' not in getattr(epochs_df, 'columns', [])):
                 return []
-            rows = epochs_df[epochs_df['lap_id'].to_numpy() == lap_id]
+            try:
+                lap_id_key = int(lap_id)
+                rows = epochs_df[pd.to_numeric(epochs_df['lap_id'], errors='coerce').astype('Int64') == lap_id_key]
+            except Exception:
+                rows = epochs_df[epochs_df['lap_id'].to_numpy() == lap_id]
             if len(rows) == 0:
                 return []
-            stop_col: str = 'stop' if ('stop' in rows.columns) else 'end'
-            return [(float(st), float(en)) for st, en in zip(rows['start'].to_numpy(), rows[stop_col].to_numpy())]
+            return _subfn_epoch_rows_as_intervals(rows)
 
 
-        def _subfn_shade_train_test_intervals(ax, train_intervals: List[Tuple[float, float]], test_intervals: List[Tuple[float, float]], train_facecolor: str = 'green', test_facecolor: str = 'purple', train_alpha: float = 0.08, test_alpha: float = 0.12, zorder: float = 5.0):
-            """Shade within-lap train (light green) and test (purple) fragments — palette matches `TrainTestLapsSplitting.debug_draw_laps_train_test_split_epochs`."""
+        def _subfn_train_test_intervals_overlapping_window(epochs_df: Optional[pd.DataFrame], t_start: float, t_stop: float) -> List[Tuple[float, float]]:
+            """Return intervals that overlap `[t_start, t_stop]` (clipped to that window)."""
+            if (epochs_df is None) or (len(epochs_df) == 0) or ('start' not in getattr(epochs_df, 'columns', [])):
+                return []
+            stop_col: str = 'stop' if ('stop' in epochs_df.columns) else 'end'
+            starts = epochs_df['start'].to_numpy(dtype=float)
+            stops = epochs_df[stop_col].to_numpy(dtype=float)
+            mask = (starts < float(t_stop)) & (stops > float(t_start))
+            if not np.any(mask):
+                return []
+            return [(max(float(st), float(t_start)), min(float(en), float(t_stop))) for st, en in zip(starts[mask], stops[mask])]
+
+
+        def _subfn_resolve_train_test_intervals_for_lap(train_epochs_dict: Optional[Dict[str, pd.DataFrame]], test_epochs_dict: Optional[Dict[str, pd.DataFrame]], truth_name: str, lap_id, lap_t_start: float, lap_t_stop: float) -> Tuple[List[Tuple[float, float]], List[Tuple[float, float]]]:
+            """Prefer truth-decoder + lap_id; fall back to any decoder by lap_id, then by time overlap."""
+            decoder_order: List[str] = []
+            if truth_name:
+                decoder_order.append(str(truth_name))
+            for dname in list((train_epochs_dict or {}).keys()) + list((test_epochs_dict or {}).keys()):
+                if dname not in decoder_order:
+                    decoder_order.append(dname)
+            ## END for dname in list((train_epochs_dict or {}).keys()) + list((test_epochs_dict or {}).keys())...
+
+            for dname in decoder_order:
+                train_ivs = _subfn_train_test_intervals_for_lap((train_epochs_dict or {}).get(dname), lap_id)
+                test_ivs = _subfn_train_test_intervals_for_lap((test_epochs_dict or {}).get(dname), lap_id)
+                if (len(train_ivs) + len(test_ivs)) > 0:
+                    return train_ivs, test_ivs
+            ## END for dname in decoder_order...
+
+            for dname in decoder_order:
+                train_ivs = _subfn_train_test_intervals_overlapping_window((train_epochs_dict or {}).get(dname), lap_t_start, lap_t_stop)
+                test_ivs = _subfn_train_test_intervals_overlapping_window((test_epochs_dict or {}).get(dname), lap_t_start, lap_t_stop)
+                if (len(train_ivs) + len(test_ivs)) > 0:
+                    return train_ivs, test_ivs
+            ## END for dname in decoder_order...
+            return [], []
+
+
+        def _subfn_draw_train_interval_top_bracket(ax, t0: float, t1: float, color: str = 'purple', linewidth: float = 1.25, tip_fraction: float = 0.07, zorder: float = 14.0):
+            """Thin hard bracket along the top of the axes spanning [t0, t1], vertical tips pointing down into the posterior."""
+            ymin, ymax = ax.get_ylim()
+            tip_len: float = float(ymax - ymin) * float(tip_fraction)
+            y_top: float = float(ymax)
+            y_tip: float = float(ymax - tip_len)
+            bracket_kwargs = dict(color=color, linewidth=linewidth, solid_capstyle='butt', solid_joinstyle='miter', clip_on=False, zorder=zorder, alpha=1.0)
+            ax.plot([t0, t1], [y_top, y_top], **bracket_kwargs)  # top bar
+            ax.plot([t0, t0], [y_top, y_tip], **bracket_kwargs)  # left tip down
+            ax.plot([t1, t1], [y_top, y_tip], **bracket_kwargs)  # right tip down
+
+
+        def _subfn_shade_train_test_intervals(ax, train_intervals: List[Tuple[float, float]], test_intervals: List[Tuple[float, float]], test_facecolor: str = '#ff00ff', test_alpha: float = 0.28, zorder: float = 12.0):
+            """Train: purple top hard-bracket (tips down). Test: magenta hatch band above the posterior."""
             for t0, t1 in train_intervals:
-                ax.axvspan(t0, t1, facecolor=train_facecolor, alpha=train_alpha, linewidth=0, zorder=zorder)
+                _subfn_draw_train_interval_top_bracket(ax, t0=float(t0), t1=float(t1), color='purple', linewidth=1.25, tip_fraction=0.07, zorder=max(float(zorder), 14.0))
             ## END for t0, t1 in train_intervals...
             for t0, t1 in test_intervals:
-                ax.axvspan(t0, t1, facecolor=test_facecolor, alpha=test_alpha, linewidth=0, zorder=zorder)
+                ax.axvspan(t0, t1, facecolor=test_facecolor, alpha=test_alpha, edgecolor='magenta', linewidth=1.5, hatch='///', zorder=zorder)
             ## END for t0, t1 in test_intervals...
 
 
@@ -10778,8 +10837,8 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
             `page_lap_indicies`: positional indices into each decoder's DecodedFilterEpochsResult lists (shared lap order).
             `truth_decoder_names_for_page`: length == len(page_lap_indicies), values in decoder_names.
             `posterior_masking_value`: imshow vmin; keep 0.0 so low-P stays on the colormap (non-zero + under_color white washes out P contrast).
-            Default cmap is ``viridis`` with cyan measured traj for decode–trajectory contrast; override via `cmap` / post-style.
-            When `train_epochs_dict`/`test_epochs_dict` and `page_lap_ids` are provided, shade within-lap train/test intervals on every column.
+            Default cmap is ``viridis`` with red measured traj for decode–trajectory contrast; override via `cmap` / post-style.
+            When `train_epochs_dict`/`test_epochs_dict` are provided: train = purple top bracket (tips down); test = magenta hatch; on every column.
             When `should_dim_low_firing_bins` and `spikes_df` are set, bins with fewer than `min_num_unique_active_neurons_per_time_bin` firing aclus are dimmed (same defaults as train-test pos-err; default 1).
             """
             if decoder_names is None:
@@ -10788,30 +10847,35 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
             n_cols: int = int(len(decoder_names))
             assert n_rows == len(truth_decoder_names_for_page)
             enable_low_firing_dimming: bool = bool(should_dim_low_firing_bins) and (spikes_df is not None)
-            enable_train_test_spans: bool = (train_epochs_dict is not None) and (test_epochs_dict is not None) and (page_lap_ids is not None)
+            enable_train_test_spans: bool = (train_epochs_dict is not None) and (test_epochs_dict is not None)
 
-            # under/over still set for out-of-range; viridis + cyan measured traj for decode–trajectory contrast (override via cmap kwarg)
+            # under/over still set for out-of-range; viridis + red measured traj for decode–trajectory contrast (override via cmap kwarg)
             cmap = kwargs.pop('cmap', get_heatmap_cmap(cmap='viridis', bad_color='black', under_color='black', over_color='white'))
             posterior_heatmap_imshow_kwargs = kwargs.pop('posterior_heatmap_imshow_kwargs', dict(cmap=cmap, vmin=float(posterior_masking_value), vmax=1.0))
             skip_plotting_most_likely_positions: bool = kwargs.pop('skip_plotting_most_likely_positions', True)
             skip_plotting_measured_positions: bool = kwargs.pop('skip_plotting_measured_positions', False)
-            measured_line_color: str = kwargs.pop('measured_line_color', '#00e5ff')
-            measured_line_alpha: float = float(kwargs.pop('measured_line_alpha', 0.85))
+            measured_line_color: str = kwargs.pop('measured_line_color', '#ff0000')
+            measured_line_alpha: float = float(kwargs.pop('measured_line_alpha', 0.45))
+            measured_line_linewidth: float = float(kwargs.pop('measured_line_linewidth', 0.8))
 
             fig, axs = plt.subplots(nrows=n_rows, ncols=n_cols, figsize=(figsize_width, max(figsize_per_row * float(n_rows), 2.0)), dpi=dpi, squeeze=False, sharex=False, sharey=False, constrained_layout=True)
+            n_rows_with_train_test_spans: int = 0
+            ref_result_for_epochs: DecodedFilterEpochsResult = decoder_laps_filter_epochs_decoder_result_dict[decoder_names[0]]
+            ref_laps_epochs_df = ensure_dataframe(ref_result_for_epochs.active_filter_epochs)
             for row_i, lap_idx in enumerate(page_lap_indicies):
                 truth_name: str = str(truth_decoder_names_for_page[row_i])
                 lap_id = page_lap_ids[row_i] if (page_lap_ids is not None) else None
+                lap_t_start, lap_t_stop = ref_laps_epochs_df.iloc[int(lap_idx)][['start', 'stop']].to_numpy().astype(float)
                 train_intervals: List[Tuple[float, float]] = []
                 test_intervals: List[Tuple[float, float]] = []
                 if enable_train_test_spans:
-                    train_intervals = _subfn_train_test_intervals_for_lap(train_epochs_dict.get(truth_name), lap_id)
-                    test_intervals = _subfn_train_test_intervals_for_lap(test_epochs_dict.get(truth_name), lap_id)
+                    train_intervals, test_intervals = _subfn_resolve_train_test_intervals_for_lap(train_epochs_dict, test_epochs_dict, truth_name=truth_name, lap_id=lap_id, lap_t_start=float(lap_t_start), lap_t_stop=float(lap_t_stop))
+                    if (len(train_intervals) + len(test_intervals)) > 0:
+                        n_rows_with_train_test_spans += 1
                 ## Compute low-firing mask once per lap (shared time bins across the four directional decoders):
                 low_firing_mask_rgba, low_firing_xmin, low_firing_xmax = None, None, None
                 if enable_low_firing_dimming:
-                    ref_result: DecodedFilterEpochsResult = decoder_laps_filter_epochs_decoder_result_dict[decoder_names[0]]
-                    low_firing_mask_rgba, _is_active, low_firing_xmin, low_firing_xmax = _subfn_compute_low_firing_mask_rgba_for_time_bin_container(spikes_df=spikes_df, time_bin_container=ref_result.time_bin_containers[int(lap_idx)], min_num_spikes_per_bin_to_be_considered_active=min_num_spikes_per_bin_to_be_considered_active, min_num_unique_active_neurons_per_time_bin=min_num_unique_active_neurons_per_time_bin)
+                    low_firing_mask_rgba, _is_active, low_firing_xmin, low_firing_xmax = _subfn_compute_low_firing_mask_rgba_for_time_bin_container(spikes_df=spikes_df, time_bin_container=ref_result_for_epochs.time_bin_containers[int(lap_idx)], min_num_spikes_per_bin_to_be_considered_active=min_num_spikes_per_bin_to_be_considered_active, min_num_unique_active_neurons_per_time_bin=min_num_unique_active_neurons_per_time_bin)
                 for col_i, a_decoder_name in enumerate(decoder_names):
                     ax = axs[row_i, col_i]
                     a_result: DecodedFilterEpochsResult = decoder_laps_filter_epochs_decoder_result_dict[a_decoder_name]
@@ -10822,12 +10886,14 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
                                                             active_most_likely_positions_1D=curr_most_likely, variable_name=variable_name, enable_flat_line_drawing=False,
                                                             skip_plotting_measured_positions=skip_plotting_measured_positions, skip_plotting_most_likely_positions=skip_plotting_most_likely_positions,
                                                             posterior_heatmap_imshow_kwargs=posterior_heatmap_imshow_kwargs, return_created_artists=True)
-                    # measured traj: cyan @ 0.85 for contrast against viridis (override via measured_line_color / measured_line_alpha)
+                    # measured traj: thin red @ 0.45 so posterior mass stays readable (override via measured_line_*)
                     _measured_lines = _artists.get('line_measured_position')
                     if _measured_lines is not None:
                         for _ln in (_measured_lines if isinstance(_measured_lines, (list, tuple)) else [_measured_lines]):
                             _ln.set_color(measured_line_color)
                             _ln.set_alpha(measured_line_alpha)
+                            _ln.set_linewidth(measured_line_linewidth)
+                            _ln.set_zorder(13.0)
                         ## END for _ln in (_measured_lines if isinstance(_measured_lines, (list, tuple)) else [_measured_lines])...
                     ## END if _measured_lines is not None...
                     epoch_slice = ensure_dataframe(a_result.active_filter_epochs).iloc[int(lap_idx)][['start', 'stop']].to_numpy()
@@ -10839,7 +10905,7 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
                     else:
                         ax.set_ylabel('')
                         ax.tick_params(axis='y', labelleft=False)  # y labels only on leftmost column
-                    if enable_train_test_spans:
+                    if enable_train_test_spans and ((len(train_intervals) + len(test_intervals)) > 0):
                         _subfn_shade_train_test_intervals(ax, train_intervals=train_intervals, test_intervals=test_intervals)
                     if a_decoder_name == truth_name:
                         _subfn_draw_green_groundtruth_axis_box(ax)
@@ -10849,6 +10915,8 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
                         _subfn_overlay_low_firing_bins_dimming(ax, mask_rgba=low_firing_mask_rgba, xmin=low_firing_xmin, xmax=low_firing_xmax, zorder=11.0)
                 ## END for col_i, a_decoder_name in enumerate(decoder_names)...
             ## END for row_i, lap_idx in enumerate(page_lap_indicies)...
+            if enable_train_test_spans:
+                print(f'\ttrain/test axvspans: {n_rows_with_train_test_spans}/{n_rows} rows on this page matched TrainTestSplit intervals', flush=True)
             return fig, axs
 
         # @function_attributes(short_name=None, tags=['laps', 'export', 'combined', 'four-decoder', 'groundtruth', 'Agg', 'headless', 'batch'], input_requires=[], output_provides=[],
@@ -10864,7 +10932,7 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
             Returns dict with keys: `laps_epochs_df`, `page_png_paths`, `combined_img_out_path`, `n_pages`, `n_laps`.
             `posterior_masking_value` default 0.0 disables under-threshold whitening (pass >0 only if intentional clipping is desired).
             Low-firing dimming defaults match ``export_train_test_pos_err`` (`min_num_unique_active_neurons_per_time_bin=1`).
-            When `train_epochs_dict`/`test_epochs_dict` are provided, shades within-lap train/test intervals (viridis + cyan measured traj by default).
+            When `train_epochs_dict`/`test_epochs_dict` are provided, shades within-lap train/test intervals (viridis + red measured traj by default).
             """
             output_dir = Path(output_dir).resolve()
             output_dir.mkdir(parents=True, exist_ok=True)
@@ -10946,8 +11014,9 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
         train_epochs_dict: Optional[Dict[str, pd.DataFrame]] = None
         test_epochs_dict: Optional[Dict[str, pd.DataFrame]] = None
         if train_test_split_result is not None:
-            train_epochs_dict = getattr(train_test_split_result, 'train_epochs_dict', None)
-            test_epochs_dict = getattr(train_test_split_result, 'test_epochs_dict', None)
+            train_epochs_dict = train_test_split_result.train_epochs_dict
+            test_epochs_dict = train_test_split_result.test_epochs_dict
+            print(f'\tTrainTestSplit loaded: train_keys={list(train_epochs_dict.keys()) if train_epochs_dict is not None else None}, test_keys={list(test_epochs_dict.keys()) if test_epochs_dict is not None else None}', flush=True)
         else:
             print('WARN: TrainTestSplit missing; skipping train/test axvspans on laps_correct_decoder_side_by_side figure', flush=True)
 
