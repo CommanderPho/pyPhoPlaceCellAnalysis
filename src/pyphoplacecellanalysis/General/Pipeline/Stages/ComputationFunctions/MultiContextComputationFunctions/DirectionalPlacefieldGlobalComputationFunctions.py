@@ -5658,7 +5658,7 @@ class CustomDecodeEpochsResult(UnpackableMixin):
 @function_attributes(short_name='custom_decode_epochs', tags=['USEFUL', 'decode', 'pure'], input_requires=[], output_provides=[], uses=['DecodedFilterEpochsResult.mask_computed_DecodedFilterEpochsResult_by_required_spike_counts_per_time_bin'], used_by=['_do_custom_decode_epochs_dict', '_do_train_test_split_decode_and_evaluate'], creation_date='2024-04-05 11:59', related_items=[])
 def _do_custom_decode_epochs(global_spikes_df: pd.DataFrame, global_measured_position_df: pd.DataFrame, pfND_Decoder: BasePositionDecoder, epochs_to_decode_df: pd.DataFrame, decoding_time_bin_size: float,
                              debug_print=False, measured_pos_column_name: str = 'lin_pos',
-                             should_mask_by_required_spike_counts: bool = True, min_num_spikes_per_bin_to_be_considered_active: int = 1, min_num_unique_active_neurons_per_time_bin: int = 3, masked_bin_fill_mode: str = 'nan_filled',
+                             should_mask_by_required_spike_counts: bool = True, min_num_spikes_per_bin_to_be_considered_active: int = 1, min_num_unique_active_neurons_per_time_bin: Optional[int] = 1, masked_bin_fill_mode: str = 'nan_filled',
                              **kwargs) -> CustomDecodeEpochsResult: #Tuple[MeasuredDecodedPositionComparison, DecodedFilterEpochsResult]:
     """
     Do a single position decoding using a single decoder for a single set of epochs
@@ -5666,7 +5666,7 @@ def _do_custom_decode_epochs(global_spikes_df: pd.DataFrame, global_measured_pos
     measured_pos_column_name (str): measured 1D position column used for the primary ``sq_err`` / ``err_cm`` comparison metrics (default ``'x'``; pass ``'lin_pos'`` for linearized position).
 
     should_mask_by_required_spike_counts (bool): when True (default), low-firing time bins are masked the same way as PBE leave-one-out / directional decoder spike-count filtering
-        via ``mask_computed_DecodedFilterEpochsResult_by_required_spike_counts_per_time_bin``. ``min_num_unique_active_neurons_per_time_bin`` is the minimum number of firing aclus per bin.
+        via ``mask_computed_DecodedFilterEpochsResult_by_required_spike_counts_per_time_bin``. ``min_num_unique_active_neurons_per_time_bin`` is the minimum number of firing aclus per bin (default 1).
         ``masked_bin_fill_mode='nan_filled'`` so NaN bins drop out of position-error metrics.
     
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import _do_custom_decode_epochs
@@ -5760,9 +5760,12 @@ def _do_custom_decode_epochs_dict(global_spikes_df: pd.DataFrame, global_measure
 
 @function_attributes(short_name=None, tags=['TrainTestSplit', 'decode'], input_requires=[], output_provides=[],
                       uses=['_do_custom_decode_epochs', 'get_proper_global_spikes_df', '_check_result_laps_epochs_df_performance', 'DirectionalPseudo2DDecodersResult'], used_by=['_perform_run_rigorous_decoder_performance_assessment'], creation_date='2024-10-08 02:35', related_items=[])
-def _do_train_test_split_decode_and_evaluate(curr_active_pipeline, active_laps_decoding_time_bin_size: float=1.5, force_recompute_directional_train_test_split_result: bool=False, compute_separate_decoder_results: bool=True, included_neuron_IDs=None, measured_pos_column_name: str = 'lin_pos', debug_print=False):
+def _do_train_test_split_decode_and_evaluate(curr_active_pipeline, active_laps_decoding_time_bin_size: float=1.5, force_recompute_directional_train_test_split_result: bool=False, compute_separate_decoder_results: bool=True, included_neuron_IDs=None, measured_pos_column_name: str = 'lin_pos',
+                                            should_mask_by_required_spike_counts: bool = True, min_num_spikes_per_bin_to_be_considered_active: int = 1, min_num_unique_active_neurons_per_time_bin: Optional[int] = 1, masked_bin_fill_mode: str = 'nan_filled', debug_print=False):
     """
     measured_pos_column_name (str): measured 1D position column used for the primary ``sq_err`` / ``err_cm`` comparison metrics (default ``'x'``; pass ``'lin_pos'`` for linearized position).
+
+    Low-firing bin masking kwargs (`should_mask_by_required_spike_counts`, `min_num_unique_active_neurons_per_time_bin`, ...) are forwarded to ``_do_custom_decode_epochs`` (default min aclus = 1).
 
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import _do_train_test_split_decode_and_evaluate
 
@@ -5847,7 +5850,9 @@ def _do_train_test_split_decode_and_evaluate(curr_active_pipeline, active_laps_d
                                                                                                                                         pfND_Decoder_dict=train_lap_specific_pfND_Decoder_dict,
                                                                                                                                         epochs_to_decode_dict=deepcopy(test_epochs_dict), 
                                                                                                                                         decoding_time_bin_size=active_laps_decoding_time_bin_size,
-                                                                                                                                        decoder_and_epoch_keys_independent=False, measured_pos_column_name=measured_pos_column_name, debug_print=debug_print)
+                                                                                                                                        decoder_and_epoch_keys_independent=False, measured_pos_column_name=measured_pos_column_name,
+                                                                                                                                        should_mask_by_required_spike_counts=should_mask_by_required_spike_counts, min_num_spikes_per_bin_to_be_considered_active=min_num_spikes_per_bin_to_be_considered_active,
+                                                                                                                                        min_num_unique_active_neurons_per_time_bin=min_num_unique_active_neurons_per_time_bin, masked_bin_fill_mode=masked_bin_fill_mode, debug_print=debug_print)
         train_decoded_results_dict: Dict[types.DecoderName, DecodedFilterEpochsResult] = {k:v.decoder_result for k, v in test_decoder_results_dict.items()}
         # weighted_corr_data_dict = compute_weighted_correlations(train_decoded_results_dict, debug_print=True)
         # # weighted_corr_data_dict
@@ -5863,7 +5868,9 @@ def _do_train_test_split_decode_and_evaluate(curr_active_pipeline, active_laps_d
     ## Decoding of the test epochs (what matters) for `all_directional_pf1D_Decoder`:
     test_all_directional_decoder_result: CustomDecodeEpochsResult = _do_custom_decode_epochs(global_spikes_df=get_proper_global_spikes_df(curr_active_pipeline), global_measured_position_df=deepcopy(curr_active_pipeline.sess.position.to_dataframe()).dropna(subset=['lap']),
                                                             pfND_Decoder=all_directional_pf1D_Decoder, epochs_to_decode_df=deepcopy(all_test_epochs_df),
-                                                            decoding_time_bin_size=active_laps_decoding_time_bin_size, measured_pos_column_name=measured_pos_column_name, debug_print=debug_print)
+                                                            decoding_time_bin_size=active_laps_decoding_time_bin_size, measured_pos_column_name=measured_pos_column_name,
+                                                            should_mask_by_required_spike_counts=should_mask_by_required_spike_counts, min_num_spikes_per_bin_to_be_considered_active=min_num_spikes_per_bin_to_be_considered_active,
+                                                            min_num_unique_active_neurons_per_time_bin=min_num_unique_active_neurons_per_time_bin, masked_bin_fill_mode=masked_bin_fill_mode, debug_print=debug_print)
     all_directional_laps_filter_epochs_decoder_result: DecodedFilterEpochsResult = test_all_directional_decoder_result.decoder_result
     ## INPUTS: test_all_directional_decoder_result
     (laps_directional_marginals_tuple, laps_track_identity_marginals_tuple, laps_non_marginalized_decoder_marginals_tuple), laps_marginals_df = all_directional_laps_filter_epochs_decoder_result.compute_marginals(epoch_idx_col_name='lap_idx', epoch_start_t_col_name='lap_start_t',
@@ -5899,13 +5906,18 @@ def _do_train_test_split_decode_and_evaluate(curr_active_pipeline, active_laps_d
 
 
 @function_attributes(short_name=None, tags=['TrainTestSplit', 'position', 'error', 'CSV', 'KDIBA'], input_requires=[], output_provides=[], uses=['_do_train_test_split_decode_and_evaluate'], used_by=['export_kdiba_train_test_position_error_csvs'], creation_date='2026-11-20 17:50', related_items=[])
-def compute_kdiba_train_test_position_error_dfs(curr_active_pipeline, active_laps_decoding_time_bin_size: float = 0.075, force_recompute_directional_train_test_split_result: bool = False, debug_print: bool = False) -> Tuple[pd.DataFrame, pd.DataFrame]:
+def compute_kdiba_train_test_position_error_dfs(curr_active_pipeline, active_laps_decoding_time_bin_size: float = 0.075, force_recompute_directional_train_test_split_result: bool = False,
+                                                should_mask_by_required_spike_counts: bool = True, min_num_spikes_per_bin_to_be_considered_active: int = 1, min_num_unique_active_neurons_per_time_bin: Optional[int] = 1, masked_bin_fill_mode: str = 'nan_filled',
+                                                debug_print: bool = False) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """Ensure TrainTestSplit, decode held-out test lap segments, return (train_test_pos_err_df, train_test_pos_err_agg_df).
 
     ``train_test_pos_err_df``: per-epoch rows with ``decoder_name``, ``session_name``, ``time_bin_size``, ``t``, ``sq_err``, ``err_cm``, ``abs_err_cm_mean``, ``abs_err_cm_median`` (+ optional ``*_1D``/``*_2D``).
     ``train_test_pos_err_agg_df``: per-``decoder_name`` mean/median of RMSE and abs-error columns and counts for session QC.
+    Low-firing masking kwargs are forwarded to ``_do_train_test_split_decode_and_evaluate`` (default ``min_num_unique_active_neurons_per_time_bin=1``).
     """
-    _out = _do_train_test_split_decode_and_evaluate(curr_active_pipeline=curr_active_pipeline, active_laps_decoding_time_bin_size=float(active_laps_decoding_time_bin_size), force_recompute_directional_train_test_split_result=force_recompute_directional_train_test_split_result, compute_separate_decoder_results=True, included_neuron_IDs=None, debug_print=debug_print)
+    _out = _do_train_test_split_decode_and_evaluate(curr_active_pipeline=curr_active_pipeline, active_laps_decoding_time_bin_size=float(active_laps_decoding_time_bin_size), force_recompute_directional_train_test_split_result=force_recompute_directional_train_test_split_result, compute_separate_decoder_results=True, included_neuron_IDs=None,
+                                                   should_mask_by_required_spike_counts=should_mask_by_required_spike_counts, min_num_spikes_per_bin_to_be_considered_active=min_num_spikes_per_bin_to_be_considered_active,
+                                                   min_num_unique_active_neurons_per_time_bin=min_num_unique_active_neurons_per_time_bin, masked_bin_fill_mode=masked_bin_fill_mode, debug_print=debug_print)
     _out_separate_decoder_results = _out[-1]
     assert _out_separate_decoder_results is not None, "compute_separate_decoder_results=True but _out_separate_decoder_results is None"
     _test_decoder_results_dict, _train_decoded_results_dict, train_decoded_measured_diff_df_dict = _out_separate_decoder_results
@@ -5945,16 +5957,21 @@ def compute_kdiba_train_test_position_error_dfs(curr_active_pipeline, active_lap
 
 
 @function_attributes(short_name=None, tags=['TrainTestSplit', 'position', 'error', 'CSV', 'KDIBA', 'export'], input_requires=[], output_provides=[], uses=['compute_kdiba_train_test_position_error_dfs', 'build_complete_session_identifier_filename_string'], used_by=['generalized_decode_epochs_dict_and_export_results_completion_function'], creation_date='2026-11-20 17:50', related_items=[])
-def export_kdiba_train_test_position_error_csvs(curr_active_pipeline, parent_output_path: Path, active_laps_decoding_time_bin_size: float = 0.025, output_date_str: Optional[str] = None, force_recompute_directional_train_test_split_result: bool = False, debug_print: bool = False) -> Dict[str, Path]:
+def export_kdiba_train_test_position_error_csvs(curr_active_pipeline, parent_output_path: Path, active_laps_decoding_time_bin_size: float = 0.025, output_date_str: Optional[str] = None, force_recompute_directional_train_test_split_result: bool = False,
+                                                should_mask_by_required_spike_counts: bool = True, min_num_spikes_per_bin_to_be_considered_active: int = 1, min_num_unique_active_neurons_per_time_bin: Optional[int] = 1, masked_bin_fill_mode: str = 'nan_filled',
+                                                debug_print: bool = False) -> Dict[str, Path]:
     """Compute held-out lap position errors and write parseable collected_outputs CSVs.
 
     Filenames: ``*(train_test_pos_err)_tbin-{size}.csv`` and ``*(train_test_pos_err_agg)_tbin-{size}.csv``.
+    Low-firing masking kwargs are forwarded to ``compute_kdiba_train_test_position_error_dfs`` (default ``min_num_unique_active_neurons_per_time_bin=1``).
     """
     parent_output_path = Path(parent_output_path).resolve()
     parent_output_path.mkdir(parents=True, exist_ok=True)
     if output_date_str is None:
         output_date_str = get_now_rounded_time_str(rounded_minutes=10)
-    train_test_pos_err_df, train_test_pos_err_agg_df = compute_kdiba_train_test_position_error_dfs(curr_active_pipeline=curr_active_pipeline, active_laps_decoding_time_bin_size=float(active_laps_decoding_time_bin_size), force_recompute_directional_train_test_split_result=force_recompute_directional_train_test_split_result, debug_print=debug_print)
+    train_test_pos_err_df, train_test_pos_err_agg_df = compute_kdiba_train_test_position_error_dfs(curr_active_pipeline=curr_active_pipeline, active_laps_decoding_time_bin_size=float(active_laps_decoding_time_bin_size), force_recompute_directional_train_test_split_result=force_recompute_directional_train_test_split_result,
+                                                                                                   should_mask_by_required_spike_counts=should_mask_by_required_spike_counts, min_num_spikes_per_bin_to_be_considered_active=min_num_spikes_per_bin_to_be_considered_active,
+                                                                                                   min_num_unique_active_neurons_per_time_bin=min_num_unique_active_neurons_per_time_bin, masked_bin_fill_mode=masked_bin_fill_mode, debug_print=debug_print)
     tbin_str: str = str(float(active_laps_decoding_time_bin_size))
     out_paths: Dict[str, Path] = {}
     for file_type_key, export_df in (('train_test_pos_err', train_test_pos_err_df), ('train_test_pos_err_agg', train_test_pos_err_agg_df)):
@@ -10643,13 +10660,13 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
                           used_by=['figures_export_laps_correct_decoder_side_by_side_completion_function'], creation_date='2026-11-12 00:00', related_items=[], is_global=True)
     def _display_laps_correct_decoder_side_by_side_posteriors(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True, parent_output_folder: Optional[Path] = None,
                                                              max_subplots_per_page: int = 8, variable_name: str = 'lin_pos', posterior_masking_value: float = 0.0, dpi: int = 150, combined_image_basename: Optional[str] = None,
-                                                             should_dim_low_firing_bins: bool = True, min_num_spikes_per_bin_to_be_considered_active: int = 1, min_num_unique_active_neurons_per_time_bin: int = 3, **kwargs):
+                                                             should_dim_low_firing_bins: bool = True, min_num_spikes_per_bin_to_be_considered_active: int = 1, min_num_unique_active_neurons_per_time_bin: Optional[int] = 1, **kwargs):
         """Headless Agg export of all laps as 4-decoder side-by-side posteriors with a green axis box on the session-lap ground-truth decoder; pages are vertical-stacked into one PNG.
 
         `posterior_masking_value` is imshow `vmin` (default 0.0 = no under-threshold whitening). Non-zero values clip low-P to `under_color` and dominate low/high-P contrast.
 
         Low-firing bin dimming (default on): same thresholds as ``export_train_test_pos_err`` / ``_do_custom_decode_epochs``
-        (`min_num_spikes_per_bin_to_be_considered_active=1`, `min_num_unique_active_neurons_per_time_bin=3`). Inactive bins get a semi-transparent black overlay.
+        (`min_num_spikes_per_bin_to_be_considered_active=1`, `min_num_unique_active_neurons_per_time_bin=1`). Inactive bins get a semi-transparent black overlay.
 
         Usage (BATCH):
             ipython ProcessBatchOutputs_qclus1246789_Only.ipy -- --date 2026-11-23 --computer GL --tbin 0.075 --only figures_export_laps_correct_decoder_side_by_side
@@ -10730,13 +10747,13 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
                                                          page_lap_indicies: NDArray, truth_decoder_names_for_page: NDArray, decoder_names: Optional[List[str]] = None, variable_name: str = 'lin_pos',
                                                          posterior_masking_value: float = 0.0, figsize_per_row: float = 1.6, figsize_width: float = 16.0, dpi: int = 150,
                                                          spikes_df: Optional[pd.DataFrame] = None, should_dim_low_firing_bins: bool = True,
-                                                         min_num_spikes_per_bin_to_be_considered_active: int = 1, min_num_unique_active_neurons_per_time_bin: int = 3, **kwargs) -> Tuple[plt.Figure, NDArray]:
+                                                         min_num_spikes_per_bin_to_be_considered_active: int = 1, min_num_unique_active_neurons_per_time_bin: Optional[int] = 1, **kwargs) -> Tuple[plt.Figure, NDArray]:
             """Plot one page: rows = laps on this page, columns = four directional decoders; green-box the ground-truth decoder per row.
 
             `page_lap_indicies`: positional indices into each decoder's DecodedFilterEpochsResult lists (shared lap order).
             `truth_decoder_names_for_page`: length == len(page_lap_indicies), values in decoder_names.
             `posterior_masking_value`: imshow vmin; keep 0.0 so low-P stays on the colormap (non-zero + under_color white washes out P contrast).
-            When `should_dim_low_firing_bins` and `spikes_df` are set, bins with fewer than `min_num_unique_active_neurons_per_time_bin` firing aclus are dimmed (same defaults as train-test pos-err).
+            When `should_dim_low_firing_bins` and `spikes_df` are set, bins with fewer than `min_num_unique_active_neurons_per_time_bin` firing aclus are dimmed (same defaults as train-test pos-err; default 1).
             """
             if decoder_names is None:
                 decoder_names = list(TrackTemplates.get_decoder_names())
@@ -10799,12 +10816,12 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
                                                                      output_dir, combined_image_basename: str = 'laps_4decoder_gt_boxed', max_subplots_per_page: int = 8, variable_name: str = 'lin_pos',
                                                                      posterior_masking_value: float = 0.0, dpi: int = 150, write_png: bool = True, debug_print: bool = False,
                                                                      spikes_df: Optional[pd.DataFrame] = None, should_dim_low_firing_bins: bool = True,
-                                                                     min_num_spikes_per_bin_to_be_considered_active: int = 1, min_num_unique_active_neurons_per_time_bin: int = 3, **kwargs) -> Dict[str, Any]:
+                                                                     min_num_spikes_per_bin_to_be_considered_active: int = 1, min_num_unique_active_neurons_per_time_bin: Optional[int] = 1, **kwargs) -> Dict[str, Any]:
             """Headless Agg export: paginate all laps as 4-decoder side-by-side pages with GT green boxes, then vertical-stack PNGs into one combined figure.
 
             Returns dict with keys: `laps_epochs_df`, `page_png_paths`, `combined_img_out_path`, `n_pages`, `n_laps`.
             `posterior_masking_value` default 0.0 disables under-threshold whitening (pass >0 only if intentional clipping is desired).
-            Low-firing dimming defaults match ``export_train_test_pos_err`` (`min_num_unique_active_neurons_per_time_bin=3`).
+            Low-firing dimming defaults match ``export_train_test_pos_err`` (`min_num_unique_active_neurons_per_time_bin=1`).
             """
             output_dir = Path(output_dir).resolve()
             output_dir.mkdir(parents=True, exist_ok=True)

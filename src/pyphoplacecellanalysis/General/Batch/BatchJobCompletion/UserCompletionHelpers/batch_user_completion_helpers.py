@@ -3249,13 +3249,16 @@ def export_decoded_variables_evaluation_completion_function(self, global_data_ro
 
 @function_attributes(short_name=None, tags=['TrainTestSplit', 'position', 'error', 'CSV', 'KDIBA', 'batch', 'export', 'shuffles-indep', 'pure'], input_requires=[], output_provides=['compute_and_export_kdiba_train_test_position_error_completion_function'], uses=['export_kdiba_train_test_position_error_csvs'], used_by=[], creation_date='2026-11-20 18:00', related_items=['generalized_decode_epochs_dict_and_export_results_completion_function', 'export_kdiba_train_test_position_error_csvs'])
 def compute_and_export_kdiba_train_test_position_error_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict,
-        active_laps_decoding_time_bin_size: float = 0.025, force_recompute_directional_train_test_split_result: bool = False, debug_print: bool = False,
-        export_filename_extra_suffix_parts: Optional[List[str]] = None) -> dict:
+        active_laps_decoding_time_bin_size: float = 0.025, force_recompute_directional_train_test_split_result: bool = False,
+        should_mask_by_required_spike_counts: bool = True, min_num_spikes_per_bin_to_be_considered_active: int = 1, min_num_unique_active_neurons_per_time_bin: Optional[int] = 1, masked_bin_fill_mode: str = 'nan_filled',
+        debug_print: bool = False, export_filename_extra_suffix_parts: Optional[List[str]] = None) -> dict:
     """Ensure ``TrainTestSplit`` (compute-if-missing), decode held-out lap test segments, export position-error CSVs.
 
     Writes under ``self.collected_outputs_path``:
       ``*(train_test_pos_err)_tbin-{size}.csv``
       ``*(train_test_pos_err_agg)_tbin-{size}.csv``
+
+    Low-firing masking kwargs (default ``min_num_unique_active_neurons_per_time_bin=1``) are forwarded to ``export_kdiba_train_test_position_error_csvs``.
 
     from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import compute_and_export_kdiba_train_test_position_error_completion_function
     """
@@ -3266,13 +3269,15 @@ def compute_and_export_kdiba_train_test_position_error_completion_function(self,
     if across_session_results_extended_dict is None:
         across_session_results_extended_dict = {}
     print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
-    print(f'compute_and_export_kdiba_train_test_position_error_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, active_laps_decoding_time_bin_size: {active_laps_decoding_time_bin_size}, ...)')
+    print(f'compute_and_export_kdiba_train_test_position_error_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, active_laps_decoding_time_bin_size: {active_laps_decoding_time_bin_size}, min_num_unique_active_neurons_per_time_bin: {min_num_unique_active_neurons_per_time_bin}, ...)')
     assert self.collected_outputs_path.exists()
     apply_export_filename_extra_suffix_parts_to_pipeline(curr_active_pipeline, export_filename_extra_suffix_parts=export_filename_extra_suffix_parts)
 
-    callback_outputs = {'train_test_pos_err_csv_paths': None, 'active_laps_decoding_time_bin_size': float(active_laps_decoding_time_bin_size), 'error': None}
+    callback_outputs = {'train_test_pos_err_csv_paths': None, 'active_laps_decoding_time_bin_size': float(active_laps_decoding_time_bin_size), 'min_num_unique_active_neurons_per_time_bin': min_num_unique_active_neurons_per_time_bin, 'error': None}
     try:
-        train_test_pos_err_csv_paths = export_kdiba_train_test_position_error_csvs(curr_active_pipeline=curr_active_pipeline, parent_output_path=self.collected_outputs_path.resolve(), active_laps_decoding_time_bin_size=float(active_laps_decoding_time_bin_size), output_date_str=getattr(self, 'BATCH_DATE_TO_USE', None), force_recompute_directional_train_test_split_result=bool(force_recompute_directional_train_test_split_result), debug_print=bool(debug_print))
+        train_test_pos_err_csv_paths = export_kdiba_train_test_position_error_csvs(curr_active_pipeline=curr_active_pipeline, parent_output_path=self.collected_outputs_path.resolve(), active_laps_decoding_time_bin_size=float(active_laps_decoding_time_bin_size), output_date_str=getattr(self, 'BATCH_DATE_TO_USE', None), force_recompute_directional_train_test_split_result=bool(force_recompute_directional_train_test_split_result),
+                                                                                   should_mask_by_required_spike_counts=bool(should_mask_by_required_spike_counts), min_num_spikes_per_bin_to_be_considered_active=int(min_num_spikes_per_bin_to_be_considered_active),
+                                                                                   min_num_unique_active_neurons_per_time_bin=min_num_unique_active_neurons_per_time_bin, masked_bin_fill_mode=str(masked_bin_fill_mode), debug_print=bool(debug_print))
         callback_outputs['train_test_pos_err_csv_paths'] = train_test_pos_err_csv_paths
         callback_outputs['error'] = None
         print(f'train_test_pos_err_csv_paths: {train_test_pos_err_csv_paths}')
@@ -4416,12 +4421,12 @@ def compute_and_figures_nwb_wmaze_maze_context_probabilities_completion_function
                       uses=['_display_laps_correct_decoder_side_by_side_posteriors'], used_by=[], creation_date='2026-11-12 00:00', related_items=[])
 def figures_export_laps_correct_decoder_side_by_side_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict,
                                                                          max_subplots_per_page: int = 8, posterior_masking_value: float = 0.0, dpi: int = 150,
-                                                                         should_dim_low_firing_bins: bool = True, min_num_spikes_per_bin_to_be_considered_active: int = 1, min_num_unique_active_neurons_per_time_bin: int = 3,
+                                                                         should_dim_low_firing_bins: bool = True, min_num_spikes_per_bin_to_be_considered_active: int = 1, min_num_unique_active_neurons_per_time_bin: Optional[int] = 1,
                                                                          fail_on_exception_for_debugging: bool = False, debug_print: bool = False, **kwargs) -> dict:
     """Batch/SLURM headless Agg export: 4-decoder lap posteriors side-by-side with green ground-truth boxes; all pages stacked into one PNG under collected_outputs.
 
     `posterior_masking_value` default 0.0 (no under-threshold whitening); non-zero vmin + white under_color washes out low/high-P contrast.
-    Low-firing dimming defaults match ``export_train_test_pos_err`` (`min_num_unique_active_neurons_per_time_bin=3`).
+    Low-firing dimming defaults match ``export_train_test_pos_err`` (`min_num_unique_active_neurons_per_time_bin=1`).
     """
     import os
     os.environ.setdefault('MPLBACKEND', 'Agg')
