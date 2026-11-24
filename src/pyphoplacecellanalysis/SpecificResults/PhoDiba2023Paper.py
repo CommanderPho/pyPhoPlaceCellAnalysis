@@ -7960,6 +7960,7 @@ class Figure5:
                 enable_figure: bool = True, num=f'Figure 5 - measured vs decoded', plot_pos_bin_axes: bool = False, should_max_normalize: bool = True,
                 split_by_session: bool = False, pdf_export_path: Optional[Union[str, Path]] = None,
                 precomputed_measured_occupancy_seconds_dict_dict: Optional[Dict[str, Dict[str, Dict[str, NDArray]]]] = None,
+                session_track_bounds: Optional[pd.DataFrame] = None, xbin_centers_by_session: Optional[Dict[str, NDArray]] = None,
                 **kwargs,
         ):
         """Plots measured vs decoded occupancy.
@@ -7971,10 +7972,12 @@ class Figure5:
         Pass `skip_plotting_all=True` to omit the ``all`` column (2x2 pre/post only).
         Pass `prepare_for_publication=True` to apply `PhoPublicationFigureHelper` Artboard-3 fonts/spines and 6.5" max width.
         Pass `export_legend_separately=True` to omit the on-figure legend and write a standalone legend SVG (next to `pdf_export_path`, or `legend_export_path` if given).
+        Pass `session_track_bounds` (DataFrame with ``session``, ``long_notable_x``, ``short_notable_x``) plus `xbin_centers_by_session` to overlay long/short platform/endcap vlines in cm on each session mosaic.
         """
         if enable_figure:
             import matplotlib.pyplot as plt
             from neuropy.plotting.placemaps import perform_plot_occupancy
+            from pyphoplacecellanalysis.Pho2D.track_shape_drawing import perform_add_vertical_track_bounds_lines
 
         ## INPUTS: full_epoch_occupancy_seconds_dict_dict, full_epoch_occupancy_fractional_dict_dict, time_bin_size, measured_x_col: str = 'binned_x_meas'
         ## When split_by_session=True, optional prefix builds a spanning left label per figure, e.g. outer_group_label_prefix='Animal' → "Animal: gor01"
@@ -8012,6 +8015,14 @@ class Figure5:
 
         if not skip_plotting_measured:
             assert (active_measured_positions_dfs_dict is not None) or (precomputed_measured_occupancy_seconds_dict_dict is not None), "provide active_measured_positions_dfs_dict or precomputed_measured_occupancy_seconds_dict_dict (or pass skip_plotting_measured=True)"
+
+        bounds_by_session: Optional[pd.DataFrame] = None
+        if session_track_bounds is not None:
+            _required_bounds_cols = {'session', 'long_notable_x', 'short_notable_x'}
+            _missing_bounds_cols = _required_bounds_cols.difference(set(session_track_bounds.columns))
+            assert len(_missing_bounds_cols) == 0, f"session_track_bounds missing required columns: {_missing_bounds_cols}"
+            assert xbin_centers_by_session is not None, "session_track_bounds requires xbin_centers_by_session so occupancy stairs use cm x-axis (cannot overlay cm endcaps on bin-index axes)"
+            bounds_by_session = session_track_bounds.set_index('session', drop=False)
 
         def _is_session_nested_occupancy(occupancy_dict_dict) -> bool:
             return (len(occupancy_dict_dict) > 0) and set(occupancy_dict_dict.keys()).isdisjoint(_PERIOD_KEYS)
@@ -8112,12 +8123,13 @@ class Figure5:
             return out_path
 
 
-        def _plot_occupancy_mosaic(fig, decoded_seconds_dict_dict, measured_seconds_dict_dict, outer_row_group_label: Optional[str] = None, include_fig_legend: bool = True):
+        def _plot_occupancy_mosaic(fig, decoded_seconds_dict_dict, measured_seconds_dict_dict, outer_row_group_label: Optional[str] = None, include_fig_legend: bool = True, xbin_centers: Optional[NDArray] = None):
             """2xN laps/PBEs × pre/post[/all] mosaic on `fig`. Decoded on primary (left) y-axis; measured on twin right y-axis (independent autoscale).
 
             Left mosaic columns: optional outer group label (e.g. ``Animal: gor01``, spanning both rows), then whole-row epoch labels (``Laps`` / ``PBEs``).
             When ``skip_plotting_all`` is True, the ``all`` column is omitted (2x2).
-            Returns ``(ax_dict, legend_handles, legend_labels)``.
+            Pass ``xbin_centers`` (cm) to plot stairs in real position space; otherwise bin-index x-axis.
+            Returns ``(ax_dict, legend_handles, legend_labels, _data_ax_keys)``.
             """
             # Narrow label column(s) sit left of the "decoded (s)" ylabel without colliding.
             _period_ax_suffixes = [f'_{p}' for p in _plot_period_names]  # ['_pre-delta', '_post-delta'] or + '_all'
@@ -8178,6 +8190,13 @@ class Figure5:
 
             legend_handles = None
             legend_labels = None
+            ## `perform_plot_occupancy` 1D path uses `ax.stairs(..., xbin_edges)` — centers alone are ignored when edges is None (matplotlib defaults to bin indices 0..N).
+            if xbin_centers is not None:
+                from neuropy.utils.mixins.binning_helpers import get_bin_edges
+                xbin_centers = np.asarray(xbin_centers, dtype=float)
+                xbin_edges = get_bin_edges(xbin_centers)
+            else:
+                xbin_edges = None
             for lap_PBEs_plus_pre_post in _data_ax_keys:
                 ax = ax_dict[lap_PBEs_plus_pre_post]
                 a_lap_pbe_epoch_name, pre_post = lap_PBEs_plus_pre_post.split('_')
@@ -8188,11 +8207,6 @@ class Figure5:
                     ax.set_title(f"{pre_post_label}  (no data)", fontsize=_panel_title_fs)
                     fig5_pub_style.apply_to_axes(ax)
                     continue
-
-                # xbin_edges = np.linspace(loaded_track_limits['long_xlim'][0], loaded_track_limits['long_xlim'][1], n_pos + 1) ## I think always using 'long*' here is why both tracks are stretched to the long track length, but it would make since because they both use the same pos bins right? Oh, the bins aren't right from the bounds alone.
-                # xbin_centers = 0.5 * (xbin_edges[:-1] + xbin_edges[1:])
-                xbin_edges = None
-                xbin_centers = None
 
                 # decoded_active = full_epoch_occupancy_fractional_dict_dict[pre_post][a_lap_pbe_epoch_name]
                 # measured_active = measured_epoch_occupancy_fractional_dict_dict[pre_post][a_lap_pbe_epoch_name]
@@ -8262,7 +8276,7 @@ class Figure5:
 
             if (legend_handles is not None) and include_fig_legend:
                 fig.legend(legend_handles, legend_labels, loc='outside right', frameon=True, fontsize=_legend_fs)
-            return ax_dict, legend_handles, legend_labels
+            return ax_dict, legend_handles, legend_labels, _data_ax_keys
 
         is_session_nested: bool = _is_session_nested_occupancy(full_epoch_occupancy_seconds_dict_dict)
         _include_fig_legend: bool = (not export_legend_separately)
@@ -8339,9 +8353,30 @@ class Figure5:
                     with fig5_pub_style.rc_context():
                         sess_fig = plt.figure(layout='constrained', figsize=figsize, dpi=dpi, clear=True, num=f'{num} | {session_name}')
                         _outer_label: Optional[str] = (f'{outer_group_label_prefix}: {session_name}' if (outer_group_label_prefix is not None) else None)
-                        ax_dict, _leg_h, _leg_l = _plot_occupancy_mosaic(sess_fig, sess_decoded_seconds, sess_measured_seconds, outer_row_group_label=_outer_label, include_fig_legend=_include_fig_legend)
+                        _sess_xbin_centers = None
+                        if xbin_centers_by_session is not None:
+                            _sess_xbin_centers = xbin_centers_by_session.get(session_name)
+                            if (_sess_xbin_centers is None) and (bounds_by_session is not None):
+                                print(f'WARN: Figure5.main: session "{session_name}" has no xbin_centers_by_session entry; skipping track-bounds overlay (stairs stay in bin-index space)')
+                        ax_dict, _leg_h, _leg_l, _data_ax_keys = _plot_occupancy_mosaic(sess_fig, sess_decoded_seconds, sess_measured_seconds, outer_row_group_label=_outer_label, include_fig_legend=_include_fig_legend, xbin_centers=_sess_xbin_centers)
                         if (_captured_legend_handles is None) and (_leg_h is not None):
                             _captured_legend_handles, _captured_legend_labels = _leg_h, _leg_l
+                        if bounds_by_session is not None:
+                            if session_name not in bounds_by_session.index:
+                                print(f'WARN: Figure5.main: session "{session_name}" not in session_track_bounds; skipping track-bounds overlay')
+                            elif _sess_xbin_centers is None:
+                                pass  # already warned above
+                            else:
+                                _bounds_row = bounds_by_session.loc[session_name]
+                                if isinstance(_bounds_row, pd.DataFrame):
+                                    _bounds_row = _bounds_row.iloc[0]
+                                for _ax_key in _data_ax_keys:
+                                    perform_add_vertical_track_bounds_lines(
+                                        long_notable_x_platform_positions=tuple(_bounds_row.long_notable_x),
+                                        short_notable_x_platform_positions=tuple(_bounds_row.short_notable_x),
+                                        ax=ax_dict[_ax_key], include_long=True, include_short=True, include_labels=False,
+                                    )
+                                ## END for _ax_key in _data_ax_keys...
                         # Skip figure-level title when left spanning label already names the group (e.g. "Animal: gor01")
                         if _outer_label is None:
                             _sess_suptitle = f'{session_name}' if prepare_for_publication else f'Figure 5 — measured vs decoded occupancy | {session_name}'
@@ -8423,7 +8458,7 @@ class Figure5:
             ## single figure mode
             with fig5_pub_style.rc_context():
                 fig = plt.figure(layout='constrained', figsize=figsize, dpi=dpi, clear=True, num=num)
-                ax_dict, _captured_legend_handles, _captured_legend_labels = _plot_occupancy_mosaic(fig, full_epoch_occupancy_seconds_dict_dict, measured_epoch_occupancy_seconds_dict_dict, include_fig_legend=_include_fig_legend)
+                ax_dict, _captured_legend_handles, _captured_legend_labels, _data_ax_keys = _plot_occupancy_mosaic(fig, full_epoch_occupancy_seconds_dict_dict, measured_epoch_occupancy_seconds_dict_dict, include_fig_legend=_include_fig_legend)
                 _single_suptitle = ('decoded occupancy' if skip_plotting_measured else 'measured vs decoded occupancy') if prepare_for_publication else (f'Figure 5 — measured x vs decoded occupancy' if (not skip_plotting_measured) else f'Figure 5 — decoded occupancy')
                 plt.suptitle(_single_suptitle, fontsize=_suptitle_fs)
             if export_legend_separately and (_captured_legend_handles is not None):

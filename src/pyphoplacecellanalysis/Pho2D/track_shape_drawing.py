@@ -1059,7 +1059,7 @@ def test_LinearTrackDimensions_2D_Matplotlib(long_track_dims=None, short_track_d
 # ==================================================================================================================== #
 
 @function_attributes(short_name=None, tags=['matplotlib', 'grid_bin_bounds'], input_requires=[], output_provides=[], uses=['perform_add_1D_track_bounds_lines'], used_by=['perform_add_1D_track_bounds_lines'], creation_date='2025-01-20 08:06', related_items=[])
-def perform_add_vertical_track_bounds_lines(long_notable_x_platform_positions=None, short_notable_x_platform_positions=None, ax=None, include_long:bool=True, include_short:bool=True):
+def perform_add_vertical_track_bounds_lines(long_notable_x_platform_positions=None, short_notable_x_platform_positions=None, ax=None, include_long:bool=True, include_short:bool=True, include_labels: bool=True):
     """ Plots eight vertical lines across ax representing the (start, stop) of each platform (long_left, short_left, short_right, long_right)
     
     Usage:
@@ -1068,11 +1068,11 @@ def perform_add_vertical_track_bounds_lines(long_notable_x_platform_positions=No
         long_track_line_collection, short_track_line_collection = perform_add_vertical_track_bounds_lines(grid_bin_bounds=grid_bin_bounds, ax=None)
 
     """
-    return perform_add_1D_track_bounds_lines(long_notable_x_platform_positions=long_notable_x_platform_positions, short_notable_x_platform_positions=short_notable_x_platform_positions, ax=ax, include_long=include_long, include_short=include_short, is_vertical=True)
+    return perform_add_1D_track_bounds_lines(long_notable_x_platform_positions=long_notable_x_platform_positions, short_notable_x_platform_positions=short_notable_x_platform_positions, ax=ax, include_long=include_long, include_short=include_short, is_vertical=True, include_labels=include_labels)
 
 
 @function_attributes(short_name=None, tags=['grid_bin_bounds', 'matplotlib'], input_requires=[], output_provides=[], uses=[], used_by=['perform_add_vertical_track_bounds_lines'], creation_date='2025-01-20 07:50', related_items=[])
-def perform_add_1D_track_bounds_lines(long_notable_x_platform_positions=None, short_notable_x_platform_positions=None, ax=None, include_long:bool=True, include_short:bool=True, is_vertical:bool=True, long_and_short_labels_opposite_side: bool=True):
+def perform_add_1D_track_bounds_lines(long_notable_x_platform_positions=None, short_notable_x_platform_positions=None, ax=None, include_long:bool=True, include_short:bool=True, is_vertical:bool=True, long_and_short_labels_opposite_side: bool=True, include_labels: bool=True):
     """ Plots eight vertical lines across ax representing the (start, stop) of each platform (long_left, short_left, short_right, long_right)
         2025-02-11 - also now plots small labels next to each of the lines with their appropriate text name
         
@@ -1123,16 +1123,20 @@ def perform_add_1D_track_bounds_lines(long_notable_x_platform_positions=None, sh
             # long_track_line_collection: matplotlib.collections.LineCollection = plt.vlines(long_notable_x_platform_positions, label='long_track_x_pos_lines', ymin=ax.get_ybound()[0], ymax=ax.get_ybound()[1], colors=long_kwargs.get('edgecolor', '#0000FFAA'), linewidths=long_kwargs.get('linewidth', 1.0), linestyles='dashed', zorder=-98) # matplotlib.collections.LineCollection
             long_track_line_collection: matplotlib.collections.LineCollection = ax.vlines(long_notable_x_platform_positions, label='long_track_x_pos_lines', **common_ax_bound_kwargs, colors=long_kwargs.get('edgecolor', '#0000FFAA'), linewidths=long_kwargs.get('linewidth', 1.0), linestyles='dashed', zorder=-98) # matplotlib.collections.LineCollection
             # Iterate through the vlines in the LineCollection and add labels
-            for pos, a_txt_label in zip(long_notable_x_platform_positions, long_notable_x_platform_label_names):
-                # ax.text(pos, ax.get_ylim()[1], a_txt_label, color=long_track_line_collection.get_colors(), fontsize=9, ha='center', va='bottom', zorder=-98)
-                ax.text(pos, long_const_alt_ax_pos, a_txt_label, color=long_track_line_collection.get_colors(), fontsize=9, ha='center', va='bottom', zorder=-98)
+            if include_labels:
+                for pos, a_txt_label in zip(long_notable_x_platform_positions, long_notable_x_platform_label_names):
+                    # ax.text(pos, ax.get_ylim()[1], a_txt_label, color=long_track_line_collection.get_colors(), fontsize=9, ha='center', va='bottom', zorder=-98)
+                    ax.text(pos, long_const_alt_ax_pos, a_txt_label, color=long_track_line_collection.get_colors(), fontsize=9, ha='center', va='bottom', zorder=-98)
+                ## END for pos, a_txt_label in zip(long_notable_x_platform_positions, long_notable_x_platform_label_names)...
         else:
             ## Horizontal lines - normal plotting with position along the x-axis:
             long_track_line_collection: matplotlib.collections.LineCollection = ax.hlines(long_notable_x_platform_positions, label='long_track_x_pos_lines', **common_ax_bound_kwargs, colors=long_kwargs.get('edgecolor', '#0000FFAA'), linewidths=long_kwargs.get('linewidth', 1.0), linestyles='dashed', zorder=-98) # matplotlib.collections.LineCollection
             # Iterate through the hlines in the LineCollection and add labels
-            for pos, a_txt_label in zip(long_notable_x_platform_positions, long_notable_x_platform_label_names):
-                # ax.text(ax.get_xbound()[1], (pos + const_line_text_label_y_offset), a_txt_label, color=long_track_line_collection.get_colors(), fontsize=9, ha='right', va='bottom', zorder=-98) # could also use `color=long_kwargs.get('edgecolor', '#0000FFAA')`
-                ax.text(long_const_alt_ax_pos, (pos + const_line_text_label_y_offset), a_txt_label, color=long_track_line_collection.get_colors(), fontsize=9, ha='right', va='bottom', zorder=-98) # could also use `color=long_kwargs.get('edgecolor', '#0000FFAA')`
+            if include_labels:
+                for pos, a_txt_label in zip(long_notable_x_platform_positions, long_notable_x_platform_label_names):
+                    # ax.text(ax.get_xbound()[1], (pos + const_line_text_label_y_offset), a_txt_label, color=long_track_line_collection.get_colors(), fontsize=9, ha='right', va='bottom', zorder=-98) # could also use `color=long_kwargs.get('edgecolor', '#0000FFAA')`
+                    ax.text(long_const_alt_ax_pos, (pos + const_line_text_label_y_offset), a_txt_label, color=long_track_line_collection.get_colors(), fontsize=9, ha='right', va='bottom', zorder=-98) # could also use `color=long_kwargs.get('edgecolor', '#0000FFAA')`
+                ## END for pos, a_txt_label in zip(long_notable_x_platform_positions, long_notable_x_platform_label_names)...
                 
     else:
         long_track_line_collection = None
@@ -1147,19 +1151,23 @@ def perform_add_1D_track_bounds_lines(long_notable_x_platform_positions=None, sh
         if is_vertical:
             short_track_line_collection: matplotlib.collections.LineCollection = ax.vlines(short_notable_x_platform_positions, label='short_track_x_pos_lines', **common_ax_bound_kwargs, colors=short_kwargs.get('edgecolor', '#FF0000AA'), linewidths=short_kwargs.get('linewidth', 1.0), linestyles='dashed', zorder=-98) # matplotlib.collections.LineCollection
             # Iterate through the vlines in the LineCollection and add labels
-            assert len(short_notable_x_platform_label_names) == len(short_notable_x_platform_positions)
-            for pos, a_txt_label in zip(short_notable_x_platform_positions, short_notable_x_platform_label_names):
-                # ax.text(pos, ax.get_ylim()[1], a_txt_label, color=short_track_line_collection.get_colors(), fontsize=9, ha='center', va='bottom', zorder=-98)            
-                ax.text(pos, short_const_alt_ax_pos, a_txt_label, color=short_track_line_collection.get_colors(), fontsize=9, ha='center', va='bottom', zorder=-98)            
+            if include_labels:
+                assert len(short_notable_x_platform_label_names) == len(short_notable_x_platform_positions)
+                for pos, a_txt_label in zip(short_notable_x_platform_positions, short_notable_x_platform_label_names):
+                    # ax.text(pos, ax.get_ylim()[1], a_txt_label, color=short_track_line_collection.get_colors(), fontsize=9, ha='center', va='bottom', zorder=-98)            
+                    ax.text(pos, short_const_alt_ax_pos, a_txt_label, color=short_track_line_collection.get_colors(), fontsize=9, ha='center', va='bottom', zorder=-98)            
+                ## END for pos, a_txt_label in zip(short_notable_x_platform_positions, short_notable_x_platform_label_names)...
 
         else:
             # Horizontal lines - normal plotting with position along the x-axis:
             short_track_line_collection: matplotlib.collections.LineCollection = ax.hlines(short_notable_x_platform_positions, label='short_track_x_pos_lines', **common_ax_bound_kwargs, colors=short_kwargs.get('edgecolor', '#FF0000AA'), linewidths=short_kwargs.get('linewidth', 1.0), linestyles='dashed', zorder=-98) # matplotlib.collections.
             # Iterate through the hlines in the LineCollection and add labels
-            assert len(short_notable_x_platform_label_names) == len(short_notable_x_platform_positions)
-            for pos, a_txt_label in zip(short_notable_x_platform_positions, short_notable_x_platform_label_names):
-                # ax.text(ax.get_xbound()[1], (pos + const_line_text_label_y_offset), a_txt_label, color=short_track_line_collection.get_colors(), fontsize=9, ha='right', va='bottom', zorder=-98)
-                ax.text(short_const_alt_ax_pos, (pos + const_line_text_label_y_offset), a_txt_label, color=short_track_line_collection.get_colors(), fontsize=9, ha='right', va='bottom', zorder=-98)
+            if include_labels:
+                assert len(short_notable_x_platform_label_names) == len(short_notable_x_platform_positions)
+                for pos, a_txt_label in zip(short_notable_x_platform_positions, short_notable_x_platform_label_names):
+                    # ax.text(ax.get_xbound()[1], (pos + const_line_text_label_y_offset), a_txt_label, color=short_track_line_collection.get_colors(), fontsize=9, ha='right', va='bottom', zorder=-98)
+                    ax.text(short_const_alt_ax_pos, (pos + const_line_text_label_y_offset), a_txt_label, color=short_track_line_collection.get_colors(), fontsize=9, ha='right', va='bottom', zorder=-98)
+                ## END for pos, a_txt_label in zip(short_notable_x_platform_positions, short_notable_x_platform_label_names)...
 
     else:
         short_track_line_collection = None

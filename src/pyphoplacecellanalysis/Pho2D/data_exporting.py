@@ -891,9 +891,37 @@ class PosteriorExporting:
     
 
     @classmethod
+    def write_shared_xbin_and_pos_df_to_posterior_h5(cls, save_path: Path, xbin: Optional[NDArray] = None, pos_df: Optional[pd.DataFrame] = None) -> None:
+        """ Append session-shared `/xbin` (HDF5 dataset) and `/pos_df` (pandas table) onto an existing posteriors export file. """
+        import h5py
+        if not isinstance(save_path, Path):
+            save_path = Path(save_path).resolve()
+        assert save_path.exists(), f'save_path: "{save_path}" must exist before writing shared xbin/pos_df'
+        if xbin is not None:
+            with h5py.File(save_path, 'a') as f:
+                if 'xbin' in f:
+                    del f['xbin']
+                f.create_dataset('xbin', data=np.asarray(xbin))
+            ## END with h5py.File(save_path, 'a')...
+            print(f'\t wrote shared /xbin ({np.shape(np.asarray(xbin))}) to "{save_path}"')
+        ## END if xbin is not None...
+        if pos_df is not None:
+            _pos_df = deepcopy(pos_df)
+            leftover_object_cols = [c for c in _pos_df.columns if pd.api.types.is_object_dtype(_pos_df[c])]
+            for col in leftover_object_cols:
+                _pos_df[col] = _pos_df[col].astype(str)
+            ## END for col in leftover_object_cols...
+            _pos_df.to_hdf(save_path, key='/pos_df', format='table', data_columns=True)
+            print(f'\t wrote shared /pos_df (shape={_pos_df.shape}) to "{save_path}"')
+        ## END if pos_df is not None...
+
+
+
+    @classmethod
     @function_attributes(short_name=None, tags=['MAIN', 'save', 'export', 'HDF5', 'h5'], input_requires=[], output_provides=[], uses=['save_decoded_posteriors_to_HDF5'], used_by=[], creation_date='2024-08-28 08:36', related_items=['LoadedPosteriorContainer.load_batch_hdf5_exports'])
     def perform_save_all_decoded_posteriors_to_HDF5(cls, decoder_laps_filter_epochs_decoder_result_dict: Dict[types.DecoderName, DecodedFilterEpochsResult], decoder_ripple_filter_epochs_decoder_result_dict: Dict[types.DecoderName, DecodedFilterEpochsResult], _save_context: IdentifyingContext, save_path: Path, should_overwrite_extant_file:bool=True,
-                                                     pseudo2D_laps_filter_epochs_decoder_result: Optional[DecodedFilterEpochsResult] = None, pseudo2D_ripple_filter_epochs_decoder_result: Optional[DecodedFilterEpochsResult] = None, pseudo2D_decoder_key: str = 'pseudo2D'):
+                                                     pseudo2D_laps_filter_epochs_decoder_result: Optional[DecodedFilterEpochsResult] = None, pseudo2D_ripple_filter_epochs_decoder_result: Optional[DecodedFilterEpochsResult] = None, pseudo2D_decoder_key: str = 'pseudo2D',
+                                                     xbin: Optional[NDArray] = None, pos_df: Optional[pd.DataFrame] = None):
         """
         
         Usage:
@@ -906,6 +934,7 @@ class PosteriorExporting:
         History:
             Refactored from `ComputerVisionComputations` on 2024-09-30
             2026-11-18: optional `pseudo2D_*` kwargs inject true merged Pseudo2D under `pseudo2D_decoder_key` alongside the 1D decoders
+            2026-11-24: optional `xbin` / `pos_df` written once at file root as `/xbin` and `/pos_df`
         """
         _flat_all_out_paths = []
 
@@ -969,6 +998,9 @@ class PosteriorExporting:
         if decoder_ripple_filter_epochs_decoder_result_dict is not None:
             out_contexts['ripple'] = _subfn_perform_save_single_epochs(decoder_ripple_filter_epochs_decoder_result_dict, a_save_context=_save_context, epochs_name='ripple', save_path=save_path)
         ## END if decoder_ripple_filter_epochs_decoder_result_dict is not None...
+        if (xbin is not None) or (pos_df is not None):
+            cls.write_shared_xbin_and_pos_df_to_posterior_h5(save_path=save_path, xbin=xbin, pos_df=pos_df)
+        ## END if (xbin is not None) or (pos_df is not None)...
         return out_contexts, _flat_all_out_paths
 
 

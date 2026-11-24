@@ -1004,11 +1004,14 @@ def compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_fu
             'display_fn_name': lambda k, v: f"{v}", # just include the name
         }
         directional_merged_decoders_result = curr_active_pipeline.global_computation_results.computed_data.get('DirectionalMergedDecoders')
+        _shared_xbin = deepcopy(track_templates.get_decoders()[0].xbin)
+        _shared_pos_df = deepcopy(curr_active_pipeline.sess.position.to_dataframe())
         out_contexts, _flat_all_HDF5_out_paths = PosteriorExporting.perform_save_all_decoded_posteriors_to_HDF5(decoder_laps_filter_epochs_decoder_result_dict=deepcopy(directional_decoders_epochs_decode_result.decoder_laps_filter_epochs_decoder_result_dict),
                                                                                     decoder_ripple_filter_epochs_decoder_result_dict=deepcopy(directional_decoders_epochs_decode_result.decoder_ripple_filter_epochs_decoder_result_dict),
                                                                                     _save_context=_parent_save_context.get_raw_identifying_context(), save_path=save_path, should_overwrite_extant_file=(not allow_append_to_session_h5_file),
                                                                                     pseudo2D_laps_filter_epochs_decoder_result=getattr(directional_merged_decoders_result, 'all_directional_laps_filter_epochs_decoder_result', None),
-                                                                                    pseudo2D_ripple_filter_epochs_decoder_result=getattr(directional_merged_decoders_result, 'all_directional_ripple_filter_epochs_decoder_result', None))
+                                                                                    pseudo2D_ripple_filter_epochs_decoder_result=getattr(directional_merged_decoders_result, 'all_directional_ripple_filter_epochs_decoder_result', None),
+                                                                                    xbin=_shared_xbin, pos_df=_shared_pos_df)
 
         _flat_all_HDF5_out_paths = list(dict.fromkeys([v.as_posix() for v in _flat_all_HDF5_out_paths]).keys())
         # _output_HDF5_paths_info_str: str = '\n'.join([f'"{file_uri_from_path(a_path)}"' for a_path in _flat_all_HDF5_out_paths])
@@ -2596,7 +2599,11 @@ def save_custom_session_files_completion_function(self, global_data_root_parent_
     if enable_save_h5:
         try:
             assert self.collected_outputs_path.exists()
-            hdf5_output_path, _, _ = curr_active_pipeline.build_complete_session_identifier_filename_string(output_date_str=self.BATCH_DATE_TO_USE, data_identifier_str='(pipeline_results)', parent_output_path=self.collected_outputs_path.resolve(), out_extension='.h5')
+            ## BATCH_DATE_TO_USE often already appends custom_suffix (e.g. '2026-11-24_Apogee_withNormal...'); session_identifier also includes it — strip so the filename is not doubled
+            _pipeline_h5_output_date_str: str = self.BATCH_DATE_TO_USE
+            if (custom_suffix is not None) and (len(custom_suffix) > 0) and isinstance(_pipeline_h5_output_date_str, str) and _pipeline_h5_output_date_str.endswith(custom_suffix):
+                _pipeline_h5_output_date_str = _pipeline_h5_output_date_str[:-len(custom_suffix)]
+            hdf5_output_path, _, _ = curr_active_pipeline.build_complete_session_identifier_filename_string(output_date_str=_pipeline_h5_output_date_str, data_identifier_str='(pipeline_results)', parent_output_path=self.collected_outputs_path.resolve(), out_extension='.h5')
             _pipeline_h5_path, _HDF5_err = curr_active_pipeline.export_pipeline_to_h5(override_path=hdf5_output_path)
             if (_HDF5_err is None) and isinstance(_pipeline_h5_path, Path):
                 hdf5_output_path = _pipeline_h5_path
@@ -2664,10 +2671,13 @@ def save_custom_session_files_completion_function(self, global_data_root_parent_
             decoder_laps_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult] = directional_decoders_epochs_decode_result.decoder_laps_filter_epochs_decoder_result_dict
             decoder_ripple_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult] = directional_decoders_epochs_decode_result.decoder_ripple_filter_epochs_decoder_result_dict
             directional_merged_decoders_result = curr_active_pipeline.global_computation_results.computed_data.get('DirectionalMergedDecoders')
+            _shared_xbin = deepcopy(track_templates.get_decoders()[0].xbin)
+            _shared_pos_df = deepcopy(curr_active_pipeline.sess.position.to_dataframe())
 
             out_contexts = PosteriorExporting.perform_save_all_decoded_posteriors_to_HDF5(decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict, _save_context=_parent_save_context, save_path=posteriors_save_path,
                                                                                         pseudo2D_laps_filter_epochs_decoder_result=getattr(directional_merged_decoders_result, 'all_directional_laps_filter_epochs_decoder_result', None),
-                                                                                        pseudo2D_ripple_filter_epochs_decoder_result=getattr(directional_merged_decoders_result, 'all_directional_ripple_filter_epochs_decoder_result', None))
+                                                                                        pseudo2D_ripple_filter_epochs_decoder_result=getattr(directional_merged_decoders_result, 'all_directional_ripple_filter_epochs_decoder_result', None),
+                                                                                        xbin=_shared_xbin, pos_df=_shared_pos_df)
             callback_outputs['posteriors_h5'] = posteriors_save_path
             print(f'\tposteriors_save_path: "{posteriors_save_path}"')
 
