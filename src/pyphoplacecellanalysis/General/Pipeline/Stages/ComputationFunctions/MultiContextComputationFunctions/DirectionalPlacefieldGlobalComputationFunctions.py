@@ -11142,9 +11142,9 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
 
         def _subfn_shade_train_test_intervals(ax, train_intervals: List[Tuple[float, float]], test_intervals: List[Tuple[float, float]], train_bracket_color: str = '#b8860b', test_bracket_color: str = '#c2410c', linewidth: float = 1.5, above_axes_fraction: float = 0.03, tip_fraction: float = 0.04, zorder: float = 2000.0):
             """Train: darkgoldenrod top hard-bracket (tips down). Test: dark orange-red top hard-bracket (tips down). Outside axes, above GT green box (darker so readable over limegreen)."""
-            for t0, t1 in train_intervals:
-                _subfn_draw_interval_top_bracket(ax, t0=float(t0), t1=float(t1), color=train_bracket_color, linewidth=linewidth, above_axes_fraction=above_axes_fraction, tip_fraction=tip_fraction, zorder=zorder)
-            ## END for t0, t1 in train_intervals...
+            # for t0, t1 in train_intervals:
+            #     _subfn_draw_interval_top_bracket(ax, t0=float(t0), t1=float(t1), color=train_bracket_color, linewidth=linewidth, above_axes_fraction=above_axes_fraction, tip_fraction=tip_fraction, zorder=zorder)
+            # ## END for t0, t1 in train_intervals...
             for t0, t1 in test_intervals:
                 _subfn_draw_interval_top_bracket(ax, t0=float(t0), t1=float(t1), color=test_bracket_color, linewidth=linewidth, above_axes_fraction=above_axes_fraction, tip_fraction=tip_fraction, zorder=zorder)
             ## END for t0, t1 in test_intervals...
