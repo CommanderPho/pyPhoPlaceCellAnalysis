@@ -4467,7 +4467,7 @@ def compute_and_figures_nwb_wmaze_maze_context_probabilities_completion_function
     return across_session_results_extended_dict
 
 
-@function_attributes(short_name=None, tags=['figure', 'batch', 'laps', 'posterior', 'four-decoder', 'groundtruth', 'Agg', 'headless'], input_requires=['DirectionalLaps', 'DirectionalDecodersEpochsEvaluations', 'TrainTestSplit'], output_provides=[],
+@function_attributes(short_name=None, tags=['figure', 'batch', 'laps', 'posterior', 'four-decoder', 'groundtruth', 'Agg', 'headless'], input_requires=['DirectionalLaps', 'TrainTestSplit'], output_provides=[],
                       uses=['_display_laps_correct_decoder_side_by_side_posteriors', 'compute_and_export_kdiba_train_test_position_error_completion_function'], used_by=[], creation_date='2026-11-12 00:00', related_items=['compute_and_export_kdiba_train_test_position_error_completion_function'])
 def figures_export_laps_correct_decoder_side_by_side_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict,
                                                                          max_subplots_per_page: int = 8, posterior_masking_value: float = 0.0, dpi: int = 150,
@@ -4478,6 +4478,7 @@ def figures_export_laps_correct_decoder_side_by_side_completion_function(self, g
     """Batch/SLURM headless Agg export: left GT test-err metrics column + 4-decoder lap posteriors with green ground-truth boxes; pages stacked into one PNG under collected_outputs.
 
     Runs ``compute_and_export_kdiba_train_test_position_error_completion_function`` first (dependency) and passes ``train_test_pos_err_df`` / ``train_test_pos_err_bins_df`` into the display for the left GT test-error metrics column (whole-lap median + valid per-bin errors).
+    Background heatmaps are decoded with ``TrainTestSplit.train_lap_specific_pf1D_Decoder_dict`` at ``active_laps_decoding_time_bin_size`` (same held-out source as I-bars / left-box errors).
     Mismatch-driven ``TrainTestSplit`` recompute when ``active_laps_decoding_time_bin_size`` / ``should_filter_inactive_bins_before_split`` / mask thresholds differ from the stored result.
     `posterior_masking_value` default 0.0 (no under-threshold whitening); non-zero vmin + white under_color washes out low/high-P contrast.
     Low-firing dimming defaults match ``export_train_test_pos_err`` (`min_num_unique_active_neurons_per_time_bin=1`).
@@ -4538,6 +4539,7 @@ def figures_export_laps_correct_decoder_side_by_side_completion_function(self, g
                                             parent_output_folder=self.collected_outputs_path.resolve(), max_subplots_per_page=max_subplots_per_page, posterior_masking_value=posterior_masking_value,
                                             dpi=dpi, combined_image_basename=combined_image_basename, should_dim_low_firing_bins=should_dim_low_firing_bins,
                                             min_num_spikes_per_bin_to_be_considered_active=min_num_spikes_per_bin_to_be_considered_active, min_num_unique_active_neurons_per_time_bin=min_num_unique_active_neurons_per_time_bin,
+                                            active_laps_decoding_time_bin_size=float(active_laps_decoding_time_bin_size),
                                             train_test_pos_err_df=train_test_pos_err_df, train_test_pos_err_bins_df=train_test_pos_err_bins_df, debug_print=debug_print, **kwargs)
         ## Unwrap {display_context: graphics_output_dict}
         graphics_output_dict = list(_out.values())[0] if isinstance(_out, dict) else _out

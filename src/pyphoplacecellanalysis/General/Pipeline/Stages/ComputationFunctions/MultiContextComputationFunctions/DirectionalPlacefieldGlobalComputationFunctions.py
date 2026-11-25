@@ -10943,19 +10943,23 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
 
 
     @function_attributes(short_name='laps_correct_decoder_side_by_side_posteriors', tags=['laps', 'posterior', 'four-decoder', 'groundtruth', 'export', 'Agg', 'headless', 'NON-VISUAL', 'NO-DISPLAY', 'batch'],
-                          conforms_to=['output_registering', 'figure_saving'], input_requires=['DirectionalLaps', 'DirectionalDecodersEpochsEvaluations'], output_provides=[],
-                          uses=['_subfn_export_laps_four_decoder_gt_boxed_combined_figure', 'plot_1D_most_likely_position_comparsions', 'add_laps_groundtruth_information_to_dataframe', 'vertical_image_stack'],
+                          conforms_to=['output_registering', 'figure_saving'], input_requires=['DirectionalLaps', 'TrainTestSplit'], output_provides=[],
+                          uses=['_subfn_export_laps_four_decoder_gt_boxed_combined_figure', 'plot_1D_most_likely_position_comparsions', 'add_laps_groundtruth_information_to_dataframe', 'vertical_image_stack', 'get_proper_global_spikes_df', 'TrainTestSplit.train_lap_specific_pf1D_Decoder_dict'],
                           used_by=['figures_export_laps_correct_decoder_side_by_side_completion_function'], creation_date='2026-11-12 00:00', related_items=['train_test_pos_err_df', 'train_test_pos_err_bins_df'], is_global=True)
     def _display_laps_correct_decoder_side_by_side_posteriors(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True, parent_output_folder: Optional[Path] = None,
                                                              max_subplots_per_page: int = 8, variable_name: str = 'lin_pos', posterior_masking_value: float = 0.0, dpi: int = 150, combined_image_basename: Optional[str] = None,
-                                                             should_dim_low_firing_bins: bool = True, min_num_spikes_per_bin_to_be_considered_active: int = 1, min_num_unique_active_neurons_per_time_bin: Optional[int] = 1, **kwargs):
+                                                             should_dim_low_firing_bins: bool = True, min_num_spikes_per_bin_to_be_considered_active: int = 1, min_num_unique_active_neurons_per_time_bin: Optional[int] = 1,
+                                                             active_laps_decoding_time_bin_size: Optional[float] = None, **kwargs):
         """Headless Agg export of all laps as 4-decoder side-by-side posteriors with a green axis box on the session-lap ground-truth decoder; pages are vertical-stacked into one PNG.
+
+        Background heatmaps are decoded with ``TrainTestSplit.train_lap_specific_pf1D_Decoder_dict`` (90%-train held-out) at ``active_laps_decoding_time_bin_size``
+        so they match the white measured↔decoded I-bars / left-box held-out error metrics (not the 100%-laps in-sample ``DirectionalDecodersEpochsEvaluations`` result).
 
         `posterior_masking_value` is imshow `vmin` (default 0.0 = no under-threshold whitening). Non-zero values clip low-P to `under_color` and dominate low/high-P contrast.
 
         Defaults for measured-traj contrast: posterior cmap ``viridis`` (black under/bad, white over) + thin red measured line ``#ff0000`` @ 0.45, linewidth 0.8.
         Within-lap TrainTestSplit (GT decoder column only): train = dark goldenrod / test = dark orange hard brackets just above the axes top (tips down); zorder above GT green box.
-        GT decoder also gets thin white (40% opacity) measured↔decoded I-bars at each valid held-out test bin from ``train_test_pos_err_bins_df`` (1-to-1 with left-box tbin numbers).
+        GT decoder also gets thin white (80% opacity) measured↔decoded I-bars at each valid held-out test bin from ``train_test_pos_err_bins_df`` (1-to-1 with left-box tbin numbers).
         Optional ``train_test_pos_err_df`` kwarg: left column viridis_r color cell for GT-decoder held-out test-segment error (joined on lap_id + truth_decoder_name).
         Optional ``train_test_pos_err_bins_df`` kwarg: valid per-bin abs errors listed under the whole-lap median in that cell.
 
@@ -10982,6 +10986,7 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
         from pyphocorehelpers.plotting.media_output_helpers import vertical_image_stack
         from pyphoplacecellanalysis.General.Mixins.ExportHelpers import try_discover_default_collected_outputs_dir
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_1D_most_likely_position_comparsions
+        from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import is_clusterless_position_decoder
 
         train_test_pos_err_df: Optional[pd.DataFrame] = kwargs.pop('train_test_pos_err_df', None)
         train_test_pos_err_bins_df: Optional[pd.DataFrame] = kwargs.pop('train_test_pos_err_bins_df', None)
@@ -11172,8 +11177,7 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
             return decoded_y
 
 
-        def _subfn_draw_test_interval_measured_decoded_ibars(ax, time_bin_centers: NDArray, measured_y: NDArray, decoded_y: NDArray, test_intervals: Optional[List[Tuple[float, float]]] = None,
-                                                            color: str = '#ffffff', alpha: float = 0.40, linewidth: float = 0.35, capsize_pts: float = 1.5, zorder: float = 14.0):
+        def _subfn_draw_test_interval_measured_decoded_ibars(ax, time_bin_centers: NDArray, measured_y: NDArray, decoded_y: NDArray, test_intervals: Optional[List[Tuple[float, float]]] = None, color: str = '#ffffff', alpha: float = 0.80, linewidth: float = 0.35, capsize_pts: float = 1.5, zorder: float = 14.0):
             """Draw very thin white I-bars (measured ↔ decoded) at the provided time bins.
 
             When ``test_intervals`` is None/empty, draws all finite (measured, decoded) bins as-is (caller already filtered to valid held-out test bins).
@@ -11385,6 +11389,7 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
             measured_line_alpha: float = float(kwargs.pop('measured_line_alpha', 0.45))
             measured_line_linewidth: float = float(kwargs.pop('measured_line_linewidth', 0.8))
             non_gt_content_alpha: float = float(kwargs.pop('non_gt_content_alpha', 0.75))
+            ibar_alpha: float = float(kwargs.pop('ibar_alpha', 0.80))
 
             metric_col: Optional[str] = _subfn_pick_pos_err_metric_column(train_test_pos_err_df)
             page_err_values: List[Optional[float]] = []
@@ -11471,7 +11476,7 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
                     if is_gt_decoder and (row_valid_bins_df is not None) and (len(row_valid_bins_df) > 0) and ('t' in row_valid_bins_df.columns) and ('decoded' in row_valid_bins_df.columns):
                         measured_col: str = 'measured_lin_pos' if ((str(metric_col) == 'abs_err_cm_1D_median') and ('measured_lin_pos' in row_valid_bins_df.columns)) else 'measured'
                         if measured_col in row_valid_bins_df.columns:
-                            _subfn_draw_test_interval_measured_decoded_ibars(ax, time_bin_centers=row_valid_bins_df['t'].to_numpy(dtype=float), measured_y=row_valid_bins_df[measured_col].to_numpy(dtype=float), decoded_y=row_valid_bins_df['decoded'].to_numpy(dtype=float), test_intervals=None)
+                            _subfn_draw_test_interval_measured_decoded_ibars(ax, time_bin_centers=row_valid_bins_df['t'].to_numpy(dtype=float), measured_y=row_valid_bins_df[measured_col].to_numpy(dtype=float), decoded_y=row_valid_bins_df['decoded'].to_numpy(dtype=float), test_intervals=None, alpha=ibar_alpha)
 
                 ## END for col_i, a_decoder_name in enumerate(decoder_names)...
             ## END for row_i, lap_idx in enumerate(page_lap_indicies)...
@@ -11487,7 +11492,8 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
                                                                      spikes_df: Optional[pd.DataFrame] = None, should_dim_low_firing_bins: bool = True,
                                                                      min_num_spikes_per_bin_to_be_considered_active: int = 1, min_num_unique_active_neurons_per_time_bin: Optional[int] = 1,
                                                                      train_epochs_dict: Optional[Dict[str, pd.DataFrame]] = None, test_epochs_dict: Optional[Dict[str, pd.DataFrame]] = None,
-                                                                     train_test_pos_err_df: Optional[pd.DataFrame] = None, train_test_pos_err_bins_df: Optional[pd.DataFrame] = None, **kwargs) -> Dict[str, Any]:
+                                                                     train_test_pos_err_df: Optional[pd.DataFrame] = None, train_test_pos_err_bins_df: Optional[pd.DataFrame] = None,
+                                                                     active_decoders_dict: Optional[Dict[str, BasePositionDecoder]] = None, **kwargs) -> Dict[str, Any]:
             """Headless Agg export: paginate all laps as left metrics + 4-decoder side-by-side pages with GT green boxes, then vertical-stack PNGs into one combined figure.
 
             Returns dict with keys: `laps_epochs_df`, `page_png_paths`, `combined_img_out_path`, `n_pages`, `n_laps`.
@@ -11496,6 +11502,7 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
             When `train_epochs_dict`/`test_epochs_dict` are provided, draws train/test top brackets on the GT decoder column only (dark goldenrod/dark orange; above GT green box; viridis + red measured traj by default).
             When `train_test_pos_err_df` is provided, left column shows GT-decoder held-out test error (viridis_r).
             When `train_test_pos_err_bins_df` is provided, valid per-bin abs errors are listed under the whole-lap median and drawn as measured↔decoded I-bars on the GT decoder column only (1-to-1 with the left-box numbers).
+            When `active_decoders_dict` is provided (e.g. held-out ``train_lap_specific_pf1D_Decoder_dict``), ``decoder_xbin_dict`` is taken from those decoders so spatial edges match ``curr_posterior``.
             """
             output_dir = Path(output_dir).resolve()
             output_dir.mkdir(parents=True, exist_ok=True)
@@ -11509,7 +11516,22 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
 
             long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
             global_pos_df = deepcopy(curr_active_pipeline.filtered_sessions[global_epoch_name].position.to_dataframe())
-            decoder_xbin_dict: Dict[str, NDArray] = {a_name: deepcopy(a_decoder.xbin) for a_name, a_decoder in track_templates.get_decoders_dict().items()}
+            ## Prefer held-out / active decoder xbins so heatmap spatial edges match the posterior that produced the I-bars:
+            if active_decoders_dict is not None:
+                decoder_xbin_dict: Dict[str, NDArray] = {}
+                for a_name in decoder_names:
+                    a_decoder = active_decoders_dict.get(a_name, None)
+                    if (a_decoder is not None) and (getattr(a_decoder, 'xbin', None) is not None):
+                        decoder_xbin_dict[a_name] = deepcopy(a_decoder.xbin)
+                    elif (a_name in decoder_laps_filter_epochs_decoder_result_dict) and (getattr(decoder_laps_filter_epochs_decoder_result_dict[a_name], 'pos_bin_edges', None) is not None):
+                        decoder_xbin_dict[a_name] = deepcopy(decoder_laps_filter_epochs_decoder_result_dict[a_name].pos_bin_edges)
+                    else:
+                        decoder_xbin_dict[a_name] = deepcopy(track_templates.get_decoders_dict()[a_name].xbin)
+                    ## END if (a_decoder is not None) and ...
+                ## END for a_name in decoder_names...
+            else:
+                decoder_xbin_dict = {a_name: deepcopy(a_decoder.xbin) for a_name, a_decoder in track_templates.get_decoders_dict().items()}
+            ## END if active_decoders_dict is not None...
 
             all_lap_indicies = np.arange(n_laps, dtype=int)
             truth_names_all = laps_epochs_df['truth_decoder_name'].to_numpy()
@@ -11568,20 +11590,66 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
         directional_laps_results: DirectionalLapsResult = global_computation_results.computed_data['DirectionalLaps']
         track_templates: TrackTemplates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values)
 
-        directional_decoders_epochs_decode_result: DecoderDecodedEpochsResult = global_computation_results.computed_data['DirectionalDecodersEpochsEvaluations']
-        directional_decoders_epochs_decode_result.add_all_extra_epoch_columns(owning_pipeline_reference, track_templates=track_templates, required_min_percentage_of_active_cells=0.33333333, debug_print=False)
-        decoder_laps_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult] = directional_decoders_epochs_decode_result.decoder_laps_filter_epochs_decoder_result_dict
-        assert decoder_laps_filter_epochs_decoder_result_dict is not None, 'DirectionalDecodersEpochsEvaluations.decoder_laps_filter_epochs_decoder_result_dict is required'
-
+        ## Prefer TrainTestSplit 90%-train held-out decoders for background heatmaps (same source as I-bars / left-box errors):
         train_test_split_result = global_computation_results.computed_data.get('TrainTestSplit', None)
+        if train_test_split_result is None:
+            print('WARN: TrainTestSplit missing; attempting directional_train_test_split recompute for laps_correct_decoder_side_by_side figure', flush=True)
+            try:
+                owning_pipeline_reference.perform_specific_computation(computation_functions_name_includelist=['directional_train_test_split'], enabled_filter_names=None, fail_on_exception=False, debug_print=False)
+            except Exception as e:
+                print(f'WARN: directional_train_test_split recompute failed: {e}', flush=True)
+            train_test_split_result = global_computation_results.computed_data.get('TrainTestSplit', None)
+
         train_epochs_dict: Optional[Dict[str, pd.DataFrame]] = None
         test_epochs_dict: Optional[Dict[str, pd.DataFrame]] = None
+        heldout_decoders_dict: Optional[Dict[str, BasePositionDecoder]] = None
         if train_test_split_result is not None:
             train_epochs_dict = train_test_split_result.train_epochs_dict
             test_epochs_dict = train_test_split_result.test_epochs_dict
+            heldout_decoders_dict = train_test_split_result.train_lap_specific_pf1D_Decoder_dict
             print(f'\tTrainTestSplit loaded: train_keys={list(train_epochs_dict.keys()) if train_epochs_dict is not None else None}, test_keys={list(test_epochs_dict.keys()) if test_epochs_dict is not None else None}', flush=True)
         else:
-            print('WARN: TrainTestSplit missing; skipping train/test axvspans on laps_correct_decoder_side_by_side figure', flush=True)
+            print('WARN: TrainTestSplit still missing after recompute attempt; skipping train/test axvspans on laps_correct_decoder_side_by_side figure', flush=True)
+
+        long_epoch_name, short_epoch_name, global_epoch_name = owning_pipeline_reference.find_LongShortGlobal_epoch_names()
+        global_spikes_df = deepcopy(get_proper_global_spikes_df(owning_pipeline_reference, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values))
+        spikes_df_for_dimming: Optional[pd.DataFrame] = deepcopy(global_spikes_df) if should_dim_low_firing_bins else None
+
+        ## Resolve decoding time bin size (prefer explicit kwarg, else TrainTestSplit, else DirectionalMergedDecoders, else 0.025):
+        effective_laps_tbin: Optional[float] = None
+        if (active_laps_decoding_time_bin_size is not None) and (float(active_laps_decoding_time_bin_size) > 0.0):
+            effective_laps_tbin = float(active_laps_decoding_time_bin_size)
+        elif (train_test_split_result is not None) and (getattr(train_test_split_result, 'laps_decoding_time_bin_size', None) is not None):
+            effective_laps_tbin = float(train_test_split_result.laps_decoding_time_bin_size)
+        else:
+            directional_merged_decoders_result = global_computation_results.computed_data.get('DirectionalMergedDecoders', None)
+            if (directional_merged_decoders_result is not None) and (getattr(directional_merged_decoders_result, 'laps_decoding_time_bin_size', None) is not None):
+                try:
+                    effective_laps_tbin = float(directional_merged_decoders_result.laps_decoding_time_bin_size)
+                except Exception:
+                    effective_laps_tbin = None
+            ## END if (directional_merged_decoders_result is not None) and ...
+        if effective_laps_tbin is None:
+            effective_laps_tbin = 0.025
+
+        decoder_laps_filter_epochs_decoder_result_dict: Optional[Dict[str, DecodedFilterEpochsResult]] = None
+        if (heldout_decoders_dict is not None) and (len(heldout_decoders_dict) > 0):
+            global_any_laps_epochs_obj = deepcopy(owning_pipeline_reference.computation_results[global_epoch_name].computation_config.pf_params.computation_epochs)
+            min_possible_laps_time_bin_size: float = find_minimum_time_bin_duration(ensure_dataframe(global_any_laps_epochs_obj)['duration'].to_numpy())
+            laps_decoding_time_bin_size: float = min(float(effective_laps_tbin), float(min_possible_laps_time_bin_size))
+            print(f'\tdecoding held-out lap posteriors with TrainTestSplit.train_lap_specific_pf1D_Decoder_dict at laps_decoding_time_bin_size={laps_decoding_time_bin_size} (requested={effective_laps_tbin})', flush=True)
+            decoder_laps_filter_epochs_decoder_result_dict = {}
+            for a_name, a_decoder in heldout_decoders_dict.items():
+                active_spikes_df = None if is_clusterless_position_decoder(a_decoder) else deepcopy(global_spikes_df)
+                decoder_laps_filter_epochs_decoder_result_dict[a_name] = a_decoder.decode_specific_epochs(spikes_df=active_spikes_df, filter_epochs=deepcopy(global_any_laps_epochs_obj), decoding_time_bin_size=laps_decoding_time_bin_size, debug_print=False)
+            ## END for a_name, a_decoder in heldout_decoders_dict.items()...
+        else:
+            ## Fallback: in-sample DirectionalDecodersEpochsEvaluations (warn — heatmap will not match held-out I-bars):
+            print('WARN: held-out train_lap_specific_pf1D_Decoder_dict unavailable; falling back to DirectionalDecodersEpochsEvaluations for background heatmaps (I-bars may not align with posterior)', flush=True)
+            directional_decoders_epochs_decode_result: DecoderDecodedEpochsResult = global_computation_results.computed_data['DirectionalDecodersEpochsEvaluations']
+            directional_decoders_epochs_decode_result.add_all_extra_epoch_columns(owning_pipeline_reference, track_templates=track_templates, required_min_percentage_of_active_cells=0.33333333, debug_print=False)
+            decoder_laps_filter_epochs_decoder_result_dict = directional_decoders_epochs_decode_result.decoder_laps_filter_epochs_decoder_result_dict
+        assert decoder_laps_filter_epochs_decoder_result_dict is not None, 'decoder_laps_filter_epochs_decoder_result_dict is required (held-out TrainTestSplit decode or DirectionalDecodersEpochsEvaluations fallback)'
 
         complete_session_context, (session_context, additional_session_context) = owning_pipeline_reference.get_complete_session_context()
         active_context = kwargs.pop('active_context', None)
@@ -11606,19 +11674,17 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
         if combined_image_basename is None:
             combined_image_basename = f'{session_key}_laps_4decoder_gt_boxed'
 
-        spikes_df_for_dimming: Optional[pd.DataFrame] = None
-        if should_dim_low_firing_bins:
-            spikes_df_for_dimming = deepcopy(get_proper_global_spikes_df(owning_pipeline_reference, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values))
-
         export_out = _subfn_export_laps_four_decoder_gt_boxed_combined_figure(curr_active_pipeline=owning_pipeline_reference, decoder_laps_filter_epochs_decoder_result_dict=decoder_laps_filter_epochs_decoder_result_dict, track_templates=track_templates,
                                                                               output_dir=output_dir, combined_image_basename=combined_image_basename, max_subplots_per_page=max_subplots_per_page, variable_name=variable_name,
                                                                               posterior_masking_value=posterior_masking_value, dpi=dpi, write_png=bool(save_figure), debug_print=debug_print,
                                                                               spikes_df=spikes_df_for_dimming, should_dim_low_firing_bins=should_dim_low_firing_bins,
                                                                               min_num_spikes_per_bin_to_be_considered_active=min_num_spikes_per_bin_to_be_considered_active, min_num_unique_active_neurons_per_time_bin=min_num_unique_active_neurons_per_time_bin,
-                                                                              train_epochs_dict=train_epochs_dict, test_epochs_dict=test_epochs_dict, train_test_pos_err_df=train_test_pos_err_df, train_test_pos_err_bins_df=train_test_pos_err_bins_df, **kwargs)
+                                                                              train_epochs_dict=train_epochs_dict, test_epochs_dict=test_epochs_dict, train_test_pos_err_df=train_test_pos_err_df, train_test_pos_err_bins_df=train_test_pos_err_bins_df,
+                                                                              active_decoders_dict=heldout_decoders_dict, **kwargs)
 
         graphics_output_dict = dict(display_context=display_context, output_dir=output_dir, combined_img_out_path=export_out.get('combined_img_out_path'), page_png_paths=export_out.get('page_png_paths'), n_pages=export_out.get('n_pages'), n_laps=export_out.get('n_laps'), laps_epochs_df=export_out.get('laps_epochs_df'), defer_render=defer_render,
-                                    should_dim_low_firing_bins=should_dim_low_firing_bins, min_num_unique_active_neurons_per_time_bin=min_num_unique_active_neurons_per_time_bin)
+                                    should_dim_low_firing_bins=should_dim_low_firing_bins, min_num_unique_active_neurons_per_time_bin=min_num_unique_active_neurons_per_time_bin,
+                                    active_laps_decoding_time_bin_size=float(effective_laps_tbin), used_heldout_train_decoders=bool(heldout_decoders_dict is not None))
         return {display_context: graphics_output_dict}
 
 
