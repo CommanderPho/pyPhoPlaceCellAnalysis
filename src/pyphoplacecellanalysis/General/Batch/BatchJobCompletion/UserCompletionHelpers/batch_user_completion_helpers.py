@@ -3469,8 +3469,8 @@ def compute_and_export_bapun_train_test_decoder_error_distance_completion_functi
 
 @function_attributes(short_name=None, tags=['bapun', 'train-test', 'decoder', 'figure', 'batch', 'shuffles-indep', 'pure'], input_requires=[], output_provides=[], uses=['BapunPositionDecodingPerformance', 'build_and_write_to_file'], used_by=[], creation_date='2026-06-19 12:00', related_items=['compute_and_export_bapun_train_test_decoder_error_distance_completion_function'])
 def figures_plot_bapun_train_test_decoder_error_distance_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, write_png: bool = True, write_vector_format: bool = False, force_recompute: bool = False,
-        training_data_portion: float = 9.0/10.0, laps_decoding_time_bin_size: float = 0.250, maze_epoch_names: Optional[List[str]] = None, use_clusterless_decoders: Optional[bool] = None, y_col_name: str='err_cm', debug_print: bool = False) -> dict:
-    """Plots and exports Bapun train/test decoder squared-error scatter figure. Loads prior CSV export when available."""
+        training_data_portion: float = 9.0/10.0, laps_decoding_time_bin_size: float = 0.250, maze_epoch_names: Optional[List[str]] = None, use_clusterless_decoders: Optional[bool] = None, y_col_name: str='abs_err_cm_median', debug_print: bool = False) -> dict:
+    """Plots and exports Bapun train/test decoder median-abs-error scatter figure. Loads prior CSV export when available."""
     import pandas as pd
     from typing import Optional, List
     from pyphoplacecellanalysis.General.Mixins.ExportHelpers import FileOutputManager, FigureOutputLocation, ContextToPathMode, build_and_write_to_file
@@ -3508,7 +3508,8 @@ def figures_plot_bapun_train_test_decoder_error_distance_completion_function(sel
         print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
         return across_session_results_extended_dict
 
-    assert y_col_name in ['sq_err', 'err_cm', 'sq_err_1D', 'err_cm_1D', 'sq_err_2D', 'err_cm_2D'], f"y_col_name: {y_col_name} is not in ['sq_err', 'err_cm', 'sq_err_1D', 'err_cm_1D', 'sq_err_2D', 'err_cm_2D']"
+    _allowed_y_cols = ['abs_err_cm_median', 'abs_err_cm_1D_median', 'abs_err_cm_2D_median']
+    assert y_col_name in _allowed_y_cols, f"y_col_name: {y_col_name} is not in {_allowed_y_cols}"
     fig, ax = BapunPositionDecodingPerformance.perform_plot_test_decoder_performance_error_distance(curr_active_pipeline=curr_active_pipeline, test_err_df=test_err_df, y_col_name = y_col_name, title_string = 'Test Lap Decoded vs Measured Pos')
     custom_figure_output_path = self.collected_outputs_path
     custom_fig_man: FileOutputManager = FileOutputManager(figure_output_location=FigureOutputLocation.CUSTOM, context_to_path_mode=ContextToPathMode.GLOBAL_UNIQUE, override_output_parent_path=custom_figure_output_path)
@@ -3517,16 +3518,16 @@ def figures_plot_bapun_train_test_decoder_error_distance_completion_function(sel
     callback_outputs['figure_output_paths'].extend(figure_output_paths)
     print(f'\tfigure_output_paths: {figure_output_paths}')
 
-    if ('err_cm_1D' in test_err_df.columns) and (y_col_name != 'err_cm_1D'):
-        fig_lin_pos, ax_lin_pos = BapunPositionDecodingPerformance.perform_plot_test_decoder_performance_error_distance(curr_active_pipeline=curr_active_pipeline, test_err_df=test_err_df, y_col_name='err_cm_1D', title_string='Test Lap Decoded vs Measured lin_pos Error')
-        display_context_lin_pos = curr_active_pipeline.build_display_context_for_session('test_decoded_measured_err_cm_1D')
+    if ('abs_err_cm_1D_median' in test_err_df.columns) and (y_col_name != 'abs_err_cm_1D_median'):
+        fig_lin_pos, ax_lin_pos = BapunPositionDecodingPerformance.perform_plot_test_decoder_performance_error_distance(curr_active_pipeline=curr_active_pipeline, test_err_df=test_err_df, y_col_name='abs_err_cm_1D_median', title_string='Test Lap Decoded vs Measured lin_pos Median Abs Error')
+        display_context_lin_pos = curr_active_pipeline.build_display_context_for_session('test_decoded_measured_abs_err_cm_1D_median')
         figure_output_paths_lin_pos = build_and_write_to_file(fig_lin_pos, display_context_lin_pos, fig_man=custom_fig_man, write_vector_format=write_vector_format, write_png=write_png)
         callback_outputs['figure_output_paths'].extend(figure_output_paths_lin_pos)
         print(f'\tlin_pos figure_output_paths: {figure_output_paths_lin_pos}')
 
-    if ('err_cm_2D' in test_err_df.columns) and (y_col_name != 'err_cm_2D'):
-        fig_2d, ax_2d = BapunPositionDecodingPerformance.perform_plot_test_decoder_performance_error_distance(curr_active_pipeline=curr_active_pipeline, test_err_df=test_err_df, y_col_name='err_cm_2D', title_string='Test Lap Decoded vs Measured 2D Euclidean Error')
-        display_context_2d = curr_active_pipeline.build_display_context_for_session('test_decoded_measured_err_cm_2D')
+    if ('abs_err_cm_2D_median' in test_err_df.columns) and (y_col_name != 'abs_err_cm_2D_median'):
+        fig_2d, ax_2d = BapunPositionDecodingPerformance.perform_plot_test_decoder_performance_error_distance(curr_active_pipeline=curr_active_pipeline, test_err_df=test_err_df, y_col_name='abs_err_cm_2D_median', title_string='Test Lap Decoded vs Measured 2D Median Abs Error')
+        display_context_2d = curr_active_pipeline.build_display_context_for_session('test_decoded_measured_abs_err_cm_2D_median')
         figure_output_paths_2d = build_and_write_to_file(fig_2d, display_context_2d, fig_man=custom_fig_man, write_vector_format=write_vector_format, write_png=write_png)
         callback_outputs['figure_output_paths'].extend(figure_output_paths_2d)
         print(f'\t2D figure_output_paths: {figure_output_paths_2d}')
@@ -3606,8 +3607,8 @@ def compute_and_pickle_clusterless_decoder_completion_function(self, global_data
 
 @function_attributes(short_name=None, tags=['bapun', 'train-test', 'decoder', 'figure', 'batch', 'clusterless', 'shuffles-indep', 'pure'], input_requires=[], output_provides=[], uses=['BapunPositionDecodingPerformance', 'build_and_write_to_file'], used_by=[], creation_date='2026-06-30 12:00', related_items=['compute_and_export_bapun_train_test_decoder_error_distance_completion_function'])
 def figures_plot_bapun_clusterless_train_test_decoder_error_distance_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, write_png: bool = True, write_vector_format: bool = False, force_recompute: bool = False,
-        training_data_portion: float = 9.0/10.0, laps_decoding_time_bin_size: float = 0.250, maze_epoch_names: Optional[List[str]] = None, use_clusterless_decoders: Optional[bool] = True, y_col_name: str='err_cm', debug_print: bool = False) -> dict:
-    """Plots and exports Bapun clusterless train/test decoder squared-error scatter figure."""
+        training_data_portion: float = 9.0/10.0, laps_decoding_time_bin_size: float = 0.250, maze_epoch_names: Optional[List[str]] = None, use_clusterless_decoders: Optional[bool] = True, y_col_name: str='abs_err_cm_median', debug_print: bool = False) -> dict:
+    """Plots and exports Bapun clusterless train/test decoder median-abs-error scatter figure."""
     import pandas as pd
     from typing import Optional, List
     from pyphoplacecellanalysis.General.Mixins.ExportHelpers import FileOutputManager, FigureOutputLocation, ContextToPathMode, build_and_write_to_file
@@ -3636,7 +3637,8 @@ def figures_plot_bapun_clusterless_train_test_decoder_error_distance_completion_
         print(f'\tCSV not found or force_recompute=True, recomputing test_err_df...')
         _test_err_agg_df, test_err_df, _test_decode_results = BapunPositionDecodingPerformance.compute_bapun_train_test_decoder_error_distance(curr_active_pipeline=curr_active_pipeline, training_data_portion=training_data_portion, laps_decoding_time_bin_size=laps_decoding_time_bin_size, maze_epoch_names=maze_epoch_names, use_clusterless_decoders=use_clusterless_decoders, debug_print=debug_print)
 
-    assert y_col_name in ['sq_err', 'err_cm', 'sq_err_1D', 'err_cm_1D', 'sq_err_2D', 'err_cm_2D'], f"y_col_name: {y_col_name} is not in ['sq_err', 'err_cm', 'sq_err_1D', 'err_cm_1D', 'sq_err_2D', 'err_cm_2D']"
+    _allowed_y_cols = ['abs_err_cm_median', 'abs_err_cm_1D_median', 'abs_err_cm_2D_median']
+    assert y_col_name in _allowed_y_cols, f"y_col_name: {y_col_name} is not in {_allowed_y_cols}"
     fig, ax = BapunPositionDecodingPerformance.perform_plot_test_decoder_performance_error_distance(curr_active_pipeline=curr_active_pipeline, test_err_df=test_err_df, y_col_name = y_col_name, title_string = 'Test Lap Decoded vs Measured Pos (Clusterless)')
     custom_figure_output_path = self.collected_outputs_path
     custom_fig_man: FileOutputManager = FileOutputManager(figure_output_location=FigureOutputLocation.CUSTOM, context_to_path_mode=ContextToPathMode.GLOBAL_UNIQUE, override_output_parent_path=custom_figure_output_path)
@@ -3645,16 +3647,16 @@ def figures_plot_bapun_clusterless_train_test_decoder_error_distance_completion_
     callback_outputs['figure_output_paths'].extend(figure_output_paths)
     print(f'\tfigure_output_paths: {figure_output_paths}')
 
-    if ('err_cm_1D' in test_err_df.columns) and (y_col_name != 'err_cm_1D'):
-        fig_lin_pos, ax_lin_pos = BapunPositionDecodingPerformance.perform_plot_test_decoder_performance_error_distance(curr_active_pipeline=curr_active_pipeline, test_err_df=test_err_df, y_col_name='err_cm_1D', title_string='Test Lap Decoded vs Measured lin_pos Error (Clusterless)')
-        display_context_lin_pos = curr_active_pipeline.build_display_context_for_session('test_decoded_measured_err_cm_1D_clusterless')
+    if ('abs_err_cm_1D_median' in test_err_df.columns) and (y_col_name != 'abs_err_cm_1D_median'):
+        fig_lin_pos, ax_lin_pos = BapunPositionDecodingPerformance.perform_plot_test_decoder_performance_error_distance(curr_active_pipeline=curr_active_pipeline, test_err_df=test_err_df, y_col_name='abs_err_cm_1D_median', title_string='Test Lap Decoded vs Measured lin_pos Median Abs Error (Clusterless)')
+        display_context_lin_pos = curr_active_pipeline.build_display_context_for_session('test_decoded_measured_abs_err_cm_1D_median_clusterless')
         figure_output_paths_lin_pos = build_and_write_to_file(fig_lin_pos, display_context_lin_pos, fig_man=custom_fig_man, write_vector_format=write_vector_format, write_png=write_png)
         callback_outputs['figure_output_paths'].extend(figure_output_paths_lin_pos)
         print(f'\tlin_pos figure_output_paths: {figure_output_paths_lin_pos}')
 
-    if ('err_cm_2D' in test_err_df.columns) and (y_col_name != 'err_cm_2D'):
-        fig_2d, ax_2d = BapunPositionDecodingPerformance.perform_plot_test_decoder_performance_error_distance(curr_active_pipeline=curr_active_pipeline, test_err_df=test_err_df, y_col_name='err_cm_2D', title_string='Test Lap Decoded vs Measured 2D Euclidean Error (Clusterless)')
-        display_context_2d = curr_active_pipeline.build_display_context_for_session('test_decoded_measured_err_cm_2D_clusterless')
+    if ('abs_err_cm_2D_median' in test_err_df.columns) and (y_col_name != 'abs_err_cm_2D_median'):
+        fig_2d, ax_2d = BapunPositionDecodingPerformance.perform_plot_test_decoder_performance_error_distance(curr_active_pipeline=curr_active_pipeline, test_err_df=test_err_df, y_col_name='abs_err_cm_2D_median', title_string='Test Lap Decoded vs Measured 2D Median Abs Error (Clusterless)')
+        display_context_2d = curr_active_pipeline.build_display_context_for_session('test_decoded_measured_abs_err_cm_2D_median_clusterless')
         figure_output_paths_2d = build_and_write_to_file(fig_2d, display_context_2d, fig_man=custom_fig_man, write_vector_format=write_vector_format, write_png=write_png)
         callback_outputs['figure_output_paths'].extend(figure_output_paths_2d)
         print(f'\t2D figure_output_paths: {figure_output_paths_2d}')
@@ -3787,8 +3789,8 @@ def compute_and_pickle_spyglass_clusterless_decoder_completion_function(self, gl
 
 @function_attributes(short_name=None, tags=['bapun', 'train-test', 'decoder', 'figure', 'batch', 'clusterless', 'spyglass', 'shuffles-indep', 'pure'], input_requires=[], output_provides=[], uses=['BapunPositionDecodingPerformance', 'build_and_write_to_file'], used_by=[], creation_date='2026-07-07 15:00', related_items=['compute_and_pickle_spyglass_clusterless_decoder_completion_function'])
 def figures_plot_bapun_spyglass_clusterless_train_test_decoder_error_distance_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, write_png: bool = True, write_vector_format: bool = False, force_recompute: bool = False,
-        training_data_portion: float = 9.0/10.0, laps_decoding_time_bin_size: float = 0.250, maze_epoch_names: Optional[List[str]] = None, use_spyglass_clusterless_decoders: Optional[bool] = True, y_col_name: str='err_cm', debug_print: bool = False) -> dict:
-    """Plots and exports Bapun Spyglass clusterless train/test decoder squared-error scatter figure."""
+        training_data_portion: float = 9.0/10.0, laps_decoding_time_bin_size: float = 0.250, maze_epoch_names: Optional[List[str]] = None, use_spyglass_clusterless_decoders: Optional[bool] = True, y_col_name: str='abs_err_cm_median', debug_print: bool = False) -> dict:
+    """Plots and exports Bapun Spyglass clusterless train/test decoder median-abs-error scatter figure."""
     import pandas as pd
     from typing import Optional, List
     from pyphoplacecellanalysis.General.Mixins.ExportHelpers import FileOutputManager, FigureOutputLocation, ContextToPathMode, build_and_write_to_file
@@ -3819,7 +3821,8 @@ def figures_plot_bapun_spyglass_clusterless_train_test_decoder_error_distance_co
         print(f'\tCSV not found or force_recompute=True, recomputing test_err_df...')
         _test_err_agg_df, test_err_df, _test_decode_results = BapunPositionDecodingPerformance.compute_bapun_train_test_decoder_error_distance(curr_active_pipeline=curr_active_pipeline, training_data_portion=training_data_portion, laps_decoding_time_bin_size=laps_decoding_time_bin_size, maze_epoch_names=maze_epoch_names, use_spyglass_clusterless_decoders=use_spyglass_clusterless_decoders, debug_print=debug_print)
 
-    assert y_col_name in ['sq_err', 'err_cm', 'sq_err_1D', 'err_cm_1D', 'sq_err_2D', 'err_cm_2D'], f"y_col_name: {y_col_name} is not in ['sq_err', 'err_cm', 'sq_err_1D', 'err_cm_1D', 'sq_err_2D', 'err_cm_2D']"
+    _allowed_y_cols = ['abs_err_cm_median', 'abs_err_cm_1D_median', 'abs_err_cm_2D_median']
+    assert y_col_name in _allowed_y_cols, f"y_col_name: {y_col_name} is not in {_allowed_y_cols}"
     fig, ax = BapunPositionDecodingPerformance.perform_plot_test_decoder_performance_error_distance(curr_active_pipeline=curr_active_pipeline, test_err_df=test_err_df, y_col_name = y_col_name, title_string = 'Test Lap Decoded vs Measured Pos (Spyglass Clusterless)')
     custom_figure_output_path = self.collected_outputs_path
     custom_fig_man: FileOutputManager = FileOutputManager(figure_output_location=FigureOutputLocation.CUSTOM, context_to_path_mode=ContextToPathMode.GLOBAL_UNIQUE, override_output_parent_path=custom_figure_output_path)
@@ -3828,16 +3831,16 @@ def figures_plot_bapun_spyglass_clusterless_train_test_decoder_error_distance_co
     callback_outputs['figure_output_paths'].extend(figure_output_paths)
     print(f'\tfigure_output_paths: {figure_output_paths}')
 
-    if ('err_cm_1D' in test_err_df.columns) and (y_col_name != 'err_cm_1D'):
-        fig_lin_pos, ax_lin_pos = BapunPositionDecodingPerformance.perform_plot_test_decoder_performance_error_distance(curr_active_pipeline=curr_active_pipeline, test_err_df=test_err_df, y_col_name='err_cm_1D', title_string='Test Lap Decoded vs Measured lin_pos Error (Spyglass Clusterless)')
-        display_context_lin_pos = curr_active_pipeline.build_display_context_for_session('test_decoded_measured_err_cm_1D_spyglass_clusterless')
+    if ('abs_err_cm_1D_median' in test_err_df.columns) and (y_col_name != 'abs_err_cm_1D_median'):
+        fig_lin_pos, ax_lin_pos = BapunPositionDecodingPerformance.perform_plot_test_decoder_performance_error_distance(curr_active_pipeline=curr_active_pipeline, test_err_df=test_err_df, y_col_name='abs_err_cm_1D_median', title_string='Test Lap Decoded vs Measured lin_pos Median Abs Error (Spyglass Clusterless)')
+        display_context_lin_pos = curr_active_pipeline.build_display_context_for_session('test_decoded_measured_abs_err_cm_1D_median_spyglass_clusterless')
         figure_output_paths_lin_pos = build_and_write_to_file(fig_lin_pos, display_context_lin_pos, fig_man=custom_fig_man, write_vector_format=write_vector_format, write_png=write_png)
         callback_outputs['figure_output_paths'].extend(figure_output_paths_lin_pos)
         print(f'\tlin_pos figure_output_paths: {figure_output_paths_lin_pos}')
 
-    if ('err_cm_2D' in test_err_df.columns) and (y_col_name != 'err_cm_2D'):
-        fig_2d, ax_2d = BapunPositionDecodingPerformance.perform_plot_test_decoder_performance_error_distance(curr_active_pipeline=curr_active_pipeline, test_err_df=test_err_df, y_col_name='err_cm_2D', title_string='Test Lap Decoded vs Measured 2D Euclidean Error (Spyglass Clusterless)')
-        display_context_2d = curr_active_pipeline.build_display_context_for_session('test_decoded_measured_err_cm_2D_spyglass_clusterless')
+    if ('abs_err_cm_2D_median' in test_err_df.columns) and (y_col_name != 'abs_err_cm_2D_median'):
+        fig_2d, ax_2d = BapunPositionDecodingPerformance.perform_plot_test_decoder_performance_error_distance(curr_active_pipeline=curr_active_pipeline, test_err_df=test_err_df, y_col_name='abs_err_cm_2D_median', title_string='Test Lap Decoded vs Measured 2D Median Abs Error (Spyglass Clusterless)')
+        display_context_2d = curr_active_pipeline.build_display_context_for_session('test_decoded_measured_abs_err_cm_2D_median_spyglass_clusterless')
         figure_output_paths_2d = build_and_write_to_file(fig_2d, display_context_2d, fig_man=custom_fig_man, write_vector_format=write_vector_format, write_png=write_png)
         callback_outputs['figure_output_paths'].extend(figure_output_paths_2d)
         print(f'\t2D figure_output_paths: {figure_output_paths_2d}')
@@ -4474,7 +4477,7 @@ def figures_export_laps_correct_decoder_side_by_side_completion_function(self, g
                                                                          fail_on_exception_for_debugging: bool = False, debug_print: bool = False, **kwargs) -> dict:
     """Batch/SLURM headless Agg export: left GT test-err metrics column + 4-decoder lap posteriors with green ground-truth boxes; pages stacked into one PNG under collected_outputs.
 
-    Runs ``compute_and_export_kdiba_train_test_position_error_completion_function`` first (dependency) and passes ``train_test_pos_err_df`` into the display for the left GT test-error metrics column.
+    Runs ``compute_and_export_kdiba_train_test_position_error_completion_function`` first (dependency) and passes ``train_test_pos_err_df`` / ``train_test_pos_err_bins_df`` into the display for the left GT test-error metrics column (whole-lap median + valid per-bin errors).
     Mismatch-driven ``TrainTestSplit`` recompute when ``active_laps_decoding_time_bin_size`` / ``should_filter_inactive_bins_before_split`` / mask thresholds differ from the stored result.
     `posterior_masking_value` default 0.0 (no under-threshold whitening); non-zero vmin + white under_color washes out low/high-P contrast.
     Low-firing dimming defaults match ``export_train_test_pos_err`` (`min_num_unique_active_neurons_per_time_bin=1`).
@@ -4508,7 +4511,7 @@ def figures_export_laps_correct_decoder_side_by_side_completion_function(self, g
         print(f'figures_export TrainTestSplit resolve: needs_recompute={_needs_tt_recompute}, kwargs={_tt_comp_kwargs}', flush=True)
 
     print(f'figures_export_laps_correct_decoder_side_by_side_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, delete_temporary_outputs={delete_temporary_outputs}, ...)', flush=True)
-    callback_outputs = {'combined_img_out_path': None, 'page_png_paths': None, 'n_pages': None, 'n_laps': None, 'output_dir': None, 'deleted_temporary_outputs': False, 'train_test_pos_err_df': None, 'train_test_split_recomputed': bool(_needs_tt_recompute), 'error': None}
+    callback_outputs = {'combined_img_out_path': None, 'page_png_paths': None, 'n_pages': None, 'n_laps': None, 'output_dir': None, 'deleted_temporary_outputs': False, 'train_test_pos_err_df': None, 'train_test_pos_err_bins_df': None, 'train_test_split_recomputed': bool(_needs_tt_recompute), 'error': None}
     across_session_results_extended_dict['figures_export_laps_correct_decoder_side_by_side_completion_function'] = callback_outputs
 
     try:
@@ -4519,8 +4522,11 @@ def figures_export_laps_correct_decoder_side_by_side_completion_function(self, g
                                                                                                                       should_mask_by_required_spike_counts=True, min_num_spikes_per_bin_to_be_considered_active=int(min_num_spikes_per_bin_to_be_considered_active),
                                                                                                                       min_num_unique_active_neurons_per_time_bin=min_num_unique_active_neurons_per_time_bin,
                                                                                                                       train_test_split_computation_kwargs=_tt_comp_kwargs, debug_print=bool(debug_print))
-        train_test_pos_err_df = across_session_results_extended_dict.get('compute_and_export_kdiba_train_test_position_error_completion_function', {}).get('train_test_pos_err_df', None)
+        _tt_pos_err_outputs = across_session_results_extended_dict.get('compute_and_export_kdiba_train_test_position_error_completion_function', {})
+        train_test_pos_err_df = _tt_pos_err_outputs.get('train_test_pos_err_df', None)
+        train_test_pos_err_bins_df = _tt_pos_err_outputs.get('train_test_pos_err_bins_df', None)
         callback_outputs['train_test_pos_err_df'] = train_test_pos_err_df
+        callback_outputs['train_test_pos_err_bins_df'] = train_test_pos_err_bins_df
 
         curr_active_pipeline.reload_default_display_functions()
         display_context = curr_active_pipeline.build_display_context_for_session(display_fn_name='laps_correct_decoder_side_by_side_posteriors')
@@ -4530,7 +4536,7 @@ def figures_export_laps_correct_decoder_side_by_side_completion_function(self, g
                                             parent_output_folder=self.collected_outputs_path.resolve(), max_subplots_per_page=max_subplots_per_page, posterior_masking_value=posterior_masking_value,
                                             dpi=dpi, combined_image_basename=combined_image_basename, should_dim_low_firing_bins=should_dim_low_firing_bins,
                                             min_num_spikes_per_bin_to_be_considered_active=min_num_spikes_per_bin_to_be_considered_active, min_num_unique_active_neurons_per_time_bin=min_num_unique_active_neurons_per_time_bin,
-                                            train_test_pos_err_df=train_test_pos_err_df, debug_print=debug_print, **kwargs)
+                                            train_test_pos_err_df=train_test_pos_err_df, train_test_pos_err_bins_df=train_test_pos_err_bins_df, debug_print=debug_print, **kwargs)
         ## Unwrap {display_context: graphics_output_dict}
         graphics_output_dict = list(_out.values())[0] if isinstance(_out, dict) else _out
         nested_combined_img_out_path = graphics_output_dict.get('combined_img_out_path')

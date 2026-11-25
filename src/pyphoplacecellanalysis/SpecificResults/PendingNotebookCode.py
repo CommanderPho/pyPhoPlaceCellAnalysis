@@ -4481,7 +4481,7 @@ class BapunPositionDecodingPerformance:
     from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import BapunPositionDecodingPerformance
 
     test_err_agg_df, test_err_df, test_decode_results = BapunPositionDecodingPerformance.compute_bapun_train_test_decoder_error_distance(curr_active_pipeline, laps_decoding_time_bin_size=0.250)
-    fig, ax = BapunPositionDecodingPerformance.perform_plot_test_decoder_performance_error_distance(curr_active_pipeline, test_err_df=test_err_df, y_col_name='err_cm')
+    fig, ax = BapunPositionDecodingPerformance.perform_plot_test_decoder_performance_error_distance(curr_active_pipeline, test_err_df=test_err_df, y_col_name='abs_err_cm_median')
 
     """
 
@@ -4559,12 +4559,8 @@ class BapunPositionDecodingPerformance:
             test_decode_results_lin_pos: Dict[str, DecodedFilterEpochsResult] = TrainTestLapsSplitting.decode_using_new_decoders(global_spikes_df, train_lap_specific_pf1D_Decoder_dict=train_test_result.train_lap_specific_lin_pos_Decoder_dict, test_epochs_dict=train_test_result.test_epochs_dict, laps_decoding_time_bin_size=laps_decoding_time_bin_size)
             _, _, test_err_df_dict_lin_pos = CustomDecodeEpochsResult.build_measured_decoded_position_comparison(test_decode_results_lin_pos, global_measured_position_df=global_measured_position_df)
             for maze_name, df_2d in test_err_df_dict.items():
-                _lin_cols = ['t', 'sq_err_1D', 'err_cm_1D']
-                for _c in ('abs_err_cm_1D_mean', 'abs_err_cm_1D_median'):
-                    if _c in test_err_df_dict_lin_pos[maze_name].columns:
-                        _lin_cols.append(_c)
-                ## END for _c in ('abs_err_cm_1D_mean', 'abs_err_cm_1D_median')...
-                df_lin = test_err_df_dict_lin_pos[maze_name][_lin_cols]
+                ## lin_pos decoder primary median → rename as 1D metric when joining into 2D frame:
+                df_lin = test_err_df_dict_lin_pos[maze_name][['t', 'abs_err_cm_median']].rename(columns={'abs_err_cm_median': 'abs_err_cm_1D_median'})
                 test_err_df_dict[maze_name] = df_2d.merge(df_lin, on='t', how='left')
             ## END for maze_name, df_2d in test_err_df_dict.items()...
             if debug_print:
@@ -4573,56 +4569,22 @@ class BapunPositionDecodingPerformance:
             df['maze'] = k
         test_err_df: pd.DataFrame = pd.concat(list(test_err_df_dict.values()))
 
-        # Performed aggregations grouped on column: 'maze'
-        agg_kwargs = dict(sq_err_mean=('sq_err', 'mean'), err_cm_mean=('err_cm', 'mean'),
-                          abs_err_cm_mean_mean=('abs_err_cm_mean', 'mean'), abs_err_cm_mean_median=('abs_err_cm_mean', 'median'),
-                          abs_err_cm_median_mean=('abs_err_cm_median', 'mean'), abs_err_cm_median_median=('abs_err_cm_median', 'median'))
-        if 'err_cm_2D' in test_err_df.columns:
-            agg_kwargs.update(sq_err_2D_mean=('sq_err_2D', 'mean'), err_cm_2D_mean=('err_cm_2D', 'mean'))
-        if 'abs_err_cm_2D_mean' in test_err_df.columns:
-            agg_kwargs.update(abs_err_cm_2D_mean_mean=('abs_err_cm_2D_mean', 'mean'), abs_err_cm_2D_mean_median=('abs_err_cm_2D_mean', 'median'),
-                              abs_err_cm_2D_median_mean=('abs_err_cm_2D_median', 'mean'), abs_err_cm_2D_median_median=('abs_err_cm_2D_median', 'median'))
-        if 'err_cm_1D' in test_err_df.columns:
-            agg_kwargs.update(sq_err_1D_mean=('sq_err_1D', 'mean'), err_cm_1D_mean=('err_cm_1D', 'mean'))
-        if 'abs_err_cm_1D_mean' in test_err_df.columns:
-            agg_kwargs.update(abs_err_cm_1D_mean_mean=('abs_err_cm_1D_mean', 'mean'), abs_err_cm_1D_mean_median=('abs_err_cm_1D_mean', 'median'),
-                              abs_err_cm_1D_median_mean=('abs_err_cm_1D_median', 'mean'), abs_err_cm_1D_median_median=('abs_err_cm_1D_median', 'median'))
+        # Performed aggregations grouped on column: 'maze' — median abs-error only:
+        agg_kwargs = dict(abs_err_cm_median_mean=('abs_err_cm_median', 'mean'), abs_err_cm_median_median=('abs_err_cm_median', 'median'))
+        if 'abs_err_cm_2D_median' in test_err_df.columns:
+            agg_kwargs.update(abs_err_cm_2D_median_mean=('abs_err_cm_2D_median', 'mean'), abs_err_cm_2D_median_median=('abs_err_cm_2D_median', 'median'))
+        if 'abs_err_cm_1D_median' in test_err_df.columns:
+            agg_kwargs.update(abs_err_cm_1D_median_mean=('abs_err_cm_1D_median', 'mean'), abs_err_cm_1D_median_median=('abs_err_cm_1D_median', 'median'))
         test_err_agg_df = test_err_df.groupby(['maze']).agg(**agg_kwargs).reset_index()
 
-        # ## INPUTS: test_err_df_dict
-        # test_err_df_dict = {k:an_err_df.rename(columns={'sq_err': f'sq_err_{k}', 'err_cm': f'err_cm_{k}'}) for k, an_err_df in test_err_df_dict.items()}
-        # test_err_df: pd.DataFrame = pd.concat(list(test_err_df_dict.values()))
-        test_err_df
-
         ## OUTPUTS: test_err_df, test_err_agg_df
-        test_err_agg_df
-
-        # # optional: decode train epochs too for comparison
-        # train_decode_results = TrainTestLapsSplitting.decode_using_new_decoders(
-        #     get_proper_global_spikes_df(curr_active_pipeline),
-        #     train_test_result.train_lap_specific_pf1D_Decoder_dict,
-        #     train_test_result.train_epochs_dict,
-        #     laps_decoding_time_bin_size=0.250, # 250ms
-        # )
-        # train_measured, train_decoded, train_err_df_dict = CustomDecodeEpochsResult.build_measured_decoded_position_comparison(train_decode_results, global_measured_position_df=global_measured_position_df)
-
-        # ## INPUTS: train_err_df_dict
-        # train_err_df_dict = {k:train_err_df.rename(columns={'sq_err': f'sq_err_{k}', 'err_cm': f'err_cm_{k}'}) for k, train_err_df in train_err_df_dict.items()}
-        # train_err_df: pd.DataFrame = pd.concat(list(train_err_df_dict.values()))
-        # train_err_df
-
-        # train_measured
-        # train_decoded
-        ## OUTPUTS: train_err_df_dict, test_err_df_dict
-        # test_err_df_dict
-
         return (test_err_agg_df, test_err_df, test_decode_results)
 
 
     @function_attributes(short_name=None, tags=['plot', 'bapun', 'train-test', 'decoder', 'figure'], input_requires=[], output_provides=[], uses=['compute_max_possible_maze_err_cm'], used_by=[], creation_date='2026-06-20 09:47', related_items=[])
     @classmethod
-    def perform_plot_test_decoder_performance_error_distance(cls, curr_active_pipeline, test_err_df: pd.DataFrame, y_col_name='sq_err', title_string: str = 'Test Lap Decoded vs Measured Position Squared Error', subtitle_string: Optional[str] = None, ax = None):
-        """ plots the train/test split performance results across laps/time
+    def perform_plot_test_decoder_performance_error_distance(cls, curr_active_pipeline, test_err_df: pd.DataFrame, y_col_name='abs_err_cm_median', title_string: str = 'Test Lap Decoded vs Measured Position Median Abs Error', subtitle_string: Optional[str] = None, ax = None):
+        """ plots the train/test split performance results across laps/time (median abs error over valid bins).
         """
         from flexitext import flexitext
         from neuropy.utils.matplotlib_helpers import FormattedFigureText
@@ -4651,7 +4613,11 @@ class BapunPositionDecodingPerformance:
             ax.set_ylim([0.0, observed_pos_range_max_distance_cm + (observed_pos_range_max_distance_cm * 0.02)])
             return {'max_line': a_max_line, 'max_line_label': a_max_line_label}
 
-        if y_col_name in ('err_cm_1D', 'sq_err_1D'):
+        _allowed_y_cols = ('abs_err_cm_median', 'abs_err_cm_1D_median', 'abs_err_cm_2D_median')
+        assert y_col_name in _allowed_y_cols, f"y_col_name: {y_col_name} is not in {_allowed_y_cols}"
+        assert y_col_name in test_err_df.columns, f"y_col_name: {y_col_name} missing from test_err_df.columns: {list(test_err_df.columns)}"
+
+        if y_col_name == 'abs_err_cm_1D_median':
             pos_df = curr_active_pipeline.sess.position.to_dataframe()
             observed_pos_range_max_distance_cm: float = float(np.nanmax(pos_df['lin_pos'].to_numpy()) - np.nanmin(pos_df['lin_pos'].to_numpy())) if ('lin_pos' in pos_df.columns) else cls.compute_max_possible_maze_err_cm(curr_active_pipeline)
         else:
@@ -4661,8 +4627,8 @@ class BapunPositionDecodingPerformance:
         if subtitle_string is None:
             subtitle_string = f'metric: {y_col_name}, all_epochs'
 
-        active_context = curr_active_pipeline.build_display_context_for_session('test_decoded_measured_sq_err')
-        title_string = 'Test Lap Decoded vs Measured Position Error'
+        active_context = curr_active_pipeline.build_display_context_for_session(f'test_decoded_measured_{y_col_name}')
+        title_string = 'Test Lap Decoded vs Measured Position Median Abs Error'
         
         ax = test_err_df.plot.scatter(x='t', y=y_col_name, ax=ax)
         # ax = test_err_df.plot.scatter(x='t', y='sq_err_sprinkle', ax=ax, color='orange', label='sprinkle')
@@ -22013,7 +21979,7 @@ def _perform_build_individual_time_bin_decoded_posteriors_df(curr_active_pipelin
 def _perform_run_rigorous_decoder_performance_assessment(curr_active_pipeline, included_neuron_IDs, active_laps_decoding_time_bin_size: float = 0.25, force_recompute_directional_train_test_split_result: bool = False, measured_pos_column_name: str = 'lin_pos', debug_print=False):
     """ runs for a specific subset of cells
 
-    measured_pos_column_name (str): measured 1D position column used for the primary ``sq_err`` / ``err_cm`` comparison metrics (default ``'lin_pos'``; falls back to ``'x'`` if missing or all-NaN).
+    measured_pos_column_name (str): measured 1D position column used for the primary ``abs_err_cm_median`` comparison metric (default ``'lin_pos'``).
     """
     # Inputs: all_directional_pf1D_Decoder, alt_directional_merged_decoders_result
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import TrainTestSplitResult, TrainTestLapsSplitting, CustomDecodeEpochsResult, decoder_name, epoch_split_key, get_proper_global_spikes_df, DirectionalPseudo2DDecodersResult
