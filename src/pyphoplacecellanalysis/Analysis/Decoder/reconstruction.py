@@ -2493,7 +2493,7 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
 
 
     @function_attributes(short_name=None, tags=['mask', 'unit-spike-counts', 'pure'], input_requires=[], output_provides=[], uses=['self.mask_computed_DecodedFilterEpochsResult_by_time_bin_inclusion_masks', 'spikes_df.spikes.compute_unit_time_binned_spike_counts_and_mask'], used_by=[], creation_date='2025-03-04 01:32', related_items=[])
-    def mask_computed_DecodedFilterEpochsResult_by_required_spike_counts_per_time_bin(self, spikes_df: pd.DataFrame, min_num_spikes_per_bin_to_be_considered_active:int=1, min_num_unique_active_neurons_per_time_bin:int=3, masked_bin_fill_mode:MaskedTimeBinFillType='last_valid') -> Tuple["DecodedFilterEpochsResult", Tuple[NDArray, NDArray]]:
+    def mask_computed_DecodedFilterEpochsResult_by_required_spike_counts_per_time_bin(self, spikes_df: pd.DataFrame, min_num_spikes_per_bin_to_be_considered_active:int=1, min_num_unique_active_neurons_per_time_bin:int=3, masked_bin_fill_mode:MaskedTimeBinFillType='last_valid', included_neuron_ids: Optional[NDArray]=None) -> Tuple["DecodedFilterEpochsResult", Tuple[NDArray, NDArray]]:
         """ Returns a copy of itself, masked by finding periods where there is insufficient firing to decode based on the provided paramters, copies the decoded result and returns a version with positions back-filled from the last bin that did meet the minimum firing criteria
         
         Pure: does not modify self
@@ -2501,6 +2501,8 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
         a_decoded_result.p_x_given_n_list[0].shape # (59, 2, 69487)
         a_decoded_result.most_likely_position_indicies_list[0].shape # .shape (2, 69487)
         a_decoded_result.most_likely_positions_list[0].shape # .shape (69487, 2)
+
+        included_neuron_ids: optional neuron IDs used for the activity mask (e.g. pfND_Decoder.neuron_IDs). When None, all aclus in spikes_df are counted.
 
 
         spikes_df: pd.DataFrame = deepcopy(get_proper_global_spikes_df(curr_active_pipeline))
@@ -2534,13 +2536,13 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
             sliding_iv = tc.get_sliding_window_intervals()
             if sliding_iv is not None:
                 w_st, w_en = sliding_iv
-                _unused_counts, _unused_units, (is_time_bin_active, _inactive_mask, _mask_rgba) = spikes_df.spikes.compute_unit_time_binned_spike_counts_and_mask_from_window_intervals(window_start_edges=w_st, window_stop_edges=w_en, included_neuron_ids=None, min_num_spikes_per_bin_to_be_considered_active=min_num_spikes_per_bin_to_be_considered_active, min_num_unique_active_neurons_per_time_bin=min_num_unique_active_neurons_per_time_bin)
+                _unused_counts, _unused_units, (is_time_bin_active, _inactive_mask, _mask_rgba) = spikes_df.spikes.compute_unit_time_binned_spike_counts_and_mask_from_window_intervals(window_start_edges=w_st, window_stop_edges=w_en, included_neuron_ids=included_neuron_ids, min_num_spikes_per_bin_to_be_considered_active=min_num_spikes_per_bin_to_be_considered_active, min_num_unique_active_neurons_per_time_bin=min_num_unique_active_neurons_per_time_bin)
             else:
                 a_time_bin_edges: NDArray = np.asarray(a_decoded_result.time_bin_edges[i])
                 if a_time_bin_edges.ndim == 2 and a_time_bin_edges.shape[0] == num_time_bins and a_time_bin_edges.shape[1] == 2:
-                    _unused_counts, _unused_units, (is_time_bin_active, _inactive_mask, _mask_rgba) = spikes_df.spikes.compute_unit_time_binned_spike_counts_and_mask_from_window_intervals(window_start_edges=a_time_bin_edges[:, 0], window_stop_edges=a_time_bin_edges[:, 1], included_neuron_ids=None, min_num_spikes_per_bin_to_be_considered_active=min_num_spikes_per_bin_to_be_considered_active, min_num_unique_active_neurons_per_time_bin=min_num_unique_active_neurons_per_time_bin)
+                    _unused_counts, _unused_units, (is_time_bin_active, _inactive_mask, _mask_rgba) = spikes_df.spikes.compute_unit_time_binned_spike_counts_and_mask_from_window_intervals(window_start_edges=a_time_bin_edges[:, 0], window_stop_edges=a_time_bin_edges[:, 1], included_neuron_ids=included_neuron_ids, min_num_spikes_per_bin_to_be_considered_active=min_num_spikes_per_bin_to_be_considered_active, min_num_unique_active_neurons_per_time_bin=min_num_unique_active_neurons_per_time_bin)
                 elif a_time_bin_edges.ndim == 1 and len(a_time_bin_edges) == (num_time_bins + 1):
-                    _unused_counts, _unused_units, (is_time_bin_active, _inactive_mask, _mask_rgba) = spikes_df.spikes.compute_unit_time_binned_spike_counts_and_mask(time_bin_edges=a_time_bin_edges, min_num_spikes_per_bin_to_be_considered_active=min_num_spikes_per_bin_to_be_considered_active, min_num_unique_active_neurons_per_time_bin=min_num_unique_active_neurons_per_time_bin)
+                    _unused_counts, _unused_units, (is_time_bin_active, _inactive_mask, _mask_rgba) = spikes_df.spikes.compute_unit_time_binned_spike_counts_and_mask(time_bin_edges=a_time_bin_edges, included_neuron_ids=included_neuron_ids, min_num_spikes_per_bin_to_be_considered_active=min_num_spikes_per_bin_to_be_considered_active, min_num_unique_active_neurons_per_time_bin=min_num_unique_active_neurons_per_time_bin)
                 else:
                     print(f'WARN: Epoch[{i}]: cannot derive spike mask from time_bin_edges with shape {getattr(a_time_bin_edges, "shape", None)}; treating all time bins as active.')
                     is_time_bin_active = np.ones((num_time_bins,), dtype=bool)

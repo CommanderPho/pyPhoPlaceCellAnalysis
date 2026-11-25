@@ -5702,7 +5702,8 @@ def _do_custom_decode_epochs(global_spikes_df: pd.DataFrame, global_measured_pos
         decoder_result, _mask_index_tuple = decoder_result.mask_computed_DecodedFilterEpochsResult_by_required_spike_counts_per_time_bin(spikes_df=deepcopy(global_spikes_df),
                                                                                                                                          min_num_spikes_per_bin_to_be_considered_active=min_num_spikes_per_bin_to_be_considered_active,
                                                                                                                                          min_num_unique_active_neurons_per_time_bin=min_num_unique_active_neurons_per_time_bin,
-                                                                                                                                         masked_bin_fill_mode=masked_bin_fill_mode)
+                                                                                                                                         masked_bin_fill_mode=masked_bin_fill_mode,
+                                                                                                                                         included_neuron_ids=pfND_Decoder.neuron_IDs)
         is_time_bin_active_list, _inactive_mask_list, _all_time_bin_indicies_list, _last_valid_indices_list = _mask_index_tuple ## only non-masked bins should enter position-error terms
     # Interpolated measured position DataFrame - looks good
     ## INPUTS: test_all_directional_decoder_result, all_directional_pf1D_Decoder
