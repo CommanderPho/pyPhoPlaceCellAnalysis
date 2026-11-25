@@ -2971,14 +2971,21 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
     
 
     @function_attributes(short_name=None, tags=['epoch', 'slice', 'restrict'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-29 19:08', related_items=[])
-    def replacing_computation_epochs(self, epochs: Union[Epoch, pd.DataFrame]):
+    def replacing_computation_epochs(self, epochs: Union[Epoch, pd.DataFrame], preserve_source_neuron_IDs: bool = False):
         """Implementors return a copy of themselves with their computation epochs (contained in their placefields at `self.pf`) replaced by the provided ones. The existing epochs are unrelated and do not need to be related to the new ones.
+            preserve_source_neuron_IDs: when False (default), refilters neuron_IDs on the new epochs like an initial computation. When True, preserves the exact source neuron_IDs (membership and order).
         """
+        self.adding_default_values_for_missing_fields()
         new_epochs_obj: Epoch = Epoch(ensure_dataframe(deepcopy(epochs)).epochs.get_valid_df()).get_non_overlapping()
+        source_ids = np.asarray(self.neuron_IDs) if (preserve_source_neuron_IDs and (self.neuron_IDs is not None)) else None
         ## Restrict the PfNDs:
-        epoch_replaced_pf1D: PfND = self.pf.replacing_computation_epochs(deepcopy(new_epochs_obj))
+        epoch_replaced_pf1D: PfND = self.pf.replacing_computation_epochs(deepcopy(new_epochs_obj), preserve_source_neuron_IDs=preserve_source_neuron_IDs, _source_neuron_ids=source_ids)
         ## apply the neuron_sliced_pf to the decoder:
         updated_decoder = BasePositionDecoder(pf=epoch_replaced_pf1D, setup_on_init=self.setup_on_init, post_load_on_init=self.post_load_on_init, debug_print=self.debug_print)
+        updated_decoder.should_discount_silence = self.should_discount_silence
+        updated_decoder.drop_negative_contributing_terms_mode = self.drop_negative_contributing_terms_mode
+        updated_decoder.reliability_modifier_mode = self.reliability_modifier_mode
+        updated_decoder.minimum_rate_eps = self.minimum_rate_eps
         return updated_decoder
 
 

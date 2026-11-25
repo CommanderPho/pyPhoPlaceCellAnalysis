@@ -5861,10 +5861,30 @@ def _do_train_test_split_decode_and_evaluate(curr_active_pipeline, active_laps_d
     train_epochs_dict: Dict[types.DecoderName, pd.DataFrame] = directional_train_test_split_result.train_epochs_dict
     train_lap_specific_pfND_Decoder_dict: Dict[types.DecoderName, BasePositionDecoder] = directional_train_test_split_result.train_lap_specific_pf1D_Decoder_dict
 
+    if curr_active_pipeline.is_kdiba_session() and (train_lap_specific_pfND_Decoder_dict is not None):
+        gcr = curr_active_pipeline.global_computation_results
+        directional_laps_results = gcr.computed_data.get('DirectionalLaps', None) if (gcr is not None) else None
+        if directional_laps_results is not None:
+            rank_order_results = gcr.computed_data.get('RankOrder', None)
+            min_fr = rank_order_results.minimum_inclusion_fr_Hz if (rank_order_results is not None) else gcr.computation_config.rank_order_shuffle_analysis.minimum_inclusion_fr_Hz
+            inc_qclu = rank_order_results.included_qclu_values if (rank_order_results is not None) else gcr.computation_config.rank_order_shuffle_analysis.included_qclu_values
+            tmpl_decoders = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=min_fr, included_qclu_values=inc_qclu).get_decoders_dict()
+            cleaned_decoders_dict: Dict[types.DecoderName, BasePositionDecoder] = {}
+            for dec_name, a_dec in train_lap_specific_pfND_Decoder_dict.items():
+                if (dec_name in tmpl_decoders) and (a_dec is not None) and (getattr(a_dec, 'neuron_IDs', None) is not None):
+                    allowed_ids = np.asarray(tmpl_decoders[dec_name].neuron_IDs)
+                    curr_ids = np.asarray(a_dec.neuron_IDs)
+                    if not np.all(np.isin(curr_ids, allowed_ids)):
+                        keep_ids = allowed_ids[np.isin(allowed_ids, curr_ids)]
+                        a_dec = a_dec.get_by_id(keep_ids)
+                cleaned_decoders_dict[dec_name] = a_dec
+            ## END for dec_name, a_dec in train_lap_specific_pfND_Decoder_dict.items()...
+
+            train_lap_specific_pfND_Decoder_dict = cleaned_decoders_dict
 
     if included_neuron_IDs is not None:
-        _alt_directional_train_test_split_result = directional_train_test_split_result.sliced_by_neuron_id(included_neuron_ids=included_neuron_IDs)
-        train_lap_specific_pfND_Decoder_dict: Dict[types.DecoderName, BasePositionDecoder] = _alt_directional_train_test_split_result.train_lap_specific_pf1D_Decoder_dict
+        req_ids = np.atleast_1d(np.asarray(included_neuron_IDs))
+        train_lap_specific_pfND_Decoder_dict = {k: v.get_by_id(req_ids[np.isin(req_ids, np.asarray(v.neuron_IDs))]) for k, v in train_lap_specific_pfND_Decoder_dict.items()}
         
 
     # OUTPUTS: train_test_split_laps_df_dict
@@ -6134,9 +6154,10 @@ class TrainTestSplitResult(ComputedResult):
         
         """
         _obj = deepcopy(self) # temporary copy of the object
-        _obj.train_lap_specific_pf1D_Decoder_dict = {k:v.get_by_id(included_neuron_ids) for k, v in _obj.train_lap_specific_pf1D_Decoder_dict.items()}
+        req_ids = np.atleast_1d(np.asarray(included_neuron_ids))
+        _obj.train_lap_specific_pf1D_Decoder_dict = {k:v.get_by_id(req_ids[np.isin(req_ids, np.asarray(v.neuron_IDs))]) for k, v in _obj.train_lap_specific_pf1D_Decoder_dict.items()}
         if _obj.train_lap_specific_lin_pos_Decoder_dict is not None:
-            _obj.train_lap_specific_lin_pos_Decoder_dict = {k:v.get_by_id(included_neuron_ids) for k, v in _obj.train_lap_specific_lin_pos_Decoder_dict.items()}
+            _obj.train_lap_specific_lin_pos_Decoder_dict = {k:v.get_by_id(req_ids[np.isin(req_ids, np.asarray(v.neuron_IDs))]) for k, v in _obj.train_lap_specific_lin_pos_Decoder_dict.items()}
         return _obj
     
 
@@ -6319,14 +6340,14 @@ class TrainTestLapsSplitting:
         else:
             for epoch_id, info in lap_active_bins.items():
                 n_active: int = int(info['n_active'])
-                if n_active == 1:
-                    ## Single active bin: keep as train (no held-out test for this lap)
-                    is_test_arr = np.zeros(n_active, dtype=bool)
-                else:
-                    n_test: int = int(np.round(n_active * test_data_portion))
-                    n_test = min(max(n_test, 1), n_active - 1)
-                    test_local_idxs = np.random.choice(n_active, size=n_test, replace=False)
-                    is_test_arr = np.zeros(n_active, dtype=bool)
+                full_width_local_idxs = np.flatnonzero(np.isclose(info['bin_stops'] - info['bin_starts'], float(time_bin_size), rtol=0.0, atol=1e-9))
+                is_test_arr = np.zeros(n_active, dtype=bool)
+                if len(full_width_local_idxs) >= 2:
+                    ## Restrict held-out test selection to full-width bins; any trailing < dt sliver stays in train:
+                    n_eligible: int = int(len(full_width_local_idxs))
+                    n_test: int = int(np.round(n_eligible * test_data_portion))
+                    n_test = min(max(n_test, 1), n_eligible - 1)
+                    test_local_idxs = np.random.choice(full_width_local_idxs, size=n_test, replace=False)
                     is_test_arr[np.asarray(test_local_idxs, dtype=int)] = True
                 _tr, _te = cls._subfn_merge_contiguous_labeled_bins_to_epochs(info['bin_starts'], info['bin_stops'], is_test=is_test_arr, identity_values=info['identity_values'])
                 train_rows.extend(_tr)
@@ -6456,7 +6477,7 @@ class TrainTestLapsSplitting:
             else:
                 if bool(should_filter_inactive_bins_before_split) and (spikes_df is None) and debug_print:
                     print(f'WARN: compute_train_test_split_laps_decoders: should_filter_inactive_bins_before_split=True but spikes_df is None; falling back to duration-based split for {a_modern_name}')
-                a_laps_training_df, a_laps_test_df = a_laps_df.epochs.split_into_training_and_test(training_data_portion=training_data_portion, group_column_name='lap_id', additional_epoch_identity_column_names=['label', 'lap_id', 'lap_dir'], skip_get_non_overlapping=False, train_test_full_lap=train_test_full_lap, debug_print=False)
+                a_laps_training_df, a_laps_test_df = a_laps_df.epochs.split_into_training_and_test(training_data_portion=training_data_portion, group_column_name='lap_id', additional_epoch_identity_column_names=['label', 'lap_id', 'lap_dir'], skip_get_non_overlapping=False, train_test_full_lap=train_test_full_lap, time_bin_size=float(laps_decoding_time_bin_size), debug_print=False)
             ## END if _use_active_bin_split...
             assert len(a_laps_training_df) > 0, f'compute_train_test_split_laps_decoders: empty training epochs for decoder {a_modern_name!r} after split (active-bin filter may have removed all bins).'
 
@@ -6506,13 +6527,10 @@ class TrainTestLapsSplitting:
             a_config_copy = deepcopy(a_config)
             a_config_copy['pf_params'].computation_epochs = curr_lap_period_epoch_obj
             split_train_test_lap_specific_configs[a_lap_period_description] = a_config_copy
-            curr_pf1D = a_1D_decoder.pf
-            ## Restrict the PfNDs:
-            lap_filtered_curr_pf1D: PfND = curr_pf1D.replacing_computation_epochs(deepcopy(curr_lap_period_epoch_obj))
+            ## Restrict the PfNDs and apply to the decoder (preserving exact curated TrackTemplates neuron_IDs and decoder scalar config without mutating pf.spikes_df or pf.config.frate_thresh):
+            a_sliced_pf1D_Decoder: BasePositionDecoder = deepcopy(a_1D_decoder).replacing_computation_epochs(deepcopy(curr_lap_period_epoch_obj), preserve_source_neuron_IDs=True)
+            lap_filtered_curr_pf1D: PfND = a_sliced_pf1D_Decoder.pf
             split_train_test_lap_specific_pf1D_dict[a_lap_period_description] = lap_filtered_curr_pf1D
-
-            ## apply the lap_filtered_curr_pf1D to the decoder:
-            a_sliced_pf1D_Decoder: BasePositionDecoder = BasePositionDecoder(lap_filtered_curr_pf1D, setup_on_init=True, post_load_on_init=True, debug_print=False)
             split_train_test_lap_specific_pf1D_Decoder_dict[a_lap_period_description] = a_sliced_pf1D_Decoder
         ## ENDFOR a_modern_name in modern_names_list
             
@@ -6601,6 +6619,27 @@ class TrainTestLapsSplitting:
                     break
             ## END if k == ...
         ## END for k, req_v in computation_kwargs.items()...
+
+        if not needs_recompute:
+            try:
+                gcr = curr_active_pipeline.global_computation_results
+                directional_laps_results = gcr.computed_data.get('DirectionalLaps', None)
+                stored_decoders = getattr(existing, 'train_lap_specific_pf1D_Decoder_dict', None)
+                if (directional_laps_results is not None) and (stored_decoders is not None):
+                    rank_order_results = gcr.computed_data.get('RankOrder', None)
+                    min_fr = rank_order_results.minimum_inclusion_fr_Hz if (rank_order_results is not None) else gcr.computation_config.rank_order_shuffle_analysis.minimum_inclusion_fr_Hz
+                    inc_qclu = rank_order_results.included_qclu_values if (rank_order_results is not None) else gcr.computation_config.rank_order_shuffle_analysis.included_qclu_values
+                    tmpl_decoders = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=min_fr, included_qclu_values=inc_qclu).get_decoders_dict()
+                    for dec_name, a_dec in stored_decoders.items():
+                        if (dec_name in tmpl_decoders) and (a_dec is not None) and (getattr(a_dec, 'neuron_IDs', None) is not None):
+                            allowed_ids = np.asarray(tmpl_decoders[dec_name].neuron_IDs)
+                            if not np.all(np.isin(np.asarray(a_dec.neuron_IDs), allowed_ids)):
+                                needs_recompute = True
+                                break
+                    ## END for dec_name, a_dec in stored_decoders.items()...
+
+            except Exception:
+                pass
         return needs_recompute, computation_kwargs
 
 

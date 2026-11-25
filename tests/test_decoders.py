@@ -415,6 +415,167 @@ class TestOverhangingEpochBinSpikeMaskClipping(unittest.TestCase):
         self.assertTrue(np.isnan(float(masked_result.most_likely_positions_list[0][1])))
 
 
+class TestGetByIdSlicesPfSpikesDfForEpochReplacement(unittest.TestCase):
+    """Verify get_by_id keeps pf.spikes_df untouched while replacing_computation_epochs supports preserve_source_neuron_IDs=(False|True)."""
+
+    def _build_synthetic_1d_pf(self):
+        from neuropy.core.position import Position
+        from neuropy.core.epoch import Epoch
+        from pyphoplacecellanalysis.Analysis.Decoder.reconstruction_dst import BayesianPlacemapPositionDecoderDST
+
+        dt = 0.025
+        t_lap1 = np.arange(0.0, 4.0, dt)
+        x_lap1 = np.linspace(20.0, 240.0, len(t_lap1))
+        t_lap2 = np.arange(5.0, 9.0, dt)
+        x_lap2 = np.linspace(20.0, 240.0, len(t_lap2))
+        t = np.concatenate([t_lap1, t_lap2])
+        x = np.concatenate([x_lap1, x_lap2])
+        pos_df = pd.DataFrame({'t': t, 'x': x, 'speed': np.full_like(t, 55.0)})
+        pos_1d = Position(pos_df)
+
+        full_epochs = Epoch(pd.DataFrame({'start': [0.0, 5.0], 'stop': [3.975, 8.975], 'label': ['lap1', 'lap2']}))
+        train_epochs = Epoch(pd.DataFrame({'start': [0.5, 5.0], 'stop': [3.975, 8.975], 'label': ['lap1_tr', 'lap2_tr']}))
+        test_epochs = pd.DataFrame({'start': [0.0], 'stop': [0.45], 'label': ['lap1_te'], 'lap_id': [1]})
+
+        # aclu 1: curated local field near x ~ 35-50 cm (t ~ 0.2-0.55 and 5.2-5.55)
+        t_aclu1 = np.concatenate([np.linspace(0.20, 0.50, 8), np.linspace(5.20, 5.55, 10)])
+        # aclu 2: curated mid-track field near x ~ 130 cm (t ~ 2.0 and 7.0)
+        t_aclu2 = np.concatenate([np.linspace(1.90, 2.20, 8), np.linspace(6.90, 7.20, 10)])
+        # aclu 99: excluded high-rate noisy unit firing heavily across x ~ 20-160 cm (silent only near 235 cm)
+        t_aclu99 = np.concatenate([np.linspace(0.05, 2.50, 90), np.linspace(5.05, 7.50, 90)])
+
+        t_all = np.concatenate([t_aclu1, t_aclu2, t_aclu99])
+        spikes_df = pd.DataFrame({
+            't_rel_seconds': t_all,
+            'x': np.interp(t_all, t, x),
+            'aclu': np.concatenate([np.full(len(t_aclu1), 1, dtype=int), np.full(len(t_aclu2), 2, dtype=int), np.full(len(t_aclu99), 99, dtype=int)]),
+            'qclu': np.concatenate([np.full(len(t_aclu1), 1, dtype=int), np.full(len(t_aclu2), 2, dtype=int), np.full(len(t_aclu99), 5, dtype=int)]),
+            'neuron_type': 'PYRAMIDAL',
+            'shank': 0,
+            'cluster': 0,
+        }).sort_values('t_rel_seconds').reset_index(drop=True)
+        spikes_df['flat_spike_idx'] = np.arange(len(spikes_df), dtype=int)
+
+        pf1d = PfND.from_config_values(spikes_df=deepcopy(spikes_df), position=pos_1d, epochs=full_epochs, frate_thresh=0.1, speed_thresh=1.0, grid_bin=(10.0, 10.0), grid_bin_bounds=((10.0, 250.0), (0.0, 10.0)), smooth=(1.0, 1.0))
+        return pf1d, spikes_df, train_epochs, test_epochs, BayesianPlacemapPositionDecoderDST
+
+
+    def test_pfnd_replacing_computation_epochs_preserve_vs_refilter_modes(self):
+        from neuropy.core.epoch import Epoch
+
+        pf1d, spikes_df, train_epochs, _test_epochs, _DSTCls = self._build_synthetic_1d_pf()
+        self.assertIn(99, pf1d.ratemap.neuron_ids)
+        sliced_pf = pf1d.get_by_id(np.array([1, 2], dtype=int))
+        # pf.spikes_df remains untouched on get_by_id
+        self.assertEqual(list(np.unique(sliced_pf.spikes_df['aclu'])), [1, 2, 99])
+        self.assertEqual(list(sliced_pf.ratemap.neuron_ids), [1, 2])
+
+        # Default (preserve_source_neuron_IDs=False): refilters from pf.spikes_df using pf.config.frate_thresh on new epochs
+        refiltered_pf = sliced_pf.replacing_computation_epochs(train_epochs, preserve_source_neuron_IDs=False)
+        self.assertEqual(list(refiltered_pf.ratemap.neuron_ids), [1, 2, 99])
+
+        # preserve_source_neuron_IDs=True: preserves exact source neuron_IDs without mutating pf.spikes_df or pf.config.frate_thresh
+        preserved_pf = sliced_pf.replacing_computation_epochs(train_epochs, preserve_source_neuron_IDs=True)
+        self.assertEqual(list(np.unique(preserved_pf.spikes_df['aclu'])), [1, 2, 99])
+        self.assertAlmostEqual(float(preserved_pf.config.frate_thresh), 0.1)
+        self.assertNotIn(99, list(preserved_pf.ratemap.neuron_ids))
+        self.assertEqual(list(preserved_pf.ratemap.neuron_ids), [1, 2])
+
+        # Disjoint epoch test: unit 77 fires ONLY in [4.1, 4.9] (outside full_epochs -> excluded initially, recovered when preserve_source_neuron_IDs=False)
+        pos_extra_t = np.arange(0.0, 9.0, 0.025)
+        pos_extra_x = np.linspace(20.0, 240.0, len(pos_extra_t))
+        from neuropy.core.position import Position
+        pos_full = Position(pd.DataFrame({'t': pos_extra_t, 'x': pos_extra_x, 'speed': np.full_like(pos_extra_t, 55.0)}))
+        t_aclu77 = np.linspace(4.20, 4.70, 25)
+        extra_rows = pd.DataFrame({'t_rel_seconds': t_aclu77, 'x': np.interp(t_aclu77, pos_extra_t, pos_extra_x), 'aclu': 77, 'qclu': 1, 'neuron_type': 'PYRAMIDAL', 'shank': 0, 'cluster': 0, 'flat_spike_idx': np.arange(len(spikes_df), len(spikes_df) + len(t_aclu77))})
+        aug_spikes = pd.concat([spikes_df, extra_rows], ignore_index=True).sort_values('t_rel_seconds').reset_index(drop=True)
+        pf_initial = PfND.from_config_values(spikes_df=aug_spikes, position=pos_full, epochs=pf1d.epochs, frate_thresh=1.0, speed_thresh=1.0, grid_bin=(10.0, 10.0), grid_bin_bounds=((10.0, 250.0), (0.0, 10.0)), smooth=(1.0, 1.0))
+        self.assertNotIn(77, list(pf_initial.ratemap.neuron_ids))
+        disjoint_epoch = Epoch(pd.DataFrame({'start': [4.05], 'stop': [4.85], 'label': ['inter']}))
+        pf_disjoint_refiltered = pf_initial.replacing_computation_epochs(disjoint_epoch, preserve_source_neuron_IDs=False)
+        self.assertEqual(list(pf_disjoint_refiltered.ratemap.neuron_ids), [77])
+        # Conversely, preserve_source_neuron_IDs=True on disjoint_epoch keeps exact source IDs [1, 2, 99] even with 0 spikes in [4.05, 4.85]
+        pf_disjoint_preserved = pf_initial.replacing_computation_epochs(disjoint_epoch, preserve_source_neuron_IDs=True)
+        self.assertEqual(list(pf_disjoint_preserved.ratemap.neuron_ids), list(pf_initial.ratemap.neuron_ids))
+        self.assertIsInstance(pf_disjoint_preserved.included_neuron_IDs, np.ndarray)
+        self.assertEqual(list(pf_disjoint_preserved.included_neuron_IDs), list(pf_initial.ratemap.neuron_ids))
+        self.assertTrue(np.allclose(pf_disjoint_preserved.ratemap.tuning_curves, 0.0))
+
+
+    def test_base_and_stateful_decoders_preserve_exact_order_and_zero_spike_units(self):
+        from neuropy.core.epoch import Epoch
+
+        pf1d, spikes_df, train_epochs, test_epochs, BayesianPlacemapPositionDecoderDST = self._build_synthetic_1d_pf()
+        curated_ids = np.array([2, 1], dtype=int)  # intentionally non-ascending order
+
+        base_dec = BasePositionDecoder(pf=deepcopy(pf1d), setup_on_init=True)
+        sliced_base = base_dec.get_by_id(curated_ids, recompute=False)
+        self.assertEqual(list(np.unique(sliced_base.pf.spikes_df['aclu'])), [1, 2, 99])
+        self.assertEqual(list(sliced_base.neuron_IDs), [2, 1])
+
+        train_dec = sliced_base.replacing_computation_epochs(train_epochs, preserve_source_neuron_IDs=True)
+        self.assertEqual(list(train_dec.neuron_IDs), [2, 1])
+        self.assertIsInstance(train_dec.pf.included_neuron_IDs, np.ndarray)
+        self.assertEqual(list(train_dec.pf.included_neuron_IDs), [2, 1])
+        self.assertEqual(train_dec.F.shape[1], 2)
+
+        # Decode test window [0.0, 0.45] using template-only global_spikes_df (aclu 99 stripped, as in get_proper_global_spikes_df)
+        template_only_spikes_df = spikes_df[np.isin(spikes_df['aclu'].to_numpy(), curated_ids)].copy()
+        res = train_dec.decode_specific_epochs(spikes_df=template_only_spikes_df, filter_epochs=test_epochs, decoding_time_bin_size=0.15)
+        # Bin [0.15, 0.30] contains aclu 1 spikes near true x ~ 35-45 cm -> MAP must stay local (< 80 cm), not jump to ~235 cm
+        decoded_pos_bin1 = float(res.most_likely_positions_list[0][1])
+        self.assertLess(decoded_pos_bin1, 80.0)
+
+        # Zero-spike subset window [2.8, 3.9] where neither aclu 1 nor aclu 2 fires: preserve_source_neuron_IDs=True still keeps [2, 1]
+        silent_sub_epoch = Epoch(pd.DataFrame({'start': [2.80], 'stop': [3.90], 'label': ['silent_sub']}))
+        silent_train_dec = sliced_base.replacing_computation_epochs(silent_sub_epoch, preserve_source_neuron_IDs=True)
+        self.assertEqual(list(silent_train_dec.neuron_IDs), [2, 1])
+        self.assertIsInstance(silent_train_dec.pf.included_neuron_IDs, np.ndarray)
+        self.assertEqual(list(silent_train_dec.pf.included_neuron_IDs), [2, 1])
+        self.assertEqual(silent_train_dec.F.shape[1], 2)
+
+        stateful_dec = BayesianPlacemapPositionDecoder(time_bin_size=0.075, pf=deepcopy(pf1d), spikes_df=deepcopy(pf1d.filtered_spikes_df), setup_on_init=True)
+        sliced_stateful = stateful_dec.get_by_id(curated_ids, recompute=False)
+        self.assertEqual(list(np.unique(sliced_stateful.pf.spikes_df['aclu'])), [1, 2, 99])
+        self.assertEqual(list(sliced_stateful.pf.replacing_computation_epochs(train_epochs, preserve_source_neuron_IDs=True).ratemap.neuron_ids), [2, 1])
+
+        dst_dec = BayesianPlacemapPositionDecoderDST(time_bin_size=0.075, pf=deepcopy(pf1d), spikes_df=deepcopy(pf1d.filtered_spikes_df), setup_on_init=True)
+        sliced_dst = dst_dec.get_by_id(curated_ids, recompute=False)
+        self.assertEqual(list(np.unique(sliced_dst.pf.spikes_df['aclu'])), [1, 2, 99])
+        self.assertEqual(list(sliced_dst.pf.replacing_computation_epochs(train_epochs, preserve_source_neuron_IDs=True).ratemap.neuron_ids), [2, 1])
+
+
+    def test_train_test_split_result_safe_slice_and_stale_pickle_detection(self):
+        from types import SimpleNamespace
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import TrainTestSplitResult, TrainTestLapsSplitting
+
+        pf1d, _spikes_df, train_epochs, test_epochs, _DSTCls = self._build_synthetic_1d_pf()
+        leaked_dec = BasePositionDecoder(pf=deepcopy(pf1d), setup_on_init=True)  # neuron_IDs = [1, 2, 99]
+        curated_dec = leaked_dec.get_by_id(np.array([1, 2], dtype=int), recompute=False)  # neuron_IDs = [1, 2]
+
+        split_res_curated = TrainTestSplitResult(is_global=True, training_data_portion=0.9, test_data_portion=0.1, laps_decoding_time_bin_size=0.15, should_filter_inactive_bins_before_split=True, min_num_spikes_per_bin_to_be_considered_active=1, min_num_unique_active_neurons_per_time_bin=1, train_test_full_lap=False, test_epochs_dict={'long_LR': test_epochs}, train_epochs_dict={'long_LR': train_epochs.to_dataframe()}, train_lap_specific_pf1D_Decoder_dict={'long_LR': deepcopy(curated_dec)})
+
+        # Safe intersection: requesting [2, 777, 1] where 777 dropped out (0 spikes on 90% split) must not raise AssertionError and must preserve requested order [2, 1]
+        sliced_split = split_res_curated.sliced_by_neuron_id(np.array([2, 777, 1], dtype=int))
+        self.assertEqual(list(sliced_split.train_lap_specific_pf1D_Decoder_dict['long_LR'].neuron_IDs), [2, 1])
+
+        # Stale-pickle detection: if stored TrainTestSplit decoder contains leaked unit 99 outside TrackTemplates [1, 2], resolve_needs_train_test_split_recompute must return True
+        fake_templates = SimpleNamespace(get_decoders_dict=lambda: {'long_LR': curated_dec})
+        fake_dir_laps = SimpleNamespace(get_templates=lambda **kwargs: fake_templates)
+        fake_rank_order = SimpleNamespace(minimum_inclusion_fr_Hz=2.0, included_qclu_values=[1, 2])
+        requested_cfg = {'laps_decoding_time_bin_size': 0.15, 'should_filter_inactive_bins_before_split': True, 'min_num_spikes_per_bin_to_be_considered_active': 1, 'min_num_unique_active_neurons_per_time_bin': 1, 'train_test_full_lap': False}
+
+        clean_pipeline = SimpleNamespace(global_computation_results=SimpleNamespace(computed_data={'TrainTestSplit': split_res_curated, 'DirectionalLaps': fake_dir_laps, 'RankOrder': fake_rank_order}))
+        needs_recomp_clean, _ = TrainTestLapsSplitting.resolve_needs_train_test_split_recompute(clean_pipeline, requested_cfg)
+        self.assertFalse(needs_recomp_clean)
+
+        stale_split = deepcopy(split_res_curated)
+        stale_split.train_lap_specific_pf1D_Decoder_dict['long_LR'] = leaked_dec
+        stale_pipeline = SimpleNamespace(global_computation_results=SimpleNamespace(computed_data={'TrainTestSplit': stale_split, 'DirectionalLaps': fake_dir_laps, 'RankOrder': fake_rank_order}))
+        needs_recomp_stale, _ = TrainTestLapsSplitting.resolve_needs_train_test_split_recompute(stale_pipeline, requested_cfg)
+        self.assertTrue(needs_recomp_stale)
+
+
 if __name__ == '__main__':
 
     unittest.main()

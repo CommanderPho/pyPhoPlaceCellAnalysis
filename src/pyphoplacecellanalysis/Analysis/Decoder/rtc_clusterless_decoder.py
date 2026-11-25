@@ -160,13 +160,13 @@ class ClusterlessRTCPositionDecoder(SerializedAttributesAllowBlockSpecifyingClas
         return isinstance(decoder, cls)
 
 
-    def replacing_computation_epochs(self, epochs):
+    def replacing_computation_epochs(self, epochs, preserve_source_neuron_IDs: bool = False):
         """Return a train-epoch copy without dropping clusterless multiunit state."""
         from neuropy.core.epoch import Epoch, ensure_dataframe
 
         new_epochs_obj = Epoch(ensure_dataframe(deepcopy(epochs)).epochs.get_valid_df()).get_non_overlapping()
         updated_decoder = deepcopy(self)
-        updated_decoder.pf = self.pf.replacing_computation_epochs(deepcopy(new_epochs_obj))
+        updated_decoder.pf = self.pf.replacing_computation_epochs(deepcopy(new_epochs_obj), preserve_source_neuron_IDs=preserve_source_neuron_IDs)
         for attr_name in ('classifier', 'rtc_results', 'p_x_given_n', 'flat_p_x_given_n', 'most_likely_positions', 'revised_most_likely_positions', 'most_likely_position_flat_indicies', 'most_likely_position_indicies', 'time_binning_container', 'is_training_mask', 'rtc_position_bin_centers', 'estimated_log_likelihood_memory_bytes', 'marginal'):
             setattr(updated_decoder, attr_name, None)
         return updated_decoder

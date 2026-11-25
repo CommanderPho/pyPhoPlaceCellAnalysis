@@ -48,7 +48,7 @@ class _MockPfND:
         self.epochs = None
 
 
-    def replacing_computation_epochs(self, epochs):
+    def replacing_computation_epochs(self, epochs, preserve_source_neuron_IDs: bool = False):
         replaced_pf = _MockPfND(n_bins=len(self.xbin_centers), ndim=self.ndim, grid_bin_bounds=self.config.grid_bin_bounds, pos_bin_size=float(np.mean(np.atleast_1d(self.pos_bin_size))))
         replaced_pf.epochs = epochs
         return replaced_pf
