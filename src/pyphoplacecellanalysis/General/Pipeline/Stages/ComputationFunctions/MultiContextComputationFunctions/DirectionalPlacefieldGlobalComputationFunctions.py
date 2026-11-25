@@ -10976,6 +10976,7 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
         import matplotlib.pyplot as plt
         plt.ioff()
 
+        from matplotlib.colors import to_rgba
         from matplotlib.patches import FancyBboxPatch
         from neuropy.utils.matplotlib_helpers import get_heatmap_cmap, set_ax_emphasis_color
         from pyphocorehelpers.plotting.media_output_helpers import vertical_image_stack
@@ -11011,23 +11012,36 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
             ax.add_patch(rect)
             return rect
 
-        def _subfn_dim_non_groundtruth_axis(ax, dim_color: str = 'dimgrey', linewidth: float = 0.8, content_alpha: float = 0.85):
-            """Dim non-GT decoder spines/ticks and fade posterior content to `content_alpha` (default 0.85)."""
+        def _subfn_dim_non_groundtruth_axis(ax, dim_color: str = 'dimgrey', linewidth: float = 0.8, content_alpha: float = 0.55):
+            """Dim non-GT decoder spines, ticks, tick labels, and posterior content to `content_alpha` (default 0.55)."""
+            _alpha: float = float(content_alpha)
+            _dim_rgba = to_rgba(dim_color, alpha=_alpha)
             set_ax_emphasis_color(ax, emphasis_color=dim_color, defer_draw=True)
             for spine in ax.spines.values():
                 spine.set_linewidth(linewidth)
                 spine.set_color(dim_color)
+                spine.set_alpha(_alpha)
             ## END for spine in ax.spines.values()...
+
+            ax.tick_params(axis='both', which='both', colors=_dim_rgba)
+            for label in (list(ax.get_xticklabels()) + list(ax.get_yticklabels())):
+                label.set_alpha(_alpha)
+            ## END for label in (list(ax.get_xticklabels()) + list(ax.get_yticklabels()))...
+
+            ax.xaxis.label.set_alpha(_alpha)
+            ax.yaxis.label.set_alpha(_alpha)
             for img in ax.images:
-                img.set_alpha(float(content_alpha))
+                img.set_alpha(_alpha)
             ## END for img in ax.images...
+
             for line in ax.lines:
                 _prev = line.get_alpha()
-                line.set_alpha(float(content_alpha) if (_prev is None) else (float(_prev) * float(content_alpha)))
+                line.set_alpha(_alpha if (_prev is None) else (float(_prev) * _alpha))
             ## END for line in ax.lines...
+
             for coll in ax.collections:
                 _prev = coll.get_alpha()
-                coll.set_alpha(float(content_alpha) if (_prev is None) else (float(_prev) * float(content_alpha)))
+                coll.set_alpha(_alpha if (_prev is None) else (float(_prev) * _alpha))
             ## END for coll in ax.collections...
 
 
@@ -11370,6 +11384,7 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
             measured_line_color: str = kwargs.pop('measured_line_color', '#ff0000')
             measured_line_alpha: float = float(kwargs.pop('measured_line_alpha', 0.45))
             measured_line_linewidth: float = float(kwargs.pop('measured_line_linewidth', 0.8))
+            non_gt_content_alpha: float = float(kwargs.pop('non_gt_content_alpha', 0.55))
 
             metric_col: Optional[str] = _subfn_pick_pos_err_metric_column(train_test_pos_err_df)
             page_err_values: List[Optional[float]] = []
@@ -11443,13 +11458,13 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
                     ax.set_ylabel('')
                     if col_i != 0:
                         ax.tick_params(axis='y', labelleft=False)
+                    if low_firing_mask_rgba is not None:
+                        _subfn_overlay_low_firing_bins_dimming(ax, mask_rgba=low_firing_mask_rgba, xmin=low_firing_xmin, xmax=low_firing_xmax, zorder=11.0)
                     is_gt_decoder: bool = (a_decoder_name == truth_name)
                     if is_gt_decoder:
                         _subfn_draw_green_groundtruth_axis_box(ax)
                     else:
-                        _subfn_dim_non_groundtruth_axis(ax)
-                    if low_firing_mask_rgba is not None:
-                        _subfn_overlay_low_firing_bins_dimming(ax, mask_rgba=low_firing_mask_rgba, xmin=low_firing_xmin, xmax=low_firing_xmax, zorder=11.0)
+                        _subfn_dim_non_groundtruth_axis(ax, content_alpha=non_gt_content_alpha)
                     ## Brackets + valid-bin I-bars only on GT decoder (green box); zorder above FancyBboxPatch 1000:
                     if is_gt_decoder and enable_train_test_spans and ((len(train_intervals) + len(test_intervals)) > 0):
                         _subfn_shade_train_test_intervals(ax, train_intervals=train_intervals, test_intervals=test_intervals)
