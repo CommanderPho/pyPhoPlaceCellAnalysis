@@ -11233,29 +11233,31 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
 
 
         def _subfn_draw_pos_err_metrics_cell(ax, lap_id, err_value: Optional[float], vmin: float, vmax: float, metric_col: str, bin_err_values: Optional[List[float]] = None):
-            """viridis_r color cell + whole-lap median + small-font valid per-bin errors underneath."""
+            """viridis_r color cell + whole-lap median + smaller-font valid per-bin errors underneath (~75% of whole-lap fontsize)."""
             ax.set_xticks([])
             ax.set_yticks([])
             for spine in ax.spines.values():
                 spine.set_visible(False)
             ## END for spine in ax.spines.values()...
+            _whole_lap_fontsize: float = 11.0
+            _bin_err_fontsize: float = 0.75 * _whole_lap_fontsize  # ~8.25
             _txt_color = 'black'
             if err_value is None or (not np.isfinite(err_value)):
                 ax.set_facecolor('#bdbdbd')
-                ax.text(0.5, 0.62, '—', ha='center', va='center', fontsize=11, color='black', transform=ax.transAxes)
+                ax.text(0.5, 0.62, '—', ha='center', va='center', fontsize=_whole_lap_fontsize, color='black', transform=ax.transAxes)
             else:
                 _norm = 0.0 if (vmax <= vmin) else float((err_value - vmin) / (vmax - vmin))
                 _norm = float(np.clip(_norm, 0.0, 1.0))
                 _rgba = plt.get_cmap('viridis_r')(_norm)
                 ax.set_facecolor(_rgba)
                 _txt_color = 'white' if (_norm > 0.55) else 'black'
-                ax.text(0.5, 0.62, f'{err_value:.1f}', ha='center', va='center', fontsize=11, color=_txt_color, transform=ax.transAxes, fontweight='bold')
+                ax.text(0.5, 0.62, f'{err_value:.1f}', ha='center', va='center', fontsize=_whole_lap_fontsize, color=_txt_color, transform=ax.transAxes, fontweight='bold')
             if bin_err_values is not None and (len(bin_err_values) > 0):
-                _bin_txt = ' '.join([f'{float(v):.1f}' for v in bin_err_values])
-                ax.text(0.5, 0.28, _bin_txt, ha='center', va='center', fontsize=5, color=_txt_color, transform=ax.transAxes, wrap=True)
+                _bin_txt = ', '.join([f'{float(v):.1f}' for v in bin_err_values])
+                ax.text(0.5, 0.28, _bin_txt, ha='center', va='center', fontsize=_bin_err_fontsize, color=_txt_color, transform=ax.transAxes, wrap=True)
             _lap_label = f'Lap {lap_id}' if (lap_id is not None) else 'Lap'
-            ax.text(0.5, 0.92, _lap_label, ha='center', va='top', fontsize=8, color='black', transform=ax.transAxes)
-            ax.text(0.5, 0.08, 'test', ha='center', va='bottom', fontsize=7, color='black', transform=ax.transAxes, style='italic')
+            ax.text(0.5, 0.92, _lap_label, ha='center', va='top', fontsize=8, color=_txt_color, transform=ax.transAxes)
+            ax.text(0.5, 0.08, 'test', ha='center', va='bottom', fontsize=7, color=_txt_color, transform=ax.transAxes, style='italic')
 
 
         # @function_attributes(short_name=None, tags=['laps', 'posterior', 'four-decoder', 'matplotlib', 'Agg', 'headless'], input_requires=[], output_provides=[], uses=['plot_1D_most_likely_position_comparsions', '_subfn_draw_green_groundtruth_axis_box'], used_by=['_subfn_export_laps_four_decoder_gt_boxed_combined_figure'], creation_date='2026-11-12 00:00', related_items=[])
