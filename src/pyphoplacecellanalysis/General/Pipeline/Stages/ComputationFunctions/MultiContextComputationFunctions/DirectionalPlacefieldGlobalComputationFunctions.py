@@ -11250,30 +11250,55 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
             return [float(v) for v in vals if np.isfinite(v)]
 
 
-        def _subfn_format_wrapped_bin_err_label(bin_err_values: List[float], max_lines: int = 4, preferred_fontsize: float = 8.25, min_fontsize: float = 3.5, chars_budget_at_preferred: int = 22) -> Tuple[str, float]:
-            """Wrap tbin errors into <= ``max_lines`` balanced lines; shrink fontsize when the longest line still exceeds the cell char budget."""
+        def _subfn_format_wrapped_bin_err_label(bin_err_values: List[float], max_lines: int = 4, preferred_fontsize: float = 8.25, min_fontsize: float = 3.5, chars_budget_at_preferred: int = 42) -> Tuple[str, float]:
+            """Keep tbin errors on 1 line when they fit; otherwise wrap greedily up to ``max_lines`` lines and shrink fontsize only as needed to fit width/height."""
             tokens: List[str] = [f'{float(v):.1f}' for v in bin_err_values]
             n: int = int(len(tokens))
             if n == 0:
                 return '', float(preferred_fontsize)
-            n_lines: int = int(min(int(max_lines), n))
-            base_count, rem = divmod(n, n_lines)
+            single_line: str = ', '.join(tokens)
+            if len(single_line) <= int(chars_budget_at_preferred):
+                return single_line, float(preferred_fontsize)
+            ## Greedy wrap at preferred char width:
             lines: List[str] = []
-            idx: int = 0
-            for line_i in range(n_lines):
-                take: int = int(base_count + (1 if line_i < rem else 0))
-                lines.append(', '.join(tokens[idx:idx + take]))
-                idx += take
-            ## END for line_i in range(n_lines)...
+            curr_tokens: List[str] = []
+            curr_len: int = 0
+            for tok in tokens:
+                add_len: int = len(tok) if (len(curr_tokens) == 0) else (2 + len(tok))
+                if (len(curr_tokens) > 0) and ((curr_len + add_len) > int(chars_budget_at_preferred)):
+                    lines.append(', '.join(curr_tokens))
+                    curr_tokens = [tok]
+                    curr_len = len(tok)
+                else:
+                    curr_tokens.append(tok)
+                    curr_len += add_len
+            ## END for tok in tokens...
+
+            if len(curr_tokens) > 0:
+                lines.append(', '.join(curr_tokens))
+            ## If greedy wrapping exceeded max_lines, rebalance into exactly max_lines and scale font down:
+            if len(lines) > int(max_lines):
+                n_lines: int = int(max_lines)
+                base_count, rem = divmod(n, n_lines)
+                lines = []
+                idx: int = 0
+                for line_i in range(n_lines):
+                    take: int = int(base_count + (1 if line_i < rem else 0))
+                    lines.append(', '.join(tokens[idx:idx + take]))
+                    idx += take
+                ## END for line_i in range(n_lines)...
+
             wrapped: str = '\n'.join(lines)
             max_line_len: int = int(max((len(line) for line in lines), default=1))
-            scale: float = min(1.0, float(chars_budget_at_preferred) / float(max(1, max_line_len)))
-            fontsize: float = float(max(float(min_fontsize), float(preferred_fontsize) * scale))
+            width_scale: float = min(1.0, float(chars_budget_at_preferred) / float(max(1, max_line_len)))
+            ## Vertical cap so 4 lines never collide with the median above or 'test' below:
+            height_cap_fontsize: float = float(preferred_fontsize) if (len(lines) <= 3) else min(float(preferred_fontsize), 7.2)
+            fontsize: float = float(max(float(min_fontsize), min(height_cap_fontsize, float(preferred_fontsize) * width_scale)))
             return wrapped, fontsize
 
 
         def _subfn_draw_pos_err_metrics_cell(ax, lap_id, err_value: Optional[float], vmin: float, vmax: float, metric_col: str, bin_err_values: Optional[List[float]] = None):
-            """viridis_r color cell + whole-lap median + wrapped valid per-bin errors underneath (max 4 lines; shrink font to fit)."""
+            """viridis_r color cell + whole-lap median + wrapped valid per-bin errors underneath (wrap only as needed, max 4 lines, shrink font to fit)."""
             ax.set_xticks([])
             ax.set_yticks([])
             for spine in ax.spines.values():
@@ -11284,20 +11309,20 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
             _txt_color = 'black'
             if err_value is None or (not np.isfinite(err_value)):
                 ax.set_facecolor('#bdbdbd')
-                ax.text(0.5, 0.62, '—', ha='center', va='center', fontsize=_whole_lap_fontsize, color='black', transform=ax.transAxes)
+                ax.text(0.5, 0.66, '—', ha='center', va='center', fontsize=_whole_lap_fontsize, color='black', transform=ax.transAxes)
             else:
                 _norm = 0.0 if (vmax <= vmin) else float((err_value - vmin) / (vmax - vmin))
                 _norm = float(np.clip(_norm, 0.0, 1.0))
                 _rgba = plt.get_cmap('viridis_r')(_norm)
                 ax.set_facecolor(_rgba)
                 _txt_color = 'white' if (_norm > 0.55) else 'black'
-                ax.text(0.5, 0.62, f'{err_value:.1f}', ha='center', va='center', fontsize=_whole_lap_fontsize, color=_txt_color, transform=ax.transAxes, fontweight='bold')
+                ax.text(0.5, 0.66, f'{err_value:.1f}', ha='center', va='center', fontsize=_whole_lap_fontsize, color=_txt_color, transform=ax.transAxes, fontweight='bold')
             if bin_err_values is not None and (len(bin_err_values) > 0):
-                _bin_txt, _bin_err_fontsize = _subfn_format_wrapped_bin_err_label(list(bin_err_values), max_lines=4, preferred_fontsize=_bin_err_fontsize_preferred, min_fontsize=3.5, chars_budget_at_preferred=22)
-                ax.text(0.5, 0.30, _bin_txt, ha='center', va='center', fontsize=_bin_err_fontsize, color=_txt_color, transform=ax.transAxes, linespacing=1.05, clip_on=True)
+                _bin_txt, _bin_err_fontsize = _subfn_format_wrapped_bin_err_label(list(bin_err_values), max_lines=4, preferred_fontsize=_bin_err_fontsize_preferred, min_fontsize=3.5, chars_budget_at_preferred=42)
+                ax.text(0.5, 0.35, _bin_txt, ha='center', va='center', fontsize=_bin_err_fontsize, color=_txt_color, transform=ax.transAxes, linespacing=1.08, clip_on=True)
             _lap_label = f'Lap {lap_id}' if (lap_id is not None) else 'Lap'
-            ax.text(0.5, 0.92, _lap_label, ha='center', va='top', fontsize=8, color=_txt_color, transform=ax.transAxes)
-            ax.text(0.5, 0.08, 'test', ha='center', va='bottom', fontsize=7, color=_txt_color, transform=ax.transAxes, style='italic')
+            ax.text(0.5, 0.93, _lap_label, ha='center', va='top', fontsize=8, color=_txt_color, transform=ax.transAxes)
+            ax.text(0.5, 0.05, 'test', ha='center', va='bottom', fontsize=7, color=_txt_color, transform=ax.transAxes, style='italic')
 
 
         # @function_attributes(short_name=None, tags=['laps', 'posterior', 'four-decoder', 'matplotlib', 'Agg', 'headless'], input_requires=[], output_provides=[], uses=['plot_1D_most_likely_position_comparsions', '_subfn_draw_green_groundtruth_axis_box'], used_by=['_subfn_export_laps_four_decoder_gt_boxed_combined_figure'], creation_date='2026-11-12 00:00', related_items=[])
