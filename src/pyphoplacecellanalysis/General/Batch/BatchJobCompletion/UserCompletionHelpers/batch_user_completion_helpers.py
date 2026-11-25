@@ -3289,8 +3289,8 @@ def export_decoded_variables_evaluation_completion_function(self, global_data_ro
 def compute_and_export_kdiba_train_test_position_error_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict,
         active_laps_decoding_time_bin_size: float = 0.025, force_recompute_directional_train_test_split_result: bool = False,
         should_mask_by_required_spike_counts: bool = True, min_num_spikes_per_bin_to_be_considered_active: int = 1, min_num_unique_active_neurons_per_time_bin: Optional[int] = 1, masked_bin_fill_mode: str = 'nan_filled',
-        debug_print: bool = False, export_filename_extra_suffix_parts: Optional[List[str]] = None) -> dict:
-    """Ensure ``TrainTestSplit`` (compute-if-missing), decode held-out lap test segments, export position-error CSVs.
+        train_test_split_computation_kwargs: Optional[Dict] = None, debug_print: bool = False, export_filename_extra_suffix_parts: Optional[List[str]] = None) -> dict:
+    """Ensure ``TrainTestSplit`` (compute-if-missing / mismatch-driven), decode held-out lap test segments, export position-error CSVs.
 
     Writes under ``self.collected_outputs_path``:
       ``*(train_test_pos_err)_tbin-{size}.csv`` (per-bin long table)
@@ -3298,6 +3298,7 @@ def compute_and_export_kdiba_train_test_position_error_completion_function(self,
 
     Stashes in-memory ``train_test_pos_err_df`` / ``train_test_pos_err_agg_df`` / ``train_test_pos_err_bins_df`` on callback_outputs (epoch DF for figure joins).
     Low-firing masking kwargs (default ``min_num_unique_active_neurons_per_time_bin=1``) are forwarded to ``export_kdiba_train_test_position_error_csvs``.
+    ``train_test_split_computation_kwargs``: optional split settings for mismatch-driven recompute of ``TrainTestSplit``.
 
     from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import compute_and_export_kdiba_train_test_position_error_completion_function
     """
@@ -3308,15 +3309,16 @@ def compute_and_export_kdiba_train_test_position_error_completion_function(self,
     if across_session_results_extended_dict is None:
         across_session_results_extended_dict = {}
     print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
-    print(f'compute_and_export_kdiba_train_test_position_error_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, active_laps_decoding_time_bin_size: {active_laps_decoding_time_bin_size}, min_num_unique_active_neurons_per_time_bin: {min_num_unique_active_neurons_per_time_bin}, ...)')
+    print(f'compute_and_export_kdiba_train_test_position_error_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, active_laps_decoding_time_bin_size: {active_laps_decoding_time_bin_size}, min_num_unique_active_neurons_per_time_bin: {min_num_unique_active_neurons_per_time_bin}, force_recompute={force_recompute_directional_train_test_split_result}, ...)')
     assert self.collected_outputs_path.exists()
     apply_export_filename_extra_suffix_parts_to_pipeline(curr_active_pipeline, export_filename_extra_suffix_parts=export_filename_extra_suffix_parts)
 
-    callback_outputs = {'train_test_pos_err_csv_paths': None, 'train_test_pos_err_df': None, 'train_test_pos_err_agg_df': None, 'train_test_pos_err_bins_df': None, 'active_laps_decoding_time_bin_size': float(active_laps_decoding_time_bin_size), 'min_num_unique_active_neurons_per_time_bin': min_num_unique_active_neurons_per_time_bin, 'error': None}
+    callback_outputs = {'train_test_pos_err_csv_paths': None, 'train_test_pos_err_df': None, 'train_test_pos_err_agg_df': None, 'train_test_pos_err_bins_df': None, 'active_laps_decoding_time_bin_size': float(active_laps_decoding_time_bin_size), 'min_num_unique_active_neurons_per_time_bin': min_num_unique_active_neurons_per_time_bin, 'train_test_split_computation_kwargs': train_test_split_computation_kwargs, 'error': None}
     try:
         train_test_pos_err_csv_paths, train_test_pos_err_df, train_test_pos_err_agg_df, train_test_pos_err_bins_df = export_kdiba_train_test_position_error_csvs(curr_active_pipeline=curr_active_pipeline, parent_output_path=self.collected_outputs_path.resolve(), active_laps_decoding_time_bin_size=float(active_laps_decoding_time_bin_size), output_date_str=getattr(self, 'BATCH_DATE_TO_USE', None), force_recompute_directional_train_test_split_result=bool(force_recompute_directional_train_test_split_result),
                                                                                    should_mask_by_required_spike_counts=bool(should_mask_by_required_spike_counts), min_num_spikes_per_bin_to_be_considered_active=int(min_num_spikes_per_bin_to_be_considered_active),
-                                                                                   min_num_unique_active_neurons_per_time_bin=min_num_unique_active_neurons_per_time_bin, masked_bin_fill_mode=str(masked_bin_fill_mode), debug_print=bool(debug_print))
+                                                                                   min_num_unique_active_neurons_per_time_bin=min_num_unique_active_neurons_per_time_bin, masked_bin_fill_mode=str(masked_bin_fill_mode),
+                                                                                   train_test_split_computation_kwargs=train_test_split_computation_kwargs, debug_print=bool(debug_print))
         callback_outputs['train_test_pos_err_csv_paths'] = train_test_pos_err_csv_paths
         callback_outputs['train_test_pos_err_df'] = train_test_pos_err_df
         callback_outputs['train_test_pos_err_agg_df'] = train_test_pos_err_agg_df
@@ -4468,10 +4470,12 @@ def figures_export_laps_correct_decoder_side_by_side_completion_function(self, g
                                                                          max_subplots_per_page: int = 8, posterior_masking_value: float = 0.0, dpi: int = 150,
                                                                          should_dim_low_firing_bins: bool = True, min_num_spikes_per_bin_to_be_considered_active: int = 1, min_num_unique_active_neurons_per_time_bin: Optional[int] = 1,
                                                                          delete_temporary_outputs: bool = True, active_laps_decoding_time_bin_size: float = 0.025,
+                                                                         should_filter_inactive_bins_before_split: bool = True, train_test_full_lap: Optional[bool] = None,
                                                                          fail_on_exception_for_debugging: bool = False, debug_print: bool = False, **kwargs) -> dict:
     """Batch/SLURM headless Agg export: left GT test-err metrics column + 4-decoder lap posteriors with green ground-truth boxes; pages stacked into one PNG under collected_outputs.
 
     Runs ``compute_and_export_kdiba_train_test_position_error_completion_function`` first (dependency) and passes ``train_test_pos_err_df`` into the display for the left GT test-error metrics column.
+    Mismatch-driven ``TrainTestSplit`` recompute when ``active_laps_decoding_time_bin_size`` / ``should_filter_inactive_bins_before_split`` / mask thresholds differ from the stored result.
     `posterior_masking_value` default 0.0 (no under-threshold whitening); non-zero vmin + white under_color washes out low/high-P contrast.
     Low-firing dimming defaults match ``export_train_test_pos_err`` (`min_num_unique_active_neurons_per_time_bin=1`).
     After a successful flat copy of the merged PNG into ``laps_correct_decoder_side_by_side/``, ``delete_temporary_outputs=True`` removes the nested session folder (page PNGs + nested merged PNG).
@@ -4481,21 +4485,40 @@ def figures_export_laps_correct_decoder_side_by_side_completion_function(self, g
     import shutil
     from pathlib import Path
     from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import compute_and_export_kdiba_train_test_position_error_completion_function
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import TrainTestLapsSplitting
     os.environ.setdefault('MPLBACKEND', 'Agg')
     import matplotlib
     matplotlib.use('Agg', force=False)
 
+    ## Pop TrainTestSplit overrides from kwargs so they do not reach display():
+    if 'should_filter_inactive_bins_before_split' in kwargs:
+        should_filter_inactive_bins_before_split = bool(kwargs.pop('should_filter_inactive_bins_before_split'))
+    if 'train_test_full_lap' in kwargs:
+        train_test_full_lap = kwargs.pop('train_test_full_lap')
+    _requested_tt: dict = {
+        'laps_decoding_time_bin_size': float(active_laps_decoding_time_bin_size),
+        'should_filter_inactive_bins_before_split': bool(should_filter_inactive_bins_before_split),
+        'min_num_spikes_per_bin_to_be_considered_active': int(min_num_spikes_per_bin_to_be_considered_active),
+        'min_num_unique_active_neurons_per_time_bin': min_num_unique_active_neurons_per_time_bin,
+    }
+    if train_test_full_lap is not None:
+        _requested_tt['train_test_full_lap'] = bool(train_test_full_lap)
+    _needs_tt_recompute, _tt_comp_kwargs = TrainTestLapsSplitting.resolve_needs_train_test_split_recompute(curr_active_pipeline, requested=_requested_tt)
+    if bool(debug_print) or _needs_tt_recompute:
+        print(f'figures_export TrainTestSplit resolve: needs_recompute={_needs_tt_recompute}, kwargs={_tt_comp_kwargs}', flush=True)
+
     print(f'figures_export_laps_correct_decoder_side_by_side_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, delete_temporary_outputs={delete_temporary_outputs}, ...)', flush=True)
-    callback_outputs = {'combined_img_out_path': None, 'page_png_paths': None, 'n_pages': None, 'n_laps': None, 'output_dir': None, 'deleted_temporary_outputs': False, 'train_test_pos_err_df': None, 'error': None}
+    callback_outputs = {'combined_img_out_path': None, 'page_png_paths': None, 'n_pages': None, 'n_laps': None, 'output_dir': None, 'deleted_temporary_outputs': False, 'train_test_pos_err_df': None, 'train_test_split_recomputed': bool(_needs_tt_recompute), 'error': None}
     across_session_results_extended_dict['figures_export_laps_correct_decoder_side_by_side_completion_function'] = callback_outputs
 
     try:
         assert self.collected_outputs_path.exists(), f"collected_outputs_path: '{self.collected_outputs_path}' does not exist!"
         ## Dependency: held-out test-segment position errors (CSV + in-memory DF for left metrics column):
         across_session_results_extended_dict = compute_and_export_kdiba_train_test_position_error_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict,
-                                                                                                                      active_laps_decoding_time_bin_size=float(active_laps_decoding_time_bin_size), force_recompute_directional_train_test_split_result=False,
+                                                                                                                      active_laps_decoding_time_bin_size=float(active_laps_decoding_time_bin_size), force_recompute_directional_train_test_split_result=bool(_needs_tt_recompute),
                                                                                                                       should_mask_by_required_spike_counts=True, min_num_spikes_per_bin_to_be_considered_active=int(min_num_spikes_per_bin_to_be_considered_active),
-                                                                                                                      min_num_unique_active_neurons_per_time_bin=min_num_unique_active_neurons_per_time_bin, debug_print=bool(debug_print))
+                                                                                                                      min_num_unique_active_neurons_per_time_bin=min_num_unique_active_neurons_per_time_bin,
+                                                                                                                      train_test_split_computation_kwargs=_tt_comp_kwargs, debug_print=bool(debug_print))
         train_test_pos_err_df = across_session_results_extended_dict.get('compute_and_export_kdiba_train_test_position_error_completion_function', {}).get('train_test_pos_err_df', None)
         callback_outputs['train_test_pos_err_df'] = train_test_pos_err_df
 

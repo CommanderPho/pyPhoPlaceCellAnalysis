@@ -5804,11 +5804,13 @@ def _do_custom_decode_epochs_dict(global_spikes_df: pd.DataFrame, global_measure
 @function_attributes(short_name=None, tags=['TrainTestSplit', 'decode'], input_requires=[], output_provides=[],
                       uses=['_do_custom_decode_epochs', 'get_proper_global_spikes_df', '_check_result_laps_epochs_df_performance', 'DirectionalPseudo2DDecodersResult'], used_by=['_perform_run_rigorous_decoder_performance_assessment'], creation_date='2024-10-08 02:35', related_items=[])
 def _do_train_test_split_decode_and_evaluate(curr_active_pipeline, active_laps_decoding_time_bin_size: float=1.5, force_recompute_directional_train_test_split_result: bool=False, compute_separate_decoder_results: bool=True, included_neuron_IDs=None, measured_pos_column_name: str = 'lin_pos',
-                                            should_mask_by_required_spike_counts: bool = True, min_num_spikes_per_bin_to_be_considered_active: int = 1, min_num_unique_active_neurons_per_time_bin: Optional[int] = 1, masked_bin_fill_mode: str = 'nan_filled', debug_print=False):
+                                            should_mask_by_required_spike_counts: bool = True, min_num_spikes_per_bin_to_be_considered_active: int = 1, min_num_unique_active_neurons_per_time_bin: Optional[int] = 1, masked_bin_fill_mode: str = 'nan_filled',
+                                            train_test_split_computation_kwargs: Optional[Dict[str, Any]] = None, debug_print=False):
     """
     measured_pos_column_name (str): measured 1D position column used for the primary ``sq_err`` / ``err_cm`` comparison metrics (default ``'x'``; pass ``'lin_pos'`` for linearized position).
 
     Low-firing bin masking kwargs (`should_mask_by_required_spike_counts`, `min_num_unique_active_neurons_per_time_bin`, ...) are forwarded to ``_do_custom_decode_epochs`` (default min aclus = 1).
+    ``train_test_split_computation_kwargs``: optional kwargs for ``directional_train_test_split`` when recomputing (e.g. ``should_filter_inactive_bins_before_split``).
 
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import _do_train_test_split_decode_and_evaluate
 
@@ -5841,12 +5843,22 @@ def _do_train_test_split_decode_and_evaluate(curr_active_pipeline, active_laps_d
         return epochs_df
         
 
+    _tt_comp_kwargs: Dict[str, Any] = dict(train_test_split_computation_kwargs or {})
+    if 'laps_decoding_time_bin_size' not in _tt_comp_kwargs:
+        _tt_comp_kwargs['laps_decoding_time_bin_size'] = float(active_laps_decoding_time_bin_size)
     directional_train_test_split_result: TrainTestSplitResult = curr_active_pipeline.global_computation_results.computed_data.get('TrainTestSplit', None)
+    if (not force_recompute_directional_train_test_split_result) and (_tt_comp_kwargs):
+        _needs_recompute, _resolved_kwargs = TrainTestLapsSplitting.resolve_needs_train_test_split_recompute(curr_active_pipeline, requested=_tt_comp_kwargs)
+        if _needs_recompute:
+            force_recompute_directional_train_test_split_result = True
+            _tt_comp_kwargs = _resolved_kwargs
+            if debug_print:
+                print(f"'TrainTestSplit' settings mismatch vs requested {_tt_comp_kwargs}; will recompute.")
     if (directional_train_test_split_result is None) or force_recompute_directional_train_test_split_result:
         ## recompute
         if debug_print:
-            print(f"'TrainTestSplit' not computed, recomputing...")
-        curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['directional_train_test_split'], enabled_filter_names=None, fail_on_exception=True, debug_print=False)
+            print(f"'TrainTestSplit' not computed or force_recompute, recomputing with kwargs={_tt_comp_kwargs}...")
+        curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['directional_train_test_split'], computation_kwargs_list=[dict(_tt_comp_kwargs)], enabled_filter_names=None, fail_on_exception=True, debug_print=False)
         directional_train_test_split_result: TrainTestSplitResult = curr_active_pipeline.global_computation_results.computed_data['TrainTestSplit']
         assert directional_train_test_split_result is not None, f"faiiled even after recomputation"
         if debug_print:
@@ -5951,17 +5963,19 @@ def _do_train_test_split_decode_and_evaluate(curr_active_pipeline, active_laps_d
 @function_attributes(short_name=None, tags=['TrainTestSplit', 'position', 'error', 'CSV', 'KDIBA'], input_requires=[], output_provides=[], uses=['_do_train_test_split_decode_and_evaluate'], used_by=['export_kdiba_train_test_position_error_csvs'], creation_date='2026-11-20 17:50', related_items=[])
 def compute_kdiba_train_test_position_error_dfs(curr_active_pipeline, active_laps_decoding_time_bin_size: float = 0.075, force_recompute_directional_train_test_split_result: bool = False,
                                                 should_mask_by_required_spike_counts: bool = True, min_num_spikes_per_bin_to_be_considered_active: int = 1, min_num_unique_active_neurons_per_time_bin: Optional[int] = 1, masked_bin_fill_mode: str = 'nan_filled',
-                                                debug_print: bool = False) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+                                                train_test_split_computation_kwargs: Optional[Dict[str, Any]] = None, debug_print: bool = False) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """Ensure TrainTestSplit, decode held-out test lap segments, return (train_test_pos_err_df, train_test_pos_err_agg_df, train_test_pos_err_bins_df).
 
     ``train_test_pos_err_df``: per-epoch rows with ``decoder_name``, ``session_name``, ``time_bin_size``, ``t``, ``sq_err``, ``err_cm``, ``abs_err_cm_mean``, ``abs_err_cm_median`` (+ optional ``*_1D``/``*_2D``; ``lap_id``/``start``/``stop`` when present on test epochs).
     ``train_test_pos_err_agg_df``: per-``decoder_name`` mean/median of RMSE and abs-error columns and counts for session QC.
     ``train_test_pos_err_bins_df``: long per-time-bin rows within each held-out test epoch (all bins; ``is_valid`` / ``is_active`` mark those entering epoch aggregates).
     Low-firing masking kwargs are forwarded to ``_do_train_test_split_decode_and_evaluate`` (default ``min_num_unique_active_neurons_per_time_bin=1``).
+    ``train_test_split_computation_kwargs``: optional split settings for mismatch-driven recompute of ``TrainTestSplit``.
     """
     _out = _do_train_test_split_decode_and_evaluate(curr_active_pipeline=curr_active_pipeline, active_laps_decoding_time_bin_size=float(active_laps_decoding_time_bin_size), force_recompute_directional_train_test_split_result=force_recompute_directional_train_test_split_result, compute_separate_decoder_results=True, included_neuron_IDs=None,
                                                    should_mask_by_required_spike_counts=should_mask_by_required_spike_counts, min_num_spikes_per_bin_to_be_considered_active=min_num_spikes_per_bin_to_be_considered_active,
-                                                   min_num_unique_active_neurons_per_time_bin=min_num_unique_active_neurons_per_time_bin, masked_bin_fill_mode=masked_bin_fill_mode, debug_print=debug_print)
+                                                   min_num_unique_active_neurons_per_time_bin=min_num_unique_active_neurons_per_time_bin, masked_bin_fill_mode=masked_bin_fill_mode,
+                                                   train_test_split_computation_kwargs=train_test_split_computation_kwargs, debug_print=debug_print)
     _out_separate_decoder_results = _out[-1]
     assert _out_separate_decoder_results is not None, "compute_separate_decoder_results=True but _out_separate_decoder_results is None"
     _test_decoder_results_dict, _train_decoded_results_dict, train_decoded_measured_diff_df_dict = _out_separate_decoder_results
@@ -6018,11 +6032,12 @@ def compute_kdiba_train_test_position_error_dfs(curr_active_pipeline, active_lap
 @function_attributes(short_name=None, tags=['TrainTestSplit', 'position', 'error', 'CSV', 'KDIBA', 'export'], input_requires=[], output_provides=[], uses=['compute_kdiba_train_test_position_error_dfs', 'build_complete_session_identifier_filename_string'], used_by=['generalized_decode_epochs_dict_and_export_results_completion_function'], creation_date='2026-11-20 17:50', related_items=[])
 def export_kdiba_train_test_position_error_csvs(curr_active_pipeline, parent_output_path: Path, active_laps_decoding_time_bin_size: float = 0.025, output_date_str: Optional[str] = None, force_recompute_directional_train_test_split_result: bool = False,
                                                 should_mask_by_required_spike_counts: bool = True, min_num_spikes_per_bin_to_be_considered_active: int = 1, min_num_unique_active_neurons_per_time_bin: Optional[int] = 1, masked_bin_fill_mode: str = 'nan_filled',
-                                                debug_print: bool = False) -> Tuple[Dict[str, Path], pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+                                                train_test_split_computation_kwargs: Optional[Dict[str, Any]] = None, debug_print: bool = False) -> Tuple[Dict[str, Path], pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """Compute held-out lap position errors and write parseable collected_outputs CSVs.
 
     Filenames: ``*(train_test_pos_err)_tbin-{size}.csv`` (per-bin long table) and ``*(train_test_pos_err_agg)_tbin-{size}.csv`` (epoch aggregates).
     Low-firing masking kwargs are forwarded to ``compute_kdiba_train_test_position_error_dfs`` (default ``min_num_unique_active_neurons_per_time_bin=1``).
+    ``train_test_split_computation_kwargs``: optional split settings for mismatch-driven recompute of ``TrainTestSplit``.
 
     Returns ``(out_paths, train_test_pos_err_df, train_test_pos_err_agg_df, train_test_pos_err_bins_df)``.
     Non-agg CSV is written from ``train_test_pos_err_bins_df``; epoch DF is still returned for figure metrics.
@@ -6033,7 +6048,8 @@ def export_kdiba_train_test_position_error_csvs(curr_active_pipeline, parent_out
         output_date_str = get_now_rounded_time_str(rounded_minutes=10)
     train_test_pos_err_df, train_test_pos_err_agg_df, train_test_pos_err_bins_df = compute_kdiba_train_test_position_error_dfs(curr_active_pipeline=curr_active_pipeline, active_laps_decoding_time_bin_size=float(active_laps_decoding_time_bin_size), force_recompute_directional_train_test_split_result=force_recompute_directional_train_test_split_result,
                                                                                                    should_mask_by_required_spike_counts=should_mask_by_required_spike_counts, min_num_spikes_per_bin_to_be_considered_active=min_num_spikes_per_bin_to_be_considered_active,
-                                                                                                   min_num_unique_active_neurons_per_time_bin=min_num_unique_active_neurons_per_time_bin, masked_bin_fill_mode=masked_bin_fill_mode, debug_print=debug_print)
+                                                                                                   min_num_unique_active_neurons_per_time_bin=min_num_unique_active_neurons_per_time_bin, masked_bin_fill_mode=masked_bin_fill_mode,
+                                                                                                   train_test_split_computation_kwargs=train_test_split_computation_kwargs, debug_print=debug_print)
     tbin_str: str = str(float(active_laps_decoding_time_bin_size))
     out_paths: Dict[str, Path] = {}
     for file_type_key, export_df in (('train_test_pos_err', train_test_pos_err_bins_df), ('train_test_pos_err_agg', train_test_pos_err_agg_df)):
@@ -6120,6 +6136,12 @@ class TrainTestSplitResult(ComputedResult):
 
     training_data_portion: float = serialized_attribute_field(default=None, is_computable=False, repr=True)
     test_data_portion: float = serialized_attribute_field(default=None, is_computable=False, repr=False)
+    ## Settings used to build this split (for mismatch-driven recompute):
+    laps_decoding_time_bin_size: Optional[float] = serialized_attribute_field(default=None, is_computable=False, repr=True)
+    should_filter_inactive_bins_before_split: Optional[bool] = serialized_attribute_field(default=None, is_computable=False, repr=True)
+    min_num_spikes_per_bin_to_be_considered_active: Optional[int] = serialized_attribute_field(default=None, is_computable=False, repr=False)
+    min_num_unique_active_neurons_per_time_bin: Optional[int] = serialized_attribute_field(default=None, is_computable=False, repr=False)
+    train_test_full_lap: Optional[bool] = serialized_attribute_field(default=None, is_computable=False, repr=False)
 
     test_epochs_dict: Dict[types.DecoderName, pd.DataFrame] = serialized_field(default=None)
     train_epochs_dict: Dict[types.DecoderName, pd.DataFrame] = serialized_field(default=None)
@@ -6548,11 +6570,59 @@ class TrainTestLapsSplitting:
             # print(f'\t_written_HDF5_manifest_keys: {",\n".join(_written_HDF5_manifest_keys)}')
             
         return TrainTestSplitResult(is_global=True, training_data_portion=training_data_portion, test_data_portion=test_data_portion,
+                             laps_decoding_time_bin_size=float(laps_decoding_time_bin_size), should_filter_inactive_bins_before_split=bool(should_filter_inactive_bins_before_split),
+                             min_num_spikes_per_bin_to_be_considered_active=int(min_num_spikes_per_bin_to_be_considered_active),
+                             min_num_unique_active_neurons_per_time_bin=(None if min_num_unique_active_neurons_per_time_bin is None else int(min_num_unique_active_neurons_per_time_bin)),
+                             train_test_full_lap=bool(train_test_full_lap),
                              test_epochs_dict=test_epochs_dict, train_epochs_dict=train_epochs_dict,
                              train_lap_specific_pf1D_Decoder_dict=train_lap_specific_pf1D_Decoder_dict)
-        
+
 
         # return (train_epochs_dict, test_epochs_dict), train_lap_specific_pf1D_Decoder_dict, split_train_test_lap_specific_configs
+
+
+    @classmethod
+    def resolve_needs_train_test_split_recompute(cls, curr_active_pipeline, requested: Dict[str, Any]) -> Tuple[bool, Dict[str, Any]]:
+        """Compare ``requested`` split settings to attrs on existing ``TrainTestSplit``; return ``(needs_recompute, computation_kwargs)``.
+
+        Tracked keys: ``laps_decoding_time_bin_size``, ``should_filter_inactive_bins_before_split``,
+        ``min_num_spikes_per_bin_to_be_considered_active``, ``min_num_unique_active_neurons_per_time_bin``, ``train_test_full_lap``.
+        Missing attrs on old results count as mismatch. Float sizes compared with ``np.isclose``.
+        """
+        _tracked_keys = ('laps_decoding_time_bin_size', 'should_filter_inactive_bins_before_split', 'min_num_spikes_per_bin_to_be_considered_active', 'min_num_unique_active_neurons_per_time_bin', 'train_test_full_lap')
+        computation_kwargs: Dict[str, Any] = {k: requested[k] for k in _tracked_keys if (k in requested) and (requested[k] is not None)}
+        existing = None
+        try:
+            existing = curr_active_pipeline.global_computation_results.computed_data.get('TrainTestSplit', None)
+        except Exception:
+            existing = None
+        if existing is None:
+            return True, computation_kwargs
+        needs_recompute: bool = False
+        for k, req_v in computation_kwargs.items():
+            if not hasattr(existing, k):
+                needs_recompute = True
+                break
+            stored_v = getattr(existing, k, None)
+            if stored_v is None:
+                needs_recompute = True
+                break
+            if k == 'laps_decoding_time_bin_size':
+                if not np.isclose(float(stored_v), float(req_v)):
+                    needs_recompute = True
+                    break
+            elif k in ('should_filter_inactive_bins_before_split', 'train_test_full_lap'):
+                if bool(stored_v) != bool(req_v):
+                    needs_recompute = True
+                    break
+            else:
+                if int(stored_v) != int(req_v):
+                    needs_recompute = True
+                    break
+            ## END if k == ...
+        ## END for k, req_v in computation_kwargs.items()...
+        return needs_recompute, computation_kwargs
+
 
     @classmethod
     def interpolate_positions(cls, df: pd.DataFrame, sample_times: NDArray, time_column_name: str = 't', additional_interp_column_names: Optional[List[str]] = None) -> pd.DataFrame:
@@ -9456,6 +9526,12 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
                                                                                                                                     min_num_spikes_per_bin_to_be_considered_active=int(min_num_spikes_per_bin_to_be_considered_active),
                                                                                                                                     min_num_unique_active_neurons_per_time_bin=min_num_unique_active_neurons_per_time_bin,
                                                                                                                                     included_neuron_ids=track_templates.any_decoder_neuron_IDs)
+        ## Ensure split-setting attrs are set (also written inside compute_train_test_split_laps_decoders):
+        a_train_test_result.laps_decoding_time_bin_size = float(laps_decoding_time_bin_size)
+        a_train_test_result.should_filter_inactive_bins_before_split = bool(should_filter_inactive_bins_before_split)
+        a_train_test_result.min_num_spikes_per_bin_to_be_considered_active = int(min_num_spikes_per_bin_to_be_considered_active)
+        a_train_test_result.min_num_unique_active_neurons_per_time_bin = (None if min_num_unique_active_neurons_per_time_bin is None else int(min_num_unique_active_neurons_per_time_bin))
+        a_train_test_result.train_test_full_lap = bool(train_test_full_lap)
 
         global_computation_results.computed_data['TrainTestSplit'] = a_train_test_result
         return global_computation_results
