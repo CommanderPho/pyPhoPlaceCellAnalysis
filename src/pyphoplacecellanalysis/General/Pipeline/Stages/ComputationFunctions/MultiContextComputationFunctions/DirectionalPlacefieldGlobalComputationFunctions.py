@@ -11012,8 +11012,8 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
             ax.add_patch(rect)
             return rect
 
-        def _subfn_dim_non_groundtruth_axis(ax, dim_color: str = 'dimgrey', linewidth: float = 0.8, content_alpha: float = 0.55):
-            """Dim non-GT decoder spines, ticks, tick labels, and posterior content to `content_alpha` (default 0.55)."""
+        def _subfn_dim_non_groundtruth_axis(ax, dim_color: str = 'dimgrey', linewidth: float = 0.8, content_alpha: float = 0.75):
+            """Dim non-GT decoder spines, ticks, tick labels, and posterior content to `content_alpha` (default 0.75)."""
             _alpha: float = float(content_alpha)
             _dim_rgba = to_rgba(dim_color, alpha=_alpha)
             set_ax_emphasis_color(ax, emphasis_color=dim_color, defer_draw=True)
@@ -11384,7 +11384,7 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
             measured_line_color: str = kwargs.pop('measured_line_color', '#ff0000')
             measured_line_alpha: float = float(kwargs.pop('measured_line_alpha', 0.45))
             measured_line_linewidth: float = float(kwargs.pop('measured_line_linewidth', 0.8))
-            non_gt_content_alpha: float = float(kwargs.pop('non_gt_content_alpha', 0.55))
+            non_gt_content_alpha: float = float(kwargs.pop('non_gt_content_alpha', 0.75))
 
             metric_col: Optional[str] = _subfn_pick_pos_err_metric_column(train_test_pos_err_df)
             page_err_values: List[Optional[float]] = []
