@@ -10953,7 +10953,7 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
         `posterior_masking_value` is imshow `vmin` (default 0.0 = no under-threshold whitening). Non-zero values clip low-P to `under_color` and dominate low/high-P contrast.
 
         Defaults for measured-traj contrast: posterior cmap ``viridis`` (black under/bad, white over) + thin red measured line ``#ff0000`` @ 0.45, linewidth 0.8.
-        Within-lap TrainTestSplit (GT decoder column only): train = yellow / test = orange hard brackets just above the axes top (tips down); zorder above GT green box.
+        Within-lap TrainTestSplit (GT decoder column only): train = dark goldenrod / test = dark orange hard brackets just above the axes top (tips down); zorder above GT green box.
         GT decoder also gets thin white (40% opacity) measured↔decoded I-bars at each valid held-out test bin from ``train_test_pos_err_bins_df`` (1-to-1 with left-box tbin numbers).
         Optional ``train_test_pos_err_df`` kwarg: left column viridis_r color cell for GT-decoder held-out test-segment error (joined on lap_id + truth_decoder_name).
         Optional ``train_test_pos_err_bins_df`` kwarg: valid per-bin abs errors listed under the whole-lap median in that cell.
@@ -11113,8 +11113,8 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
             ax.plot([t1, t1], [y_top, y_tip], **bracket_kwargs)  # right tip down
 
 
-        def _subfn_shade_train_test_intervals(ax, train_intervals: List[Tuple[float, float]], test_intervals: List[Tuple[float, float]], train_bracket_color: str = 'yellow', test_bracket_color: str = 'orange', linewidth: float = 1.5, above_axes_fraction: float = 0.03, tip_fraction: float = 0.04, zorder: float = 2000.0):
-            """Train: yellow top hard-bracket (tips down). Test: orange top hard-bracket (tips down). Outside axes, above GT green box."""
+        def _subfn_shade_train_test_intervals(ax, train_intervals: List[Tuple[float, float]], test_intervals: List[Tuple[float, float]], train_bracket_color: str = '#b8860b', test_bracket_color: str = '#c2410c', linewidth: float = 1.5, above_axes_fraction: float = 0.03, tip_fraction: float = 0.04, zorder: float = 2000.0):
+            """Train: darkgoldenrod top hard-bracket (tips down). Test: dark orange-red top hard-bracket (tips down). Outside axes, above GT green box (darker so readable over limegreen)."""
             for t0, t1 in train_intervals:
                 _subfn_draw_interval_top_bracket(ax, t0=float(t0), t1=float(t1), color=train_bracket_color, linewidth=linewidth, above_axes_fraction=above_axes_fraction, tip_fraction=tip_fraction, zorder=zorder)
             ## END for t0, t1 in train_intervals...
@@ -11418,7 +11418,7 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
             Returns dict with keys: `laps_epochs_df`, `page_png_paths`, `combined_img_out_path`, `n_pages`, `n_laps`.
             `posterior_masking_value` default 0.0 disables under-threshold whitening (pass >0 only if intentional clipping is desired).
             Low-firing dimming defaults match ``export_train_test_pos_err`` (`min_num_unique_active_neurons_per_time_bin=1`).
-            When `train_epochs_dict`/`test_epochs_dict` are provided, draws train/test top brackets on the GT decoder column only (yellow/orange; above GT green box; viridis + red measured traj by default).
+            When `train_epochs_dict`/`test_epochs_dict` are provided, draws train/test top brackets on the GT decoder column only (dark goldenrod/dark orange; above GT green box; viridis + red measured traj by default).
             When `train_test_pos_err_df` is provided, left column shows GT-decoder held-out test error (viridis_r).
             When `train_test_pos_err_bins_df` is provided, valid per-bin abs errors are listed under the whole-lap median and drawn as measured↔decoded I-bars on the GT decoder column only (1-to-1 with the left-box numbers).
             """
