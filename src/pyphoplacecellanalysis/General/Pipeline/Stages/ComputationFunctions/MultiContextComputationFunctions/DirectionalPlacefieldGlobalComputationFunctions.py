@@ -10953,8 +10953,8 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
         `posterior_masking_value` is imshow `vmin` (default 0.0 = no under-threshold whitening). Non-zero values clip low-P to `under_color` and dominate low/high-P contrast.
 
         Defaults for measured-traj contrast: posterior cmap ``viridis`` (black under/bad, white over) + thin red measured line ``#ff0000`` @ 0.45, linewidth 0.8.
-        Within-lap TrainTestSplit: train = yellow / test = orange hard brackets just above the axes top (tips down); zorder above GT green box.
-        Test intervals also get thin white (40% opacity) measured↔decoded I-bars at each time bin (displacement behind the left GT test-err metrics).
+        Within-lap TrainTestSplit (GT decoder column only): train = yellow / test = orange hard brackets just above the axes top (tips down); zorder above GT green box.
+        GT decoder also gets thin white (40% opacity) measured↔decoded I-bars at each valid held-out test bin from ``train_test_pos_err_bins_df`` (1-to-1 with left-box tbin numbers).
         Optional ``train_test_pos_err_df`` kwarg: left column viridis_r color cell for GT-decoder held-out test-segment error (joined on lap_id + truth_decoder_name).
         Optional ``train_test_pos_err_bins_df`` kwarg: valid per-bin abs errors listed under the whole-lap median in that cell.
 
@@ -11145,24 +11145,26 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
             return decoded_y
 
 
-        def _subfn_draw_test_interval_measured_decoded_ibars(ax, time_bin_centers: NDArray, measured_y: NDArray, decoded_y: NDArray, test_intervals: List[Tuple[float, float]],
+        def _subfn_draw_test_interval_measured_decoded_ibars(ax, time_bin_centers: NDArray, measured_y: NDArray, decoded_y: NDArray, test_intervals: Optional[List[Tuple[float, float]]] = None,
                                                             color: str = '#ffffff', alpha: float = 0.40, linewidth: float = 0.35, capsize_pts: float = 1.5, zorder: float = 14.0):
-            """Draw very thin white I-bars (measured ↔ decoded) at time bins inside any test interval.
+            """Draw very thin white I-bars (measured ↔ decoded) at the provided time bins.
 
+            When ``test_intervals`` is None/empty, draws all finite (measured, decoded) bins as-is (caller already filtered to valid held-out test bins).
             Caps use ``errorbar`` ``capsize`` in **points** (not data-seconds) so they stay tiny across time scales.
             """
-            if (test_intervals is None) or (len(test_intervals) == 0):
-                return
             t = np.asarray(time_bin_centers, dtype=float).reshape(-1)
             y_meas = np.asarray(measured_y, dtype=float).reshape(-1)
             y_dec = np.asarray(decoded_y, dtype=float).reshape(-1)
             if (len(t) == 0) or (len(t) != len(y_meas)) or (len(t) != len(y_dec)):
                 return
-            in_test = np.zeros(len(t), dtype=bool)
-            for t0, t1 in test_intervals:
-                in_test |= (t >= float(t0)) & (t <= float(t1))
-            ## END for t0, t1 in test_intervals...
-            valid = in_test & np.isfinite(y_meas) & np.isfinite(y_dec)
+            if (test_intervals is None) or (len(test_intervals) == 0):
+                valid = np.isfinite(y_meas) & np.isfinite(y_dec)
+            else:
+                in_test = np.zeros(len(t), dtype=bool)
+                for t0, t1 in test_intervals:
+                    in_test |= (t >= float(t0)) & (t <= float(t1))
+                ## END for t0, t1 in test_intervals...
+                valid = in_test & np.isfinite(y_meas) & np.isfinite(y_dec)
             if not np.any(valid):
                 return
             t_v = t[valid]
@@ -11205,13 +11207,16 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
             return float(np.nanmedian(vals))
 
 
-        def _subfn_lookup_gt_pos_err_bin_values(bins_df: Optional[pd.DataFrame], lap_id, truth_decoder_name: str, metric_col: Optional[str]) -> List[float]:
-            """Valid per-bin abs errors (same set that entered the whole-lap median), ordered by time."""
+        def _subfn_lookup_gt_pos_err_valid_bins_df(bins_df: Optional[pd.DataFrame], lap_id, truth_decoder_name: str, metric_col: Optional[str]) -> Optional[pd.DataFrame]:
+            """Valid held-out test bins for (lap_id, truth_decoder_name) matching the active median metric, ordered by time.
+
+            Shared by left-box tbin numbers and GT-decoder I-bars so both consumers see the exact same rows.
+            """
             if (bins_df is None) or (len(bins_df) == 0) or (metric_col is None) or (lap_id is None) or ('decoder_name' not in getattr(bins_df, 'columns', [])):
-                return []
+                return None
             bin_col: str = 'abs_err_cm_1D' if (str(metric_col) == 'abs_err_cm_1D_median') else 'abs_err_cm'
             if bin_col not in bins_df.columns:
-                return []
+                return None
             rows = bins_df[bins_df['decoder_name'].astype(str) == str(truth_decoder_name)]
             if 'lap_id' in rows.columns:
                 try:
@@ -11220,14 +11225,27 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
                 except Exception:
                     rows = rows[rows['lap_id'].to_numpy() == lap_id]
             if len(rows) == 0:
-                return []
+                return None
             if 'is_valid' in rows.columns:
                 rows = rows[rows['is_valid'].astype(bool)]
             if len(rows) == 0:
-                return []
+                return None
+            finite_mask = pd.to_numeric(rows[bin_col], errors='coerce').to_numpy(dtype=float)
+            rows = rows[np.isfinite(finite_mask)]
+            if len(rows) == 0:
+                return None
             sort_cols = [c for c in ('t', 'time_bin_index') if c in rows.columns]
             if len(sort_cols) > 0:
                 rows = rows.sort_values(sort_cols, kind='mergesort')
+            return rows.reset_index(drop=True)
+
+
+        def _subfn_lookup_gt_pos_err_bin_values(bins_df: Optional[pd.DataFrame], lap_id, truth_decoder_name: str, metric_col: Optional[str]) -> List[float]:
+            """Valid per-bin abs errors (same set that entered the whole-lap median), ordered by time."""
+            rows = _subfn_lookup_gt_pos_err_valid_bins_df(bins_df, lap_id=lap_id, truth_decoder_name=truth_decoder_name, metric_col=metric_col)
+            if rows is None:
+                return []
+            bin_col: str = 'abs_err_cm_1D' if (str(metric_col) == 'abs_err_cm_1D_median') else 'abs_err_cm'
             vals = pd.to_numeric(rows[bin_col], errors='coerce').to_numpy(dtype=float)
             return [float(v) for v in vals if np.isfinite(v)]
 
@@ -11273,7 +11291,7 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
             `page_lap_indicies`: positional indices into each decoder's DecodedFilterEpochsResult lists (shared lap order).
             `truth_decoder_names_for_page`: length == len(page_lap_indicies), values in decoder_names.
             Col 0: viridis_r color cell for held-out test-segment GT-decoder error (joined on lap_id + truth_decoder_name).
-            When train/test spans are available: thin white (40% opacity) measured↔decoded I-bars inside test intervals only (all decoder columns).
+            Train/test top brackets and valid-bin measured↔decoded I-bars are drawn on the GT decoder column only (same valid rows as the left-box tbin numbers).
             """
             if decoder_names is None:
                 decoder_names = list(TrackTemplates.get_decoder_names())
@@ -11296,11 +11314,18 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
             metric_col: Optional[str] = _subfn_pick_pos_err_metric_column(train_test_pos_err_df)
             page_err_values: List[Optional[float]] = []
             page_bin_err_values: List[List[float]] = []
+            page_valid_bins_dfs: List[Optional[pd.DataFrame]] = []
             for row_i in range(n_rows):
                 _truth = str(truth_decoder_names_for_page[row_i])
                 _lap_id = page_lap_ids[row_i] if (page_lap_ids is not None) else None
                 page_err_values.append(_subfn_lookup_gt_pos_err_value(train_test_pos_err_df, lap_id=_lap_id, truth_decoder_name=_truth, metric_col=metric_col) if metric_col else None)
-                page_bin_err_values.append(_subfn_lookup_gt_pos_err_bin_values(train_test_pos_err_bins_df, lap_id=_lap_id, truth_decoder_name=_truth, metric_col=metric_col) if metric_col else [])
+                _row_valid_bins_df = _subfn_lookup_gt_pos_err_valid_bins_df(train_test_pos_err_bins_df, lap_id=_lap_id, truth_decoder_name=_truth, metric_col=metric_col) if metric_col else None
+                page_valid_bins_dfs.append(_row_valid_bins_df)
+                if _row_valid_bins_df is None:
+                    page_bin_err_values.append([])
+                else:
+                    _bin_col = 'abs_err_cm_1D' if (str(metric_col) == 'abs_err_cm_1D_median') else 'abs_err_cm'
+                    page_bin_err_values.append([float(v) for v in pd.to_numeric(_row_valid_bins_df[_bin_col], errors='coerce').to_numpy(dtype=float) if np.isfinite(v)])
             ## END for row_i in range(n_rows)...
             _finite_page_errs = [float(v) for v in page_err_values if (v is not None) and np.isfinite(v)]
             page_err_vmin: float = float(np.nanmin(_finite_page_errs)) if (len(_finite_page_errs) > 0) else 0.0
@@ -11329,14 +11354,15 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
                 low_firing_mask_rgba, low_firing_xmin, low_firing_xmax = None, None, None
                 if enable_low_firing_dimming:
                     low_firing_mask_rgba, _is_active, low_firing_xmin, low_firing_xmax = _subfn_compute_low_firing_mask_rgba_for_time_bin_container(spikes_df=spikes_df, time_bin_container=ref_result_for_epochs.time_bin_containers[int(lap_idx)], min_num_spikes_per_bin_to_be_considered_active=min_num_spikes_per_bin_to_be_considered_active, min_num_unique_active_neurons_per_time_bin=min_num_unique_active_neurons_per_time_bin)
+                row_valid_bins_df: Optional[pd.DataFrame] = page_valid_bins_dfs[row_i]
                 for col_i, a_decoder_name in enumerate(decoder_names):
                     ax = axs[row_i, col_i + 1]
                     a_result: DecodedFilterEpochsResult = decoder_laps_filter_epochs_decoder_result_dict[a_decoder_name]
                     curr_time_bins = a_result.time_bin_containers[int(lap_idx)].centers
                     _marginal_x = a_result.marginal_x_list[int(lap_idx)]
                     curr_posterior = _marginal_x.p_x_given_n if hasattr(_marginal_x, 'p_x_given_n') else _marginal_x['p_x_given_n']
-                    decoded_y_for_ibars = _subfn_resolve_decoded_positions_1d_for_lap(a_result, int(lap_idx))
-                    curr_most_likely_for_line = None if skip_plotting_most_likely_positions else decoded_y_for_ibars
+                    decoded_y_for_line = _subfn_resolve_decoded_positions_1d_for_lap(a_result, int(lap_idx))
+                    curr_most_likely_for_line = None if skip_plotting_most_likely_positions else decoded_y_for_line
                     _fig, _ax, _artists = plot_1D_most_likely_position_comparsions(global_pos_df, time_window_centers=curr_time_bins, xbin=decoder_xbin_dict[a_decoder_name], ax=ax, posterior=curr_posterior,
                                                             active_most_likely_positions_1D=curr_most_likely_for_line, variable_name=variable_name, enable_flat_line_drawing=False,
                                                             skip_plotting_measured_positions=skip_plotting_measured_positions, skip_plotting_most_likely_positions=skip_plotting_most_likely_positions,
@@ -11357,32 +11383,25 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
                     ax.set_ylabel('')
                     if col_i != 0:
                         ax.tick_params(axis='y', labelleft=False)
-                    if a_decoder_name == truth_name:
+                    is_gt_decoder: bool = (a_decoder_name == truth_name)
+                    if is_gt_decoder:
                         _subfn_draw_green_groundtruth_axis_box(ax)
                     else:
                         _subfn_dim_non_groundtruth_axis(ax)
                     if low_firing_mask_rgba is not None:
                         _subfn_overlay_low_firing_bins_dimming(ax, mask_rgba=low_firing_mask_rgba, xmin=low_firing_xmin, xmax=low_firing_xmax, zorder=11.0)
-                    ## Brackets after GT green box so they paint on top (also zorder=1100 > FancyBboxPatch 1000):
-                    if enable_train_test_spans and ((len(train_intervals) + len(test_intervals)) > 0):
+                    ## Brackets + valid-bin I-bars only on GT decoder (green box); zorder above FancyBboxPatch 1000:
+                    if is_gt_decoder and enable_train_test_spans and ((len(train_intervals) + len(test_intervals)) > 0):
                         _subfn_shade_train_test_intervals(ax, train_intervals=train_intervals, test_intervals=test_intervals)
-                    ## White I-bars (40% opacity): measured↔decoded displacement inside test intervals only:
-                    if enable_train_test_spans and (len(test_intervals) > 0) and (decoded_y_for_ibars is not None):
-                        measured_y_for_ibars: Optional[NDArray] = None
-                        _extra_interp_cols = [variable_name] if ((variable_name is not None) and (variable_name in global_pos_df.columns) and (variable_name != 'x')) else None
-                        try:
-                            _interp_df = TrainTestLapsSplitting.interpolate_positions(global_pos_df, np.asarray(curr_time_bins, dtype=float), additional_interp_column_names=_extra_interp_cols)
-                            _meas_col = variable_name if ((variable_name is not None) and (variable_name in _interp_df.columns)) else 'x'
-                            measured_y_for_ibars = _interp_df[_meas_col].to_numpy(dtype=float)
-                        except Exception:
-                            measured_y_for_ibars = None
-                        if measured_y_for_ibars is not None:
-                            _subfn_draw_test_interval_measured_decoded_ibars(ax, time_bin_centers=curr_time_bins, measured_y=measured_y_for_ibars, decoded_y=decoded_y_for_ibars, test_intervals=test_intervals)
+                    if is_gt_decoder and (row_valid_bins_df is not None) and (len(row_valid_bins_df) > 0) and ('t' in row_valid_bins_df.columns) and ('decoded' in row_valid_bins_df.columns):
+                        measured_col: str = 'measured_lin_pos' if ((str(metric_col) == 'abs_err_cm_1D_median') and ('measured_lin_pos' in row_valid_bins_df.columns)) else 'measured'
+                        if measured_col in row_valid_bins_df.columns:
+                            _subfn_draw_test_interval_measured_decoded_ibars(ax, time_bin_centers=row_valid_bins_df['t'].to_numpy(dtype=float), measured_y=row_valid_bins_df[measured_col].to_numpy(dtype=float), decoded_y=row_valid_bins_df['decoded'].to_numpy(dtype=float), test_intervals=None)
 
                 ## END for col_i, a_decoder_name in enumerate(decoder_names)...
             ## END for row_i, lap_idx in enumerate(page_lap_indicies)...
             if enable_train_test_spans:
-                print(f'\ttrain/test axvspans: {n_rows_with_train_test_spans}/{n_rows} rows on this page matched TrainTestSplit intervals', flush=True)
+                print(f'\ttrain/test axvspans: {n_rows_with_train_test_spans}/{n_rows} rows on this page matched TrainTestSplit intervals (GT decoder only)', flush=True)
             return fig, axs
 
         # @function_attributes(short_name=None, tags=['laps', 'export', 'combined', 'four-decoder', 'groundtruth', 'Agg', 'headless', 'batch'], input_requires=[], output_provides=[],
@@ -11399,9 +11418,9 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
             Returns dict with keys: `laps_epochs_df`, `page_png_paths`, `combined_img_out_path`, `n_pages`, `n_laps`.
             `posterior_masking_value` default 0.0 disables under-threshold whitening (pass >0 only if intentional clipping is desired).
             Low-firing dimming defaults match ``export_train_test_pos_err`` (`min_num_unique_active_neurons_per_time_bin=1`).
-            When `train_epochs_dict`/`test_epochs_dict` are provided, draws train/test top brackets (yellow/orange; above GT green box; viridis + red measured traj by default).
+            When `train_epochs_dict`/`test_epochs_dict` are provided, draws train/test top brackets on the GT decoder column only (yellow/orange; above GT green box; viridis + red measured traj by default).
             When `train_test_pos_err_df` is provided, left column shows GT-decoder held-out test error (viridis_r).
-            When `train_test_pos_err_bins_df` is provided, valid per-bin abs errors are listed under the whole-lap median.
+            When `train_test_pos_err_bins_df` is provided, valid per-bin abs errors are listed under the whole-lap median and drawn as measured↔decoded I-bars on the GT decoder column only (1-to-1 with the left-box numbers).
             """
             output_dir = Path(output_dir).resolve()
             output_dir.mkdir(parents=True, exist_ok=True)
