@@ -4532,7 +4532,7 @@ def figures_export_laps_correct_decoder_side_by_side_completion_function(self, g
         display_context = curr_active_pipeline.build_display_context_for_session(display_fn_name='laps_correct_decoder_side_by_side_posteriors')
         ## Include animal/exper_name + session date (e.g. 'gor01_one_2006-6-09_1-22-43'), not session_name alone:
         _sess_ctx = curr_active_pipeline.get_session_context()
-        animal_exper_session: str = _sess_ctx.get_description(separator='_', subset_includelist=['animal', 'exper_name', 'session_name'])
+        animal_exper_session: str = '_'.join([str(v) for v in _sess_ctx.to_dict(subset_includelist=['animal', 'exper_name', 'session_name']).values() if v is not None])
         combined_image_basename: str = f"{self.BATCH_DATE_TO_USE}-{animal_exper_session}_laps_4decoder_gt_boxed"
         _out = curr_active_pipeline.display('_display_laps_correct_decoder_side_by_side_posteriors', display_context, defer_render=True, save_figure=True,
                                             parent_output_folder=self.collected_outputs_path.resolve(), max_subplots_per_page=max_subplots_per_page, posterior_masking_value=posterior_masking_value,

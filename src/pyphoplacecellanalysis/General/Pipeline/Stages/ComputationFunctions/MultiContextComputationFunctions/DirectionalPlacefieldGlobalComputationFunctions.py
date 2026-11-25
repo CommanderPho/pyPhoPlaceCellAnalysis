@@ -11581,8 +11581,9 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
         parent_output_folder = Path(parent_output_folder).resolve()
         parent_output_folder.mkdir(parents=True, exist_ok=True)
         ## Prefer animal/exper_name/session_name (e.g. 'gor01_one_2006-6-09_1-22-43'); fall back to full context description:
-        session_key: str = session_context.get_description(separator='_', subset_includelist=['animal', 'exper_name', 'session_name'])
-        if (session_key is None) or (len(str(session_key).strip()) == 0):
+        _session_key_dict = session_context.to_dict(subset_includelist=['animal', 'exper_name', 'session_name'])
+        session_key: str = '_'.join([str(v) for v in _session_key_dict.values() if v is not None])
+        if len(session_key.strip()) == 0:
             session_key = session_context.get_description(separator='_')
         output_dir = parent_output_folder.joinpath('laps_correct_decoder_side_by_side', session_key)
         output_dir.mkdir(parents=True, exist_ok=True)
