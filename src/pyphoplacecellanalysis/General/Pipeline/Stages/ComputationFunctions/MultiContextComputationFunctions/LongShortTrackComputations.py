@@ -2681,9 +2681,13 @@ def compute_measured_vs_expected_firing_rates(active_pos_df, active_filter_epoch
             curr_total_spike_counts_per_window = np.sum(a_decoder_result.spkcount[decoded_epoch_idx], axis=0) # left_out_decoder_result.spkcount[i].shape # (69, 222) - (nCells, nTimeWindowCenters)
             curr_is_time_bin_non_firing = (curr_total_spike_counts_per_window == 0) # this would mean that no cells fired in this time bin
             curr_most_likely_position_indicies = a_decoder_result.most_likely_position_indicies_list[decoded_epoch_idx] # (n_epoch_time_bins, ) one position for each time bin in the replay
+            _pos_idxs = np.asarray(np.squeeze(curr_most_likely_position_indicies)).astype(int).reshape(-1)
+            _invalid_pos = (_pos_idxs < 0)
+            _safe_pos = np.where(_invalid_pos, 0, _pos_idxs)
             
             # From the firing map of the placefields for this neuron (`decoder_1D.F.T[left_out_neuron_IDX]`) get the value for each position bin index in the epoch
-            curr_epoch_expected_fr = np.squeeze(a_decoder_1D.F.T[left_out_neuron_IDX][curr_most_likely_position_indicies])
+            curr_epoch_expected_fr = np.atleast_1d(np.asarray(np.squeeze(a_decoder_1D.F.T[left_out_neuron_IDX][_safe_pos]), dtype=float))
+            curr_epoch_expected_fr[_invalid_pos] = np.nan ## sentinel -1 → NaN (do not wrap to F[-1])
             # expected_num_spikes = curr_epoch_expected_fr * decoder_result.decoding_time_bin_size
 
             # Eqn 1:
@@ -2734,7 +2738,15 @@ def simpler_compute_measured_vs_expected_firing_rates(active_pos_df, active_filt
     num_neurons = a_decoder_1D.num_neurons
     num_epochs = a_decoder_result.num_filter_epochs
     
-    all_cells_decoded_expected_firing_rates_list: List[np.ndarray] = [a_decoder_1D.F[np.squeeze(curr_most_likely_position_indicies),:] for curr_most_likely_position_indicies in a_decoder_result.most_likely_position_indicies_list]
+    all_cells_decoded_expected_firing_rates_list: List[np.ndarray] = []
+    for curr_most_likely_position_indicies in a_decoder_result.most_likely_position_indicies_list:
+        _pos_idxs = np.asarray(np.squeeze(curr_most_likely_position_indicies)).astype(int).reshape(-1)
+        _invalid_pos = (_pos_idxs < 0)
+        _safe_pos = np.where(_invalid_pos, 0, _pos_idxs)
+        _expected_fr = np.asarray(a_decoder_1D.F[_safe_pos, :], dtype=float)
+        _expected_fr[_invalid_pos, :] = np.nan ## sentinel -1 → NaN (do not wrap to F[-1])
+        all_cells_decoded_expected_firing_rates_list.append(_expected_fr)
+    ## END for curr_most_likely_position_indicies in a_decoder_result.most_likely_position_indicies_list...
     assert len(all_cells_decoded_expected_firing_rates_list) == a_decoder_result.num_filter_epochs # one for each epoch
 
     num_timebins_in_epoch: NDArray[Shape["Num_epochs"], Int] = np.array([np.shape(epoch_values)[0] for epoch_values in all_cells_decoded_expected_firing_rates_list])

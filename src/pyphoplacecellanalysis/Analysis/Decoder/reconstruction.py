@@ -21,7 +21,7 @@ from nptyping import NDArray # for DecodedFilterEpochsResult
 import numpy as np
 import pandas as pd
 # from scipy.stats import multivariate_normal
-from scipy.special import factorial, logsumexp
+from scipy.special import factorial, gammaln, logsumexp
 from scipy.sparse import csr_matrix
 
 # import neuropy
@@ -291,11 +291,12 @@ class ZhangReconstructionImplementation:
 
     
     @staticmethod
-    def neuropy_bayesian_prob(tau, P_x, F, n, use_flat_computation_mode=True, debug_intermediates_mode=False, debug_print=False, reliability_modifier_mode=None, drop_negative_contributing_terms_mode=False):
+    def neuropy_bayesian_prob(tau, P_x, F, n, use_flat_computation_mode=True, debug_intermediates_mode=False, debug_print=False, reliability_modifier_mode=None, drop_negative_contributing_terms_mode=False, minimum_rate_eps: float = 1e-12):
         """ 
             n_i: the number of spikes fired by each cell during the time window of consideration
             use_flat_computation_mode: bool - if True, a more memory efficient accumulating computation is performed that avoids `MemoryError: Unable to allocate 65.4 GiB for an array with shape (3969, 21896, 101) and data type float64` caused by allocating the full `cell_prob` matrix
             debug_intermediates_mode: bool - if True, the intermediate computations are stored and returned for debugging purposes. MUCH slower.
+            minimum_rate_eps: float - per-bin firing-rate floor (Hz) applied after whole-cell zero→uniform fallback. Prevents a single out-of-field spike at an exact-0.0 ratemap bin from annihilating the entire spatial likelihood product. Set to 0 or None to disable. When enabled, zero-sum posterior columns caused by float64 product underflow are recomputed in max-shifted log-space.
 
         NOTES: Flat vs. Full computation modes:
         Originally 
@@ -322,6 +323,7 @@ class ZhangReconstructionImplementation:
         nFlatPositionBins = np.shape(P_x)[0]
 
         F = F.T # Transpose F so it's of the right form
+        F_eff = np.array(F, dtype=float, copy=True) # (nCells, nFlatPositionBins) — after whole-cell uniform + optional per-bin floor
 
         if debug_intermediates_mode:
             assert (not use_flat_computation_mode), "debug_intermediates_mode is only supported when use_flat_computation_mode is False"
@@ -345,14 +347,19 @@ class ZhangReconstructionImplementation:
                 cell_spkcnt: [n_{i} for i in range(nCells)]            
             """
             cell_spkcnt = n[cell, :][np.newaxis, :] # .shape: (1, nTimeBins)
-            cell_ratemap = F[cell, :][:, np.newaxis] # .shape: (nFlatPositionBins, 1)
+            cell_ratemap = F_eff[cell, :][:, np.newaxis] # .shape: (nFlatPositionBins, 1)
             coeff = 1.0 / (factorial(cell_spkcnt)) # 1/factorial(n_{i}) term # .shape: (1, nTimeBins)
 
             if np.sum(cell_ratemap) == 0:
                 ## zero ratemap for this cell encountered, replace with uniform
                 cell_ratemap[:, 0] = 1.0/float(nFlatPositionBins) # replace with uniform ratemap
+                F_eff[cell, :] = cell_ratemap[:, 0]
                 print(f'WARN: f"np.sum(cell_ratemap): {cell_ratemap} for cell: {cell}", replacing with uniform!')
                 # raise ValueError(f"np.sum(cell_ratemap): {cell_ratemap} for cell: {cell}")
+
+            if (minimum_rate_eps is not None) and (minimum_rate_eps > 0.0):
+                cell_ratemap = np.maximum(cell_ratemap, float(minimum_rate_eps))
+                F_eff[cell, :] = cell_ratemap[:, 0]
 
             if use_flat_computation_mode:
                 # Single-cell flat Version:
@@ -392,11 +399,39 @@ class ZhangReconstructionImplementation:
         if use_flat_computation_mode:
             # Single-cell flat Version:
             posterior = cell_prob # The product has already been accumulating all along
-            posterior /= np.sum(posterior, axis=0) # C(tau, n) = np.sum(posterior, axis=0): normalization condition mentioned in eqn 36 to convert to P_x_given_n
         else:
             # Full Version:
             posterior = np.prod(cell_prob, axis=2) # note this product removes axis=2 (nCells)
-            posterior /= np.sum(posterior, axis=0) # C(tau, n) = np.sum(posterior, axis=0): normalization condition mentioned in eqn 36 to convert to P_x_given_n
+
+        col_sums = np.sum(posterior, axis=0)
+        underflow_mask = (col_sums == 0.0) | (~np.isfinite(col_sums))
+        if np.any(underflow_mask) and (minimum_rate_eps is not None) and (minimum_rate_eps > 0.0):
+            ## float64 product underflowed (or hard-zeroed) despite floor: recompute those columns in max-shifted log-space
+            underflow_t_idxs = np.flatnonzero(underflow_mask)
+            for t in underflow_t_idxs:
+                log_L = np.zeros(nFlatPositionBins, dtype=float)
+                for cell in range(nCells):
+                    n_ct = float(n[cell, t])
+                    if drop_negative_contributing_terms_mode and (n_ct == 0.0):
+                        continue
+                    f_x = F_eff[cell, :]
+                    log_L += (n_ct * np.log(tau * f_x)) - gammaln(n_ct + 1.0) - (tau * f_x)
+                ## END for cell in range(nCells)...
+                if not np.any(np.isfinite(log_L)):
+                    continue
+                log_L = log_L - np.nanmax(log_L)
+                post_t = np.exp(log_L)
+                post_t_sum = np.nansum(post_t)
+                if (post_t_sum > 0.0) and np.isfinite(post_t_sum):
+                    posterior[:, t] = post_t / post_t_sum
+                    col_sums[t] = 1.0
+            ## END for t in underflow_t_idxs...
+
+        ## Normalize remaining columns (underflow rescue already left rescued columns normalized to sum==1; dividing by 1.0 is a no-op).
+        ## For still-zero/NaN columns, leave as-is (caller MAP extraction will emit -1 / NaN sentinels).
+        needs_norm_mask = (col_sums > 0.0) & np.isfinite(col_sums)
+        with np.errstate(invalid='ignore', divide='ignore'):
+            posterior[:, needs_norm_mask] = posterior[:, needs_norm_mask] / col_sums[needs_norm_mask]
 
         return posterior
 
@@ -2616,15 +2651,18 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
                 output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].p_x_given_n_list = [np.squeeze(p_x_given_n[:, i, :]) for p_x_given_n in output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].p_x_given_n_list] ## or could squish them here
 
                 # #TODO 2025-06-13 14:29: - [X] fix busted-up columns: ['most_likely_position_indicies_list', 'most_likely_positions'
-                output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].most_likely_position_indicies_list = [np.squeeze(np.argmax(p_x_given_n, axis=0)) for p_x_given_n in output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].p_x_given_n_list]  # average along time dimension
-                # output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].most_likely_positions_list = None
-                if (xbin_centers is not None) and (ybin_centers is not None):
-                    ## NOTE: I think 2D position decoding isn't implemented here.
-                    # much more efficient than the other implementation. Result is # (85844, 2)
-                    output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].most_likely_positions_list = [np.vstack((xbin_centers[most_likely_position_indicies[0,:]], self.ybin_centers[most_likely_position_indicies[1,:]])).T for most_likely_position_indicies in output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].most_likely_position_indicies_list]
-                elif (xbin_centers is not None):
-                    # 1D Decoder case:
-                    output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].most_likely_positions_list = [np.squeeze(xbin_centers[most_likely_position_indicies]) for most_likely_position_indicies in output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].most_likely_position_indicies_list]
+                _split_mlp_idx_list = []
+                for p_x_given_n in output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].p_x_given_n_list:
+                    _flat = np.asarray(np.squeeze(p_x_given_n), dtype=float)
+                    if np.ndim(_flat) < 2:
+                        _flat = _flat.reshape(-1, 1)
+                    _flat_idxs, _ = BasePositionDecoder.perform_compute_most_likely_positions(_flat, original_position_data_shape=(_flat.shape[0],))
+                    _split_mlp_idx_list.append(np.squeeze(_flat_idxs))
+                ## END for p_x_given_n in ...
+                output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].most_likely_position_indicies_list = _split_mlp_idx_list
+                if (xbin_centers is not None):
+                    # Split-to-1D posteriors are always 1D along position; map -1 → NaN via safe lookup:
+                    output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].most_likely_positions_list = [BasePositionDecoder.perform_lookup_most_likely_positions(most_likely_position_indicies, xbin_centers=xbin_centers, ybin_centers=None, ndim=1) for most_likely_position_indicies in output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].most_likely_position_indicies_list]
                 else:
                     output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].most_likely_positions_list = [[] for most_likely_position_indicies in output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].most_likely_position_indicies_list]
                 # #TODO 2025-06-13 14:30: - [ ] Finish recomputing marginals
@@ -2749,6 +2787,7 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
     ## alternative functions:
     drop_negative_contributing_terms_mode: bool = non_serialized_field(default=False)
     reliability_modifier_mode: ReliabilityDecoderModifierMode = non_serialized_field(default=ReliabilityDecoderModifierMode.IGNORE)
+    minimum_rate_eps: float = non_serialized_field(default=1e-12)
 
 
     # Properties _________________________________________________________________________________________________________ #
@@ -2924,6 +2963,7 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
         neuron_sliced_decoder.should_discount_silence = self.should_discount_silence
         neuron_sliced_decoder.drop_negative_contributing_terms_mode = self.drop_negative_contributing_terms_mode
         neuron_sliced_decoder.reliability_modifier_mode = self.reliability_modifier_mode
+        neuron_sliced_decoder.minimum_rate_eps = self.minimum_rate_eps
         if (reliability_index is not None) and ((self.reliability_active is not None) or (self.reliability_silent is not None)):
             neuron_sliced_decoder.reliability_active = self._slice_reliability_array(self.reliability_active, reliability_index)
             neuron_sliced_decoder.reliability_silent = self._slice_reliability_array(self.reliability_silent, reliability_index)
@@ -3132,7 +3172,7 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
             self.adding_default_values_for_missing_fields() ## older pickled/autoreloaded instances may lack newly-added reliability fields
             
             # Single sweep decoding:
-            curr_flat_p_x_given_n = ZhangReconstructionImplementation.neuropy_bayesian_prob(time_bin_size, self.P_x, self.F, unit_specific_time_binned_spike_counts, debug_intermediates_mode=debug_intermediates_mode, use_flat_computation_mode=use_flat_computation_mode, debug_print=(debug_print or self.debug_print), reliability_modifier_mode=self.reliability_modifier_mode, drop_negative_contributing_terms_mode=self.drop_negative_contributing_terms_mode)
+            curr_flat_p_x_given_n = ZhangReconstructionImplementation.neuropy_bayesian_prob(time_bin_size, self.P_x, self.F, unit_specific_time_binned_spike_counts, debug_intermediates_mode=debug_intermediates_mode, use_flat_computation_mode=use_flat_computation_mode, debug_print=(debug_print or self.debug_print), reliability_modifier_mode=self.reliability_modifier_mode, drop_negative_contributing_terms_mode=self.drop_negative_contributing_terms_mode, minimum_rate_eps=self.minimum_rate_eps)
             if debug_print:
                 print(f'curr_flat_p_x_given_n.shape: {curr_flat_p_x_given_n.shape}')
             # all computed
@@ -3147,11 +3187,7 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
                 # No flat versions
                 flat_outputs_container = None
                 
-            if self.ndim > 1:
-                most_likely_positions = np.vstack((self.xbin_centers[most_likely_position_indicies[0,:]], self.ybin_centers[most_likely_position_indicies[1,:]])).T # much more efficient than the other implementation. Result is # (85844, 2)
-            else:
-                # 1D Decoder case:
-                most_likely_positions = np.squeeze(self.xbin_centers[most_likely_position_indicies[0,:]])
+            most_likely_positions = self.perform_lookup_most_likely_positions(most_likely_position_indicies, xbin_centers=self.xbin_centers, ybin_centers=self.ybin_centers, ndim=int(self.ndim))
         
             return most_likely_positions, p_x_given_n, most_likely_position_indicies, flat_outputs_container
             
@@ -3675,12 +3711,61 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
 
     @classmethod
     def perform_compute_most_likely_positions(cls, flat_p_x_given_n, original_position_data_shape):
-        """ Computes the most likely positions at each timestep from flat_p_x_given_n and the shape of the original position data """
-        most_likely_position_flat_indicies = np.argmax(flat_p_x_given_n, axis=0)
-        most_likely_position_indicies = np.array(np.unravel_index(most_likely_position_flat_indicies, original_position_data_shape)) # convert back to an array
+        """ Computes the most likely positions at each timestep from flat_p_x_given_n and the shape of the original position data.
+
+        Undefined posterior columns (all-NaN, or non-positive finite mass) return sentinel index `-1`
+        (matching `DecodedFilterEpochsResult.mask_computed_DecodedFilterEpochsResult_by_time_bin_inclusion_masks`).
+        Partial-NaN columns replace NaNs with `-inf` before argmax so the finite peak is selected instead of index 0.
+        """
+        flat_p = np.asarray(flat_p_x_given_n, dtype=float)
+        n_time = int(np.shape(flat_p)[1]) if (np.ndim(flat_p) >= 2) else 1
+        if np.ndim(flat_p) < 2:
+            flat_p = flat_p.reshape(-1, 1)
+            n_time = 1
+        invalid_t_mask = (~np.any(np.isfinite(flat_p), axis=0)) | (np.nansum(flat_p, axis=0) <= 0.0)
+        argmax_input = np.where(np.isfinite(flat_p), flat_p, -np.inf)
+        most_likely_position_flat_indicies = np.argmax(argmax_input, axis=0).astype(int)
+        ## Unravel with safe (non-negative) placeholders on invalid columns, then restore -1 sentinels:
+        unravel_flat = most_likely_position_flat_indicies.copy()
+        unravel_flat[invalid_t_mask] = 0
+        most_likely_position_indicies = np.array(np.unravel_index(unravel_flat, original_position_data_shape)) # convert back to an array
+        most_likely_position_flat_indicies[invalid_t_mask] = -1
+        most_likely_position_indicies[:, invalid_t_mask] = -1
         # np.shape(most_likely_position_flat_indicies) # (85841,)
         # np.shape(most_likely_position_indicies) # (2, 85841)
         return most_likely_position_flat_indicies, most_likely_position_indicies
+
+
+    @classmethod
+    def perform_lookup_most_likely_positions(cls, most_likely_position_indicies: np.ndarray, xbin_centers: np.ndarray, ybin_centers: Optional[np.ndarray] = None, ndim: int = 1) -> np.ndarray:
+        """ Map integer most-likely position indices to float bin-center coordinates, converting sentinel `-1` to `np.nan`.
+
+        Clamps negative indices to `0` during array indexing (preventing `-1` wrapping to `xbin_centers[-1]`),
+        then masks `< 0` entries to `np.nan` *before* `np.squeeze` so `num_time_windows == 1` stays IndexError-safe.
+        """
+        idxs = np.asarray(most_likely_position_indicies)
+        if ndim > 1:
+            assert ybin_centers is not None, "ybin_centers is required when ndim > 1"
+            x_idxs = np.asarray(idxs[0, :], dtype=int)
+            y_idxs = np.asarray(idxs[1, :], dtype=int)
+            invalid_mask = (x_idxs < 0) | (y_idxs < 0)
+            safe_x = np.where(x_idxs < 0, 0, x_idxs)
+            safe_y = np.where(y_idxs < 0, 0, y_idxs)
+            most_likely_positions = np.vstack((np.asarray(xbin_centers, dtype=float)[safe_x], np.asarray(ybin_centers, dtype=float)[safe_y])).T.astype(float)
+            most_likely_positions[invalid_mask, :] = np.nan
+            return most_likely_positions
+        else:
+            ## 1D: idxs may be shape (1, n_t) or (n_t,)
+            if np.ndim(idxs) >= 2:
+                x_idxs = np.asarray(idxs[0, :], dtype=int)
+            else:
+                x_idxs = np.asarray(idxs, dtype=int).reshape(-1)
+            invalid_mask = (x_idxs < 0)
+            safe_x = np.where(x_idxs < 0, 0, x_idxs)
+            most_likely_positions = np.asarray(xbin_centers, dtype=float)[safe_x].astype(float)
+            most_likely_positions[invalid_mask] = np.nan
+            return np.squeeze(most_likely_positions)
+
 
     @classmethod
     def perform_compute_forward_filled_positions(cls, most_likely_positions: np.ndarray, is_non_firing_bin: np.ndarray) -> np.ndarray:
@@ -4309,6 +4394,7 @@ class BayesianPlacemapPositionDecoder(SerializedAttributesAllowBlockSpecifyingCl
         neuron_sliced_decoder.should_discount_silence = self.should_discount_silence
         neuron_sliced_decoder.drop_negative_contributing_terms_mode = self.drop_negative_contributing_terms_mode
         neuron_sliced_decoder.reliability_modifier_mode = self.reliability_modifier_mode
+        neuron_sliced_decoder.minimum_rate_eps = self.minimum_rate_eps
         neuron_sliced_decoder.reliability_estimation_mode = self.reliability_estimation_mode
         neuron_sliced_decoder.n_top_peaks = self.n_top_peaks
         neuron_sliced_decoder.slice_level_multiplier = self.slice_level_multiplier

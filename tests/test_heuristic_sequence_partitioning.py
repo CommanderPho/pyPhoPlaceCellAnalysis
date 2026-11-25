@@ -5,7 +5,8 @@ from typing_extensions import TypeAlias
 from nptyping import NDArray
 import neuropy.utils.type_aliases as types
 import numpy as np
-from pyphoplacecellanalysis.Analysis.Decoder.heuristic_replay_scoring import SubsequencesPartitioningResult
+import pandas as pd
+from pyphoplacecellanalysis.Analysis.Decoder.heuristic_replay_scoring import SubsequencesPartitioningResult, SequenceScoringComputations
 from neuropy.utils.indexing_helpers import PandasHelpers, NumpyHelpers, flatten
 from pyphoplacecellanalysis.Pho2D.track_shape_drawing import LinearTrackInstance
 
@@ -436,6 +437,56 @@ class TestSubsequenceMerging(unittest.TestCase):
     #     expected_sequences = [np.array([100])]
     #     self.assertEqual(len(partition_result.merged_split_positions_arrays), 1)
     #     np.testing.assert_array_equal(partition_result.merged_split_positions_arrays[0], expected_sequences[0])
+
+class TestNaNTolerantHeuristicSequencePartitioning(unittest.TestCase):
+    """Undefined (NaN) most-likely positions must not crash scoring or corrupt direction casts."""
+
+
+    def setUp(self):
+        self.pos_bin_edges = np.array([37.0774, 40.8828, 44.6882, 48.4936, 52.2991, 56.1045, 59.9099, 63.7153, 67.5207, 71.3261, 75.1316, 78.937, 82.7424, 86.5478, 90.3532, 94.1586, 97.9641, 101.769, 105.575, 109.38, 113.186, 116.991, 120.797, 124.602, 128.407, 132.213, 136.018, 139.824, 143.629, 147.434, 151.24, 155.045, 158.851, 162.656, 166.462, 170.267, 174.072, 177.878, 181.683, 185.489, 189.294, 193.099, 196.905, 200.71, 204.516, 208.321, 212.127, 215.932, 219.737, 223.543, 227.348, 231.154, 234.959, 238.764, 242.57, 246.375, 250.181, 253.986])
+        self.same_thresh = 10.7
+        self.max_ignore_bins = 2
+        self.max_jump_distance_cm = 60.0
+
+
+    def test_total_distance_and_track_coverage_ignore_nans(self):
+        positions = np.array([100.0, np.nan, 120.0, 140.0], dtype=float)
+        self.assertAlmostEqual(SequenceScoringComputations.total_distance_traveled(positions), 40.0)
+        tcov = SequenceScoringComputations.track_coverage_score(positions, pos_bin_edges=self.pos_bin_edges)
+        self.assertTrue(np.isfinite(tcov))
+        self.assertGreater(tcov, 0.0)
+
+
+    def test_find_value_equiv_groups_skips_nans(self):
+        positions = np.array([100.0, 100.5, np.nan, 130.0], dtype=float)
+        groups, idxs = SubsequencesPartitioningResult.find_value_equiv_groups(positions, same_thresh_cm=self.same_thresh)
+        flat_idxs = [i for group in idxs for i in group]
+        self.assertNotIn(2, flat_idxs)
+        self.assertEqual(len(groups), 2)
+
+
+    def test_compute_shuffle_scalar_scores_handles_embedded_and_all_nan(self):
+        positions = np.array([100.0, 110.0, np.nan, 120.0, 130.0], dtype=float)
+        scalar_dict, main_positions = SubsequencesPartitioningResult.compute_shuffle_scalar_scores(positions, pos_bin_edges=self.pos_bin_edges, max_ignore_bins=self.max_ignore_bins, same_thresh=self.same_thresh, max_jump_distance_cm=self.max_jump_distance_cm)
+        self.assertIn('mseq_dtrav', scalar_dict)
+        self.assertTrue(np.isfinite(scalar_dict['mseq_dtrav']) or (scalar_dict['mseq_dtrav'] == 0.0))
+
+        all_nan = np.full(5, np.nan, dtype=float)
+        scalar_dict_nan, _ = SubsequencesPartitioningResult.compute_shuffle_scalar_scores(all_nan, pos_bin_edges=self.pos_bin_edges, max_ignore_bins=self.max_ignore_bins, same_thresh=self.same_thresh, max_jump_distance_cm=self.max_jump_distance_cm)
+        self.assertEqual(int(scalar_dict_nan['mseq_len']), 5)
+
+
+    def test_position_changes_info_df_direction_cast_no_intmin(self):
+        position_bins_info_df = pd.DataFrame({
+            'pos': [100.0, np.nan, 120.0],
+            'flat_idx': [0, 1, 2],
+            't_bin_end': [0.1, 0.2, 0.3],
+            't_bin_center': [0.05, 0.15, 0.25],
+        })
+        changes_df = SubsequencesPartitioningResult._compute_position_changes_info_df(position_bins_info_df=position_bins_info_df, same_thresh=self.same_thresh, max_jump_distance_cm=self.max_jump_distance_cm)
+        self.assertTrue(np.all(np.isfinite(changes_df['direction'].to_numpy())))
+        self.assertFalse(np.any(changes_df['direction'].to_numpy() == np.iinfo(np.int32).min))
+
 
 if __name__ == '__main__':
     unittest.main()

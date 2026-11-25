@@ -122,7 +122,7 @@ def _compute_stddev_of_diff(arr) -> float:
      from pyphoplacecellanalysis.Analysis.Decoder.heuristic_replay_scoring import _compute_stddev_of_diff
       
     """
-    return np.std(np.diff(arr, n=1))
+    return np.nanstd(np.diff(np.asarray(arr, dtype=float), n=1))
 
 
 from neuropy.utils.mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, custom_define, serialized_field, serialized_attribute_field, non_serialized_field, keys_only_repr
@@ -558,6 +558,9 @@ class SubsequencesPartitioningResult(ComputedResult):
 
         initial_v = None
         for i, v in enumerate(longest_sequence_subsequence):
+            if not np.isfinite(v):
+                ## skip undefined (NaN) bins so they neither start/poison groups nor count as valid non-repeated values
+                continue
             if initial_v is None:
                 initial_v = v
                 curr_accum_value_equiv_group.append(v) ## add to equiv group
@@ -612,8 +615,21 @@ class SubsequencesPartitioningResult(ComputedResult):
         """
         if isinstance(a_most_likely_positions_list, list):
             a_most_likely_positions_list = np.array(a_most_likely_positions_list)
-        
-        first_order_diff_lst = np.diff(a_most_likely_positions_list, n=1, prepend=[a_most_likely_positions_list[0]])
+        a_most_likely_positions_list = np.asarray(a_most_likely_positions_list, dtype=float)
+
+        ## Build diffs vs last finite position so NaN gaps defer splitting without resetting direction,
+        ## while true reversals across a NaN still produce a finite direction change. Bit-identical when all finite.
+        first_order_diff_lst = np.full(len(a_most_likely_positions_list), np.nan, dtype=float)
+        last_finite_pos = None
+        for _i, _pos in enumerate(a_most_likely_positions_list):
+            if not np.isfinite(_pos):
+                continue
+            if last_finite_pos is None:
+                first_order_diff_lst[_i] = 0.0
+            else:
+                first_order_diff_lst[_i] = float(_pos) - float(last_finite_pos)
+            last_finite_pos = float(_pos)
+        ## END for _i, _pos in enumerate(a_most_likely_positions_list)...
         assert len(first_order_diff_lst) == len(a_most_likely_positions_list), f"the prepend above should ensure that the sequence and its first-order diff are the same length."
 
         n_diff_bins: int = len(first_order_diff_lst)
@@ -627,6 +643,10 @@ class SubsequencesPartitioningResult(ComputedResult):
         prev_accum = []
 
         for i, v in enumerate(first_order_diff_lst):
+            if not np.isfinite(v):
+                ## NaN gap: defer split (like curr_dir==0) without resetting prev_accum_dir
+                prev_accum.append(v)
+                continue
             curr_dir = np.sign(v) # either [-1, 0, +1]
             did_accum_dir_change: bool = (prev_accum_dir != curr_dir) and (curr_dir != 0) # curr_dir == 0 means that we DEFER the split
             if debug_print:
@@ -1151,7 +1171,11 @@ class SubsequencesPartitioningResult(ComputedResult):
             main_non_intrusion_pos = pos_arr[main_non_intrusion_mask]
             main_non_intrusion_flat_idx = flat_idx_arr[main_non_intrusion_mask]
             if (self.max_jump_distance_cm is not None) and (len(main_non_intrusion_pos) > 1):
-                exceeding_jump_distance_split_indicies = main_non_intrusion_flat_idx[1:][np.abs(np.diff(main_non_intrusion_pos)) > self.max_jump_distance_cm]
+                _finite_mask = np.isfinite(main_non_intrusion_pos)
+                _finite_pos = main_non_intrusion_pos[_finite_mask]
+                _finite_flat_idx = main_non_intrusion_flat_idx[_finite_mask]
+                if len(_finite_pos) > 1:
+                    exceeding_jump_distance_split_indicies = _finite_flat_idx[1:][np.abs(np.diff(_finite_pos)) > self.max_jump_distance_cm]
 
 
         # partition_result.split_indicies
@@ -1434,7 +1458,11 @@ class SubsequencesPartitioningResult(ComputedResult):
                 main_non_intrusion_pos = pos_arr[main_non_intrusion_mask]
                 main_non_intrusion_flat_idx = flat_idx_arr[main_non_intrusion_mask]
                 if (partition_result.max_jump_distance_cm is not None) and (len(main_non_intrusion_pos) > 1):
-                    exceeding_jump_distance_split_indicies = main_non_intrusion_flat_idx[1:][np.abs(np.diff(main_non_intrusion_pos)) > partition_result.max_jump_distance_cm]
+                    _finite_mask = np.isfinite(main_non_intrusion_pos)
+                    _finite_pos = main_non_intrusion_pos[_finite_mask]
+                    _finite_flat_idx = main_non_intrusion_flat_idx[_finite_mask]
+                    if len(_finite_pos) > 1:
+                        exceeding_jump_distance_split_indicies = _finite_flat_idx[1:][np.abs(np.diff(_finite_pos)) > partition_result.max_jump_distance_cm]
 
             if len(exceeding_jump_distance_split_indicies) > 0:
                 new_merged_split_indicies = np.unique(np.concatenate([np.asarray(partition_result.merged_split_indicies), np.asarray(exceeding_jump_distance_split_indicies)]))
@@ -1636,7 +1664,7 @@ class SubsequencesPartitioningResult(ComputedResult):
         prev_bin_flat_idxs = flat_idx[:-1]
         next_bin_flat_idxs = flat_idx[1:]
         split_line_flat_t = position_bins_info_df['t_bin_end'].to_numpy()[:-1].astype(float) # all but the last end, as this isn't a valid one
-        direction = np.sign(pos_diff).astype(int)
+        direction = np.where(np.isfinite(pos_diff), np.sign(pos_diff), 0).astype(int)
         exceeds_same_thresh = (np.abs(pos_diff) > same_thresh)
         n_changes: int = len(pos_diff)
         if n_changes == 0:
@@ -2492,10 +2520,12 @@ class SequenceScoringComputations:
         Returns:
             float: The total distance traversed, in the units of the provided positions.
         """
-        if (len(positions) < 2):
+        finite_positions = np.asarray(positions, dtype=float)
+        finite_positions = finite_positions[np.isfinite(finite_positions)]
+        if (len(finite_positions) < 2):
             return 0.0 # single bin sequences have no coverage
-        assert np.all(positions >= 0), f"all positions should be positive, else assumptions are violated"
-        return np.sum(np.abs(np.diff(positions, n=1)))
+        assert np.all(finite_positions >= 0), f"all positions should be positive, else assumptions are violated"
+        return np.sum(np.abs(np.diff(finite_positions, n=1)))
 
 
 
@@ -2510,7 +2540,9 @@ class SequenceScoringComputations:
             float: The sweep score, ranging from 0 to 1.
         """
         assert pos_bin_edges is not None
-        if (len(positions) < 2):
+        finite_positions = np.asarray(positions, dtype=float)
+        finite_positions = finite_positions[np.isfinite(finite_positions)]
+        if (len(finite_positions) < 2):
             return 0.0 # single bin sequences have no coverage
         
         possible_track_pos_bounds = [np.min(pos_bin_edges), np.max(pos_bin_edges)] # [37.0773897438341, 253.98616538463315]
@@ -2519,7 +2551,7 @@ class SequenceScoringComputations:
         # sequence_pos_bounds = [np.min(positions), np.max(positions)] # [37.0773897438341, 253.98616538463315]
 
         # sequence_start_end_pos = [positions[0], positions[1]]
-        sequence_pos_bounds = [np.min(positions), np.max(positions)]
+        sequence_pos_bounds = [np.min(finite_positions), np.max(finite_positions)]
 
         sequence_pos_range: float = sequence_pos_bounds[1] - sequence_pos_bounds[0]
         sequence_pos_displacement: float = np.abs(sequence_pos_range)
@@ -3366,6 +3398,8 @@ class HeuristicReplayScoring:
             a_most_likely_positions_list = a_result.most_likely_position_indicies_list[an_epoch_idx] # pos-bins
             if np.ndim(a_most_likely_positions_list) == 2:
                 a_most_likely_positions_list = a_most_likely_positions_list.flatten() # WTF is this, shouldn't we only get the x component or is it 2D for a different reason?
+            a_most_likely_positions_list = np.asarray(a_most_likely_positions_list, dtype=float)
+            a_most_likely_positions_list[a_most_likely_positions_list < 0] = np.nan ## sentinel -1 → NaN
 
         else:
             time_window_centers = cls._epoch_time_window_centers(a_result, an_epoch_idx)

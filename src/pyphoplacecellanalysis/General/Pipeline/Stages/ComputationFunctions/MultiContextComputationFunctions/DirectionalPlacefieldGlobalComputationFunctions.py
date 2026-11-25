@@ -4215,15 +4215,15 @@ class DirectionalDecodersContinuouslyDecodedResult(ComputedResult):
                 
                 ## Copied from `pyphoplacecellanalysis.Analysis.Decoder.reconstruction.DecodedFilterEpochsResult.split_pseudo2D_result_to_1D_result`
                 # #TODO 2025-06-13 14:29: - [X] fix busted-up columns: ['most_likely_position_indicies_list', 'most_likely_positions'
-                output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].most_likely_position_indicies = np.squeeze(np.argmax(output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].p_x_given_n, axis=0))   # average along time dimension
+                _flat = np.asarray(np.squeeze(output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].p_x_given_n), dtype=float)
+                if np.ndim(_flat) < 2:
+                    _flat = _flat.reshape(-1, 1)
+                _flat_idxs, _ = BasePositionDecoder.perform_compute_most_likely_positions(_flat, original_position_data_shape=(_flat.shape[0],))
+                output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].most_likely_position_indicies = np.squeeze(_flat_idxs)
 
-                if (xbin_centers is not None) and (ybin_centers is not None):
-                    ## NOTE: I think 2D position decoding isn't implemented here.
-                    # much more efficient than the other implementation. Result is # (85844, 2)
-                    output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].most_likely_positions = np.vstack((xbin_centers[output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].most_likely_position_indicies[0,:]], self.ybin_centers[output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].most_likely_position_indicies[1,:]])).T
-                elif (xbin_centers is not None):
-                    # 1D Decoder case:
-                    output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].most_likely_positions = np.squeeze(xbin_centers[output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].most_likely_position_indicies])
+                if (xbin_centers is not None):
+                    # Split-to-1D posteriors are always 1D along position; map -1 → NaN via safe lookup:
+                    output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].most_likely_positions = BasePositionDecoder.perform_lookup_most_likely_positions(output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].most_likely_position_indicies, xbin_centers=xbin_centers, ybin_centers=None, ndim=1)
                 else:
                     output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].most_likely_positions = []
                 # #TODO 2025-06-13 14:30: - [ ] Finish recomputing marginals
@@ -11580,7 +11580,10 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
                 parent_output_folder = Path('output').resolve()
         parent_output_folder = Path(parent_output_folder).resolve()
         parent_output_folder.mkdir(parents=True, exist_ok=True)
-        session_key: str = session_context.get_description(separator='_')
+        ## Prefer animal/exper_name/session_name (e.g. 'gor01_one_2006-6-09_1-22-43'); fall back to full context description:
+        session_key: str = session_context.get_description(separator='_', subset_includelist=['animal', 'exper_name', 'session_name'])
+        if (session_key is None) or (len(str(session_key).strip()) == 0):
+            session_key = session_context.get_description(separator='_')
         output_dir = parent_output_folder.joinpath('laps_correct_decoder_side_by_side', session_key)
         output_dir.mkdir(parents=True, exist_ok=True)
 

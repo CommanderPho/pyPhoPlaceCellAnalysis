@@ -436,10 +436,7 @@ class BayesianPlacemapPositionDecoderDST(BayesianPlacemapPositionDecoder):
                 else:
                     flat_outputs_container = None
 
-                if self.ndim > 1:
-                    most_likely_positions = np.vstack((self.xbin_centers[most_likely_position_indicies[0, :]], self.ybin_centers[most_likely_position_indicies[1, :]])).T
-                else:
-                    most_likely_positions = np.squeeze(self.xbin_centers[most_likely_position_indicies[0, :]])
+                most_likely_positions = self.perform_lookup_most_likely_positions(most_likely_position_indicies, xbin_centers=self.xbin_centers, ybin_centers=self.ybin_centers, ndim=int(self.ndim))
 
                 return most_likely_positions, p_x_given_n, most_likely_position_indicies, flat_outputs_container
 

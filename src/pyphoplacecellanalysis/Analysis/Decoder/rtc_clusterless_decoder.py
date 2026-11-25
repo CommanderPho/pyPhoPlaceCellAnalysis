@@ -188,10 +188,7 @@ class ClusterlessRTCPositionDecoder(SerializedAttributesAllowBlockSpecifyingClas
     def _format_decoder_posterior_outputs(self, flat_p_x_given_n: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         p_x_given_n = self._reshape_output(flat_p_x_given_n)
         most_likely_position_flat_indicies, most_likely_position_indicies = self.perform_compute_most_likely_positions(flat_p_x_given_n, self.original_position_data_shape)
-        if self.ndim > 1:
-            most_likely_positions = np.vstack((self.pf.xbin_centers[most_likely_position_indicies[0, :]], self.pf.ybin_centers[most_likely_position_indicies[1, :]])).T
-        else:
-            most_likely_positions = np.squeeze(self.pf.xbin_centers[most_likely_position_indicies[0, :]])
+        most_likely_positions = self.perform_lookup_most_likely_positions(most_likely_position_indicies, xbin_centers=self.pf.xbin_centers, ybin_centers=self.pf.ybin_centers, ndim=int(self.ndim))
         return p_x_given_n, flat_p_x_given_n, most_likely_positions, most_likely_position_flat_indicies, most_likely_position_indicies
 
 

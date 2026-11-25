@@ -21,7 +21,7 @@ except ModuleNotFoundError as e:
 finally:
     from neuropy.analyses.placefields import PfND
     from neuropy.analyses.decoders import epochs_spkcount
-    from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BayesianPlacemapPositionDecoder, DecodedFilterEpochsResult
+    from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BayesianPlacemapPositionDecoder, BasePositionDecoder, DecodedFilterEpochsResult, ZhangReconstructionImplementation
 
 
 DecodingContinuousCacheKey = Tuple[float, float]
@@ -270,6 +270,75 @@ class TestEpochsSpkcountMethods(unittest.TestCase):
         self.assertEqual(len(spkcount), 0)
         self.assertEqual(len(nbins), 0)
         self.assertEqual(len(time_bins), 0)
+
+
+class TestBayesianZeroSumPosteriorAndMapSentinels(unittest.TestCase):
+    """Guards against zero-sum / all-NaN posteriors snapping to xbin_centers[0]."""
+
+
+    def test_minimum_rate_eps_recovers_peak_despite_out_of_field_zero_ratemap(self):
+        """A co-active in-field cell should keep the true peak when another cell fires at an exact-0.0 F bin."""
+        n_pos, n_t, n_cells = 5, 1, 2
+        tau = 0.025
+        P_x = np.ones((n_pos, 1), dtype=float) / float(n_pos)
+        F = np.zeros((n_pos, n_cells), dtype=float) # (n_pos, n_cells) — transpose happens inside neuropy_bayesian_prob
+        F[3, 0] = 10.0 # cell 0 place field at bin 3
+        # cell 1 has exact 0.0 everywhere except a far bin (bin 0 stays 0.0)
+        F[1, 1] = 5.0
+        n = np.zeros((n_cells, n_t), dtype=float)
+        n[0, 0] = 2.0 # in-field spikes for cell 0
+        n[1, 0] = 1.0 # out-of-field spike for cell 1 at a bin where F[:,1]==0 at true peak (bin 3)
+
+        posterior_no_floor = ZhangReconstructionImplementation.neuropy_bayesian_prob(tau, P_x, F, n, use_flat_computation_mode=True, minimum_rate_eps=0.0)
+        self.assertTrue(np.all(~np.isfinite(posterior_no_floor[:, 0])) or np.nansum(posterior_no_floor[:, 0]) == 0.0)
+
+        posterior_flat = ZhangReconstructionImplementation.neuropy_bayesian_prob(tau, P_x, F, n, use_flat_computation_mode=True, minimum_rate_eps=1e-12)
+        posterior_full = ZhangReconstructionImplementation.neuropy_bayesian_prob(tau, P_x, F, n, use_flat_computation_mode=False, minimum_rate_eps=1e-12)
+        self.assertTrue(np.all(np.isfinite(posterior_flat[:, 0])))
+        self.assertGreater(np.nansum(posterior_flat[:, 0]), 0.0)
+        np.testing.assert_allclose(posterior_flat, posterior_full, rtol=1e-9, atol=1e-12)
+        self.assertEqual(int(np.argmax(posterior_flat[:, 0])), 3)
+
+
+    def test_all_nan_and_zero_sum_columns_map_to_neg1_and_nan_positions(self):
+        xbin_centers = np.array([10.0, 20.0, 30.0, 40.0], dtype=float)
+        flat_p = np.full((4, 3), np.nan, dtype=float)
+        flat_p[:, 1] = np.array([0.1, 0.5, 0.3, 0.1], dtype=float) # valid middle column
+        flat_idxs, idxs = BasePositionDecoder.perform_compute_most_likely_positions(flat_p, original_position_data_shape=(4,))
+        self.assertEqual(int(flat_idxs[0]), -1)
+        self.assertEqual(int(flat_idxs[1]), 1)
+        self.assertEqual(int(flat_idxs[2]), -1)
+        self.assertTrue(np.all(idxs[:, 0] == -1))
+        self.assertEqual(int(idxs[0, 1]), 1)
+        self.assertTrue(np.all(idxs[:, 2] == -1))
+
+        positions = BasePositionDecoder.perform_lookup_most_likely_positions(idxs, xbin_centers=xbin_centers, ybin_centers=None, ndim=1)
+        self.assertTrue(np.isnan(positions[0]))
+        self.assertAlmostEqual(float(positions[1]), 20.0)
+        self.assertTrue(np.isnan(positions[2]))
+        self.assertFalse(np.isclose(float(np.nan_to_num(positions[0], nan=-999.0)), float(xbin_centers[0])))
+        self.assertFalse(np.isclose(float(np.nan_to_num(positions[0], nan=-999.0)), float(xbin_centers[-1])))
+
+
+    def test_single_time_window_lookup_returns_scalar_nan_without_indexerror(self):
+        xbin_centers = np.array([1.0, 2.0, 3.0], dtype=float)
+        flat_p = np.full((3, 1), np.nan, dtype=float)
+        flat_idxs, idxs = BasePositionDecoder.perform_compute_most_likely_positions(flat_p, original_position_data_shape=(3,))
+        self.assertEqual(int(flat_idxs[0]), -1)
+        positions = BasePositionDecoder.perform_lookup_most_likely_positions(idxs, xbin_centers=xbin_centers, ybin_centers=None, ndim=1)
+        self.assertTrue(np.isscalar(positions) or (np.ndim(positions) == 0))
+        self.assertTrue(np.isnan(positions))
+
+
+    def test_2d_lookup_masks_neg1_without_wrapping_to_last_bin(self):
+        xbin_centers = np.array([1.0, 2.0, 3.0], dtype=float)
+        ybin_centers = np.array([10.0, 20.0], dtype=float)
+        idxs = np.array([[-1, 1], [-1, 0]], dtype=int) # (2, n_t)
+        positions = BasePositionDecoder.perform_lookup_most_likely_positions(idxs, xbin_centers=xbin_centers, ybin_centers=ybin_centers, ndim=2)
+        self.assertEqual(np.shape(positions), (2, 2))
+        self.assertTrue(np.all(np.isnan(positions[0, :])))
+        self.assertAlmostEqual(float(positions[1, 0]), 2.0)
+        self.assertAlmostEqual(float(positions[1, 1]), 10.0)
         
 
 if __name__ == '__main__':
