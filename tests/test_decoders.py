@@ -575,6 +575,228 @@ class TestGetByIdSlicesPfSpikesDfForEpochReplacement(unittest.TestCase):
         needs_recomp_stale, _ = TrainTestLapsSplitting.resolve_needs_train_test_split_recompute(stale_pipeline, requested_cfg)
         self.assertTrue(needs_recomp_stale)
 
+        # Subset miss (pre-preserve_source_neuron_IDs pickle that dropped unit 2 on 90% split -> [1] vs [1, 2]) must trigger recompute
+        dropped_unit_split = deepcopy(split_res_curated)
+        dropped_unit_split.train_lap_specific_pf1D_Decoder_dict['long_LR'] = curated_dec.get_by_id(np.array([1], dtype=int), recompute=False)
+        dropped_pipeline = SimpleNamespace(global_computation_results=SimpleNamespace(computed_data={'TrainTestSplit': dropped_unit_split, 'DirectionalLaps': fake_dir_laps, 'RankOrder': fake_rank_order}))
+        needs_recomp_dropped, _ = TrainTestLapsSplitting.resolve_needs_train_test_split_recompute(dropped_pipeline, requested_cfg)
+        self.assertTrue(needs_recomp_dropped)
+
+        # Reordered neuron_IDs ([2, 1] vs [1, 2]) must trigger recompute
+        reordered_split = deepcopy(split_res_curated)
+        reordered_split.train_lap_specific_pf1D_Decoder_dict['long_LR'] = curated_dec.get_by_id(np.array([2, 1], dtype=int), recompute=False)
+        reordered_pipeline = SimpleNamespace(global_computation_results=SimpleNamespace(computed_data={'TrainTestSplit': reordered_split, 'DirectionalLaps': fake_dir_laps, 'RankOrder': fake_rank_order}))
+        needs_recomp_reordered, _ = TrainTestLapsSplitting.resolve_needs_train_test_split_recompute(reordered_pipeline, requested_cfg)
+        self.assertTrue(needs_recomp_reordered)
+
+        # Duration-based (should_filter_inactive_bins_before_split=False) bin-alignment checks:
+        requested_dur_cfg = {'laps_decoding_time_bin_size': 0.15, 'should_filter_inactive_bins_before_split': False, 'min_num_spikes_per_bin_to_be_considered_active': 1, 'min_num_unique_active_neurons_per_time_bin': 1, 'train_test_full_lap': False}
+        aligned_dur_split = TrainTestSplitResult(is_global=True, training_data_portion=0.9, test_data_portion=0.1, laps_decoding_time_bin_size=0.15, should_filter_inactive_bins_before_split=False, min_num_spikes_per_bin_to_be_considered_active=1, min_num_unique_active_neurons_per_time_bin=1, train_test_full_lap=False, test_epochs_dict={'long_LR': pd.DataFrame({'start': [0.30], 'stop': [0.60], 'label': ['lap1_te'], 'lap_id': [1]})}, train_epochs_dict={'long_LR': pd.DataFrame({'start': [0.0, 0.60], 'stop': [0.30, 3.975], 'label': ['lap1_tr0', 'lap1_tr1'], 'lap_id': [1, 1]})}, train_lap_specific_pf1D_Decoder_dict={'long_LR': deepcopy(curated_dec)})
+        aligned_dur_pipeline = SimpleNamespace(global_computation_results=SimpleNamespace(computed_data={'TrainTestSplit': aligned_dur_split, 'DirectionalLaps': fake_dir_laps, 'RankOrder': fake_rank_order}))
+        needs_recomp_aligned_dur, _ = TrainTestLapsSplitting.resolve_needs_train_test_split_recompute(aligned_dur_pipeline, requested_dur_cfg)
+        self.assertFalse(needs_recomp_aligned_dur)
+
+        # Pre-bin-alignment non-multiple test duration (0.41s vs dt=0.15s) must trigger recompute
+        non_mult_dur_split = deepcopy(aligned_dur_split)
+        non_mult_dur_split.test_epochs_dict['long_LR'] = pd.DataFrame({'start': [0.30], 'stop': [0.71], 'label': ['lap1_te'], 'lap_id': [1]})
+        non_mult_pipeline = SimpleNamespace(global_computation_results=SimpleNamespace(computed_data={'TrainTestSplit': non_mult_dur_split, 'DirectionalLaps': fake_dir_laps, 'RankOrder': fake_rank_order}))
+        needs_recomp_non_mult, _ = TrainTestLapsSplitting.resolve_needs_train_test_split_recompute(non_mult_pipeline, requested_dur_cfg)
+        self.assertTrue(needs_recomp_non_mult)
+
+        # Pre-bin-alignment wrapped 2-fragment test epochs for the same lap_id must trigger recompute
+        wrapped_frag_split = deepcopy(aligned_dur_split)
+        wrapped_frag_split.test_epochs_dict['long_LR'] = pd.DataFrame({'start': [0.0, 3.825], 'stop': [0.15, 3.975], 'label': ['lap1_te0', 'lap1_te1'], 'lap_id': [1, 1]})
+        wrapped_frag_pipeline = SimpleNamespace(global_computation_results=SimpleNamespace(computed_data={'TrainTestSplit': wrapped_frag_split, 'DirectionalLaps': fake_dir_laps, 'RankOrder': fake_rank_order}))
+        needs_recomp_wrapped, _ = TrainTestLapsSplitting.resolve_needs_train_test_split_recompute(wrapped_frag_pipeline, requested_dur_cfg)
+        self.assertTrue(needs_recomp_wrapped)
+
+        # Pre-bin-alignment phase-shifted test_start (duration=0.30=2*dt, 1 row, but (0.07 - 0.0)/0.15 is not integer) must trigger recompute
+        phase_shifted_split = deepcopy(aligned_dur_split)
+        phase_shifted_split.test_epochs_dict['long_LR'] = pd.DataFrame({'start': [0.07], 'stop': [0.37], 'label': ['lap1_te'], 'lap_id': [1]})
+        phase_shifted_split.train_epochs_dict['long_LR'] = pd.DataFrame({'start': [0.0, 0.37], 'stop': [0.07, 3.975], 'label': ['lap1_tr0', 'lap1_tr1'], 'lap_id': [1, 1]})
+        phase_shifted_pipeline = SimpleNamespace(global_computation_results=SimpleNamespace(computed_data={'TrainTestSplit': phase_shifted_split, 'DirectionalLaps': fake_dir_laps, 'RankOrder': fake_rank_order}))
+        needs_recomp_phase, _ = TrainTestLapsSplitting.resolve_needs_train_test_split_recompute(phase_shifted_pipeline, requested_dur_cfg)
+        self.assertTrue(needs_recomp_phase)
+
+        # Real EpochHelpers.split_epochs_into_training_and_test(..., time_bin_size=dt) outputs must pass without false-positive recomputes
+        from neuropy.core.epoch import EpochHelpers
+        raw_laps_df = pd.DataFrame({'start': [12.3456789, 255.2513781, 410.0001], 'stop': [19.8123456, 262.4489123, 410.09], 'label': ['0', '1', '2'], 'lap_id': [1, 6, 9], 'lap_dir': [0, 0, 0]})
+        for dt_val in (0.025, 0.050, 0.075):
+            tr_df, te_df = EpochHelpers.split_epochs_into_training_and_test(raw_laps_df, training_data_portion=0.9, time_bin_size=dt_val)
+            real_split = TrainTestSplitResult(is_global=True, training_data_portion=0.9, test_data_portion=0.1, laps_decoding_time_bin_size=dt_val, should_filter_inactive_bins_before_split=False, min_num_spikes_per_bin_to_be_considered_active=1, min_num_unique_active_neurons_per_time_bin=1, train_test_full_lap=False, test_epochs_dict={'long_LR': te_df}, train_epochs_dict={'long_LR': tr_df}, train_lap_specific_pf1D_Decoder_dict={'long_LR': deepcopy(curated_dec)})
+            real_pipe = SimpleNamespace(global_computation_results=SimpleNamespace(computed_data={'TrainTestSplit': real_split, 'DirectionalLaps': fake_dir_laps, 'RankOrder': fake_rank_order}))
+            req_dt_cfg = dict(requested_dur_cfg, laps_decoding_time_bin_size=dt_val)
+            needs_recomp_real, _ = TrainTestLapsSplitting.resolve_needs_train_test_split_recompute(real_pipe, req_dt_cfg)
+            self.assertFalse(needs_recomp_real)
+        ## END for dt_val in (0.025, 0.050, 0.075)...
+
+        tr_unaligned, te_unaligned = EpochHelpers.split_epochs_into_training_and_test(raw_laps_df, training_data_portion=0.9, time_bin_size=None)
+        unaligned_split = TrainTestSplitResult(is_global=True, training_data_portion=0.9, test_data_portion=0.1, laps_decoding_time_bin_size=0.075, should_filter_inactive_bins_before_split=False, min_num_spikes_per_bin_to_be_considered_active=1, min_num_unique_active_neurons_per_time_bin=1, train_test_full_lap=False, test_epochs_dict={'long_LR': te_unaligned}, train_epochs_dict={'long_LR': tr_unaligned}, train_lap_specific_pf1D_Decoder_dict={'long_LR': deepcopy(curated_dec)})
+        unaligned_pipe = SimpleNamespace(global_computation_results=SimpleNamespace(computed_data={'TrainTestSplit': unaligned_split, 'DirectionalLaps': fake_dir_laps, 'RankOrder': fake_rank_order}))
+        needs_recomp_unaligned, _ = TrainTestLapsSplitting.resolve_needs_train_test_split_recompute(unaligned_pipe, dict(requested_dur_cfg, laps_decoding_time_bin_size=0.075))
+        self.assertTrue(needs_recomp_unaligned)
+
+
+class TestLapsSideBySidePerDecoderDimmingAndPlaceholders(unittest.TestCase):
+    """Regression tests for Gap 2 (Bug 3A): per-decoder neuron_IDs low-firing dimming and '—' placeholders for skipped/inactive test bins."""
+
+    def test_per_column_decoder_dimming_and_inactive_test_bin_placeholders(self):
+        import tempfile
+        from types import SimpleNamespace
+        from unittest.mock import patch
+        import matplotlib.pyplot as plt
+        from matplotlib.collections import LineCollection
+        from neuropy.analyses.placefields import PfND
+        from neuropy.core.epoch import Epoch
+        from neuropy.core.position import Position
+        from neuropy.utils.result_context import IdentifyingContext
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions import DirectionalPlacefieldGlobalComputationFunctions as dpg_mod
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalPlacefieldGlobalDisplayFunctions, TrainTestSplitResult
+
+        pos_df = pd.DataFrame({'t': np.linspace(0.0, 0.60, 61), 'x': np.linspace(10.0, 90.0, 61), 'lin_pos': np.linspace(10.0, 90.0, 61), 'speed': np.full(61, 20.0, dtype=float)})
+        pos_obj = Position(pos_df[['t', 'x', 'speed']].copy())
+        setup_rows = []
+        for uid, base_t in ((1, 0.05), (2, 0.15), (10, 0.25), (20, 0.35), (30, 0.45)):
+            for k in range(5):
+                t_val = base_t + (0.02 * k)
+                x_val = float(np.interp(t_val, pos_df['t'].to_numpy(), pos_df['lin_pos'].to_numpy()))
+                setup_rows.append((t_val, uid, x_val, 20.0))
+            ## END for k in range(5)...
+
+        ## END for uid, base_t in ((1, 0.05), (2, 0.15), (10, 0.25), (20, 0.35), (30, 0.45))...
+
+        setup_spikes_df = pd.DataFrame(setup_rows, columns=['t_rel_seconds', 'aclu', 'x', 'speed'])
+        setup_spikes_df['t'] = setup_spikes_df['t_rel_seconds']
+        setup_spikes_df['shank'] = 0
+        setup_spikes_df['cluster'] = setup_spikes_df['aclu']
+        setup_spikes_df['qclu'] = 1
+        setup_spikes_df['neuron_type'] = 'PYRAMIDAL'
+        setup_spikes_df['flat_spike_idx'] = np.arange(len(setup_spikes_df), dtype=int)
+
+        laps_df = pd.DataFrame({'start': [0.0], 'stop': [0.60], 'duration': [0.60], 'label': ['6'], 'lap_id': [6], 'lap_dir': [1]})
+        pf1d = PfND.from_config_values(spikes_df=deepcopy(setup_spikes_df), position=pos_obj, epochs=Epoch(laps_df[['start', 'stop', 'label']].copy()), speed_thresh=0.0, frate_thresh=0.0, grid_bin=(10.0, 10.0), grid_bin_bounds=((10.0, 90.0), (0.0, 10.0)), smooth=(1.0, 1.0))
+        base_dec = BasePositionDecoder(pf=deepcopy(pf1d), setup_on_init=True)
+        heldout_decoders_dict = {
+            'long_LR': base_dec.get_by_id(np.array([20], dtype=int), recompute=False),
+            'long_RL': base_dec.get_by_id(np.array([1, 2], dtype=int), recompute=False),
+            'short_LR': base_dec.get_by_id(np.array([10], dtype=int), recompute=False),
+            'short_RL': base_dec.get_by_id(np.array([30], dtype=int), recompute=False),
+        }
+
+        ## Lap [0.0, 0.60] @ dt=0.075 -> 8 bins; held-out test interval [0.15, 0.375] covers bins 2, 3, 4 (centers 0.1875, 0.2625, 0.3375).
+        ## Bin 2 (0.1875): aclu=1 fires (long_RL active, short_LR inactive).
+        ## Bin 3 (0.2625): ONLY aclu=10 fires (short_LR active, long_RL INACTIVE — must dim on long_RL and NOT dim on short_LR!).
+        ## Bin 4 (0.3375): aclu=2 fires (long_RL active, short_LR inactive).
+        runtime_rows = [(0.1875, 1), (0.2625, 10), (0.3375, 2)]
+        runtime_spikes_df = pd.DataFrame([(t_v, uid, float(np.interp(t_v, pos_df['t'].to_numpy(), pos_df['lin_pos'].to_numpy())), 20.0) for t_v, uid in runtime_rows], columns=['t_rel_seconds', 'aclu', 'x', 'speed'])
+        runtime_spikes_df['t'] = runtime_spikes_df['t_rel_seconds']
+        runtime_spikes_df['shank'] = 0
+        runtime_spikes_df['cluster'] = runtime_spikes_df['aclu']
+        runtime_spikes_df['qclu'] = 1
+        runtime_spikes_df['neuron_type'] = 'PYRAMIDAL'
+        runtime_spikes_df['flat_spike_idx'] = np.arange(len(runtime_spikes_df), dtype=int)
+
+        train_df_rl = pd.DataFrame({'start': [0.0, 0.375], 'stop': [0.15, 0.60], 'label': ['tr0', 'tr1'], 'lap_id': [6, 6]})
+        test_df_rl = pd.DataFrame({'start': [0.15], 'stop': [0.375], 'label': ['te0'], 'lap_id': [6]})
+        train_epochs_dict = {k: (train_df_rl.copy() if k == 'long_RL' else pd.DataFrame(columns=['start', 'stop', 'label', 'lap_id'])) for k in heldout_decoders_dict}
+        test_epochs_dict = {k: (test_df_rl.copy() if k == 'long_RL' else pd.DataFrame(columns=['start', 'stop', 'label', 'lap_id'])) for k in heldout_decoders_dict}
+
+        split_res = TrainTestSplitResult(is_global=True, training_data_portion=0.9, test_data_portion=0.1, laps_decoding_time_bin_size=0.075, should_filter_inactive_bins_before_split=False, min_num_spikes_per_bin_to_be_considered_active=1, min_num_unique_active_neurons_per_time_bin=1, train_test_full_lap=False, test_epochs_dict=test_epochs_dict, train_epochs_dict=train_epochs_dict, train_lap_specific_pf1D_Decoder_dict=heldout_decoders_dict)
+        fake_templates = SimpleNamespace(get_decoders_dict=lambda: heldout_decoders_dict)
+        fake_dir_laps = SimpleNamespace(get_templates=lambda **kw: fake_templates)
+        fake_rank_order = SimpleNamespace(minimum_inclusion_fr_Hz=2.0, included_qclu_values=[1, 2])
+        global_comp_res = SimpleNamespace(computed_data={'RankOrder': fake_rank_order, 'DirectionalLaps': fake_dir_laps, 'TrainTestSplit': split_res})
+        sess_ctxt = IdentifyingContext(format_name='kdiba', animal='gor01', exper_name='one', session_name='2006-6-09_1-22-43')
+        fake_maze_comp = SimpleNamespace(computation_config=SimpleNamespace(pf_params=SimpleNamespace(computation_epochs=laps_df.copy())))
+        fake_maze_sess = SimpleNamespace(position=SimpleNamespace(to_dataframe=lambda: pos_df.copy()))
+        fake_pipeline = SimpleNamespace(
+            global_computation_results=global_comp_res,
+            computation_results={'maze': fake_maze_comp},
+            filtered_sessions={'maze': fake_maze_sess},
+            is_kdiba_session=lambda: True,
+            find_LongShortGlobal_epoch_names=lambda: ('maze1', 'maze2', 'maze'),
+            get_complete_session_context=lambda: (sess_ctxt, (sess_ctxt, IdentifyingContext())),
+        )
+
+        train_test_pos_err_df = pd.DataFrame({'lap_id': [6], 'decoder_name': ['long_RL'], 'abs_err_cm_1D_median': [8.4]})
+        train_test_pos_err_bins_df = pd.DataFrame({
+            'lap_id': [6, 6, 6],
+            'decoder_name': ['long_RL', 'long_RL', 'long_RL'],
+            'epoch_idx': [0, 0, 0],
+            'time_bin_index': [0, 1, 2],
+            't': [0.1875, 0.2625, 0.3375],
+            'measured_lin_pos': [35.0, 45.0, 55.0],
+            'decoded': [47.3, np.nan, 50.5],
+            'abs_err_cm_1D': [12.3, np.nan, 4.5],
+            'is_valid': [True, False, True],
+        })
+
+        def _fake_add_gt(curr_active_pipeline, result_laps_epochs_df):
+            out = result_laps_epochs_df.copy()
+            out['lap_id'] = 6
+            out['true_decoder_index'] = 1  # 'long_RL' in ['long_LR', 'long_RL', 'short_LR', 'short_RL']
+            return out
+
+        captured_figs = []
+        real_close = plt.close
+        with tempfile.TemporaryDirectory() as tmpdir:
+            try:
+                with patch.object(dpg_mod, 'get_proper_global_spikes_df', return_value=runtime_spikes_df), \
+                     patch.object(dpg_mod, 'add_laps_groundtruth_information_to_dataframe', side_effect=_fake_add_gt), \
+                     patch.object(plt, 'close', side_effect=lambda f=None: captured_figs.append(f)):
+                    DirectionalPlacefieldGlobalDisplayFunctions._display_laps_correct_decoder_side_by_side_posteriors(
+                        owning_pipeline_reference=fake_pipeline,
+                        global_computation_results=global_comp_res,
+                        computation_results=fake_pipeline.computation_results,
+                        active_configs={},
+                        save_figure=False,
+                        parent_output_folder=tmpdir,
+                        active_laps_decoding_time_bin_size=0.075,
+                        train_test_pos_err_df=train_test_pos_err_df,
+                        train_test_pos_err_bins_df=train_test_pos_err_bins_df,
+                    )
+                self.assertEqual(len(captured_figs), 1)
+                fig = captured_figs[0]
+                axs = np.asarray(fig.axes).reshape(1, 5)
+
+                ## 1. Left metrics box (axs[0, 0]): must preserve '—' placeholder at skipped middle test bin (1-to-1 with 3 test bins)
+                left_texts = [t.get_text() for t in axs[0, 0].texts]
+                self.assertIn('8.4', left_texts)
+                self.assertIn('12.3, —, 4.5', left_texts)
+
+                ## 2. Per-column low-firing dimming (zorder == 11.0 overlay image, shape (1, 8, 4)):
+                ##    GT column 'long_RL' (axs[0, 2], neuron_IDs=[1, 2]): bin 2 undimmed (0), bin 3 DIMMED (200), bin 4 undimmed (0)
+                gt_ax = axs[0, 2]
+                gt_dim_imgs = [im for im in gt_ax.images if float(im.get_zorder()) == 11.0]
+                self.assertEqual(len(gt_dim_imgs), 1)
+                gt_alpha_by_bin = np.asarray(gt_dim_imgs[0].get_array())[0, :, 3]
+                self.assertEqual(int(gt_alpha_by_bin[2]), 0)
+                self.assertEqual(int(gt_alpha_by_bin[3]), 200)
+                self.assertEqual(int(gt_alpha_by_bin[4]), 0)
+
+                ##    Non-GT column 'short_LR' (axs[0, 3], neuron_IDs=[10]): bin 2 DIMMED (200), bin 3 undimmed (0), bin 4 DIMMED (200)
+                short_lr_ax = axs[0, 3]
+                short_lr_dim_imgs = [im for im in short_lr_ax.images if float(im.get_zorder()) == 11.0]
+                self.assertEqual(len(short_lr_dim_imgs), 1)
+                short_lr_alpha_by_bin = np.asarray(short_lr_dim_imgs[0].get_array())[0, :, 3]
+                self.assertEqual(int(short_lr_alpha_by_bin[2]), 200)
+                self.assertEqual(int(short_lr_alpha_by_bin[3]), 0)
+                self.assertEqual(int(short_lr_alpha_by_bin[4]), 200)
+
+                ## 3. GT column I-bars: drawn only at the 2 valid test bin centers (0.1875 and 0.3375), skipping dimmed bin 3 (0.2625)
+                from matplotlib.container import ErrorbarContainer
+                eb_containers = [c for c in gt_ax.containers if isinstance(c, ErrorbarContainer)]
+                self.assertEqual(len(eb_containers), 1)
+                stem_segs = eb_containers[0].lines[2][0].get_segments()
+                self.assertEqual(len(stem_segs), 2)
+                stem_xs = sorted([float(seg[0, 0]) for seg in stem_segs])
+                np.testing.assert_allclose(stem_xs, [0.1875, 0.3375], atol=1e-9)
+            finally:
+                for f in captured_figs:
+                    if f is not None:
+                        real_close(f)
+                ## END for f in captured_figs...
+
 
 if __name__ == '__main__':
 
