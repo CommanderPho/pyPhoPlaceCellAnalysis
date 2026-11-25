@@ -339,7 +339,81 @@ class TestBayesianZeroSumPosteriorAndMapSentinels(unittest.TestCase):
         self.assertTrue(np.all(np.isnan(positions[0, :])))
         self.assertAlmostEqual(float(positions[1, 0]), 2.0)
         self.assertAlmostEqual(float(positions[1, 1]), 10.0)
-        
+
+
+class TestOverhangingEpochBinSpikeMaskClipping(unittest.TestCase):
+    """Regression for Bug 2A: overhanging final spanning bins past epoch.stop must not stay active from post-epoch spikes.
+
+    Mirrors the clip-then-mask sequence added in ``_do_custom_decode_epochs`` without importing the heavy DirectionalPlacefield module (Qt deps).
+    """
+
+
+    def _build_overhang_decode_result_and_spikes(self):
+        """Epoch [0.0, 0.10] + bin_size 0.075 -> edges [0.0, 0.075, 0.15]; spike @0.12 is past epoch.stop but inside overhang bin 1."""
+        from neuropy.core.epoch import ensure_dataframe
+        from neuropy.utils.mixins.time_slicing import add_epochs_id_identity
+
+        neuron_ids = np.array([1], dtype=int)
+        decoding_time_bin_size = 0.075
+        epochs_to_decode_df = pd.DataFrame({'start': [0.0], 'stop': [0.10], 'label': [0], 'lap_id': [1]})
+        global_spikes_df = pd.DataFrame({
+            'aclu': [1, 1],
+            't_rel_seconds': [0.03, 0.12], # 0.03 in bin0; 0.12 past epoch.stop=0.10 but inside overhang [0.075, 0.15]
+        })
+        shell = BasePositionDecoder._build_decode_specific_epochs_result_shell(neuron_IDs=neuron_ids, spikes_df=deepcopy(global_spikes_df), filter_epochs=deepcopy(epochs_to_decode_df), decoding_time_bin_size=decoding_time_bin_size, debug_print=False)
+        decoder_result = DecodedFilterEpochsResult(**shell.to_dict())
+        for i in range(decoder_result.num_filter_epochs):
+            n_bins = int(decoder_result.nbins[i])
+            counts = np.asarray(decoder_result.spkcount[i])
+            total_per_bin = np.asarray(counts.sum(axis=0) if counts.ndim == 2 else counts, dtype=float).reshape(-1)
+            positions = np.where(total_per_bin > 0, 40.0, 200.0).astype(float) # silence-prior-like jump for zero-spike overhang bins
+            decoder_result.most_likely_positions_list.append(positions)
+            decoder_result.most_likely_position_indicies_list.append(np.zeros((n_bins,), dtype=int))
+            decoder_result.p_x_given_n_list.append(np.ones((5, n_bins), dtype=float) / 5.0)
+            decoder_result.marginal_x_list.append({'p_x_given_n': np.ones((5, n_bins), dtype=float) / 5.0, 'most_likely_positions_1D': positions})
+            decoder_result.marginal_y_list.append(None)
+            # Mirror `_perform_decoding_specific_epochs`: populate time_bin_edges from the container (shell leaves this empty).
+            _tc = decoder_result.time_bin_containers[i]
+            if _tc.window_start_edges is not None:
+                decoder_result.time_bin_edges.append(np.column_stack((np.asarray(_tc.window_start_edges), np.asarray(_tc.window_stop_edges))))
+            else:
+                decoder_result.time_bin_edges.append(np.atleast_1d(_tc.edges))
+        ## END for i in range(decoder_result.num_filter_epochs)...
+
+        return decoder_result, global_spikes_df, epochs_to_decode_df, neuron_ids, ensure_dataframe, add_epochs_id_identity
+
+
+    def test_unclipped_spikes_would_keep_overhang_bin_active(self):
+        """Control: without epoch clipping, the post-epoch spike @0.12 keeps overhang bin 1 active (the Bug 2A failure mode)."""
+        decoder_result, global_spikes_df, epochs_to_decode_df, neuron_ids, _ensure_dataframe, _add_epochs_id_identity = self._build_overhang_decode_result_and_spikes()
+        self.assertEqual(int(decoder_result.nbins[0]), 2)
+        edges = np.asarray(decoder_result.time_bin_containers[0].edges, dtype=float)
+        self.assertGreater(float(edges[-1]), float(epochs_to_decode_df['stop'].iloc[0]))
+        # Decode used clipped spikes, so overhang bin has 0 counts / silence-prior MAP:
+        self.assertEqual(float(np.asarray(decoder_result.spkcount[0]).sum(axis=0)[1]), 0.0)
+        self.assertAlmostEqual(float(decoder_result.most_likely_positions_list[0][1]), 200.0)
+        _masked, mask_index_tuple = decoder_result.mask_computed_DecodedFilterEpochsResult_by_required_spike_counts_per_time_bin(spikes_df=deepcopy(global_spikes_df), min_num_spikes_per_bin_to_be_considered_active=1, min_num_unique_active_neurons_per_time_bin=1, masked_bin_fill_mode='nan_filled', included_neuron_ids=neuron_ids)
+        is_time_bin_active_list, *_rest = mask_index_tuple
+        self.assertTrue(bool(is_time_bin_active_list[0][0]))
+        self.assertTrue(bool(is_time_bin_active_list[0][1]), 'unclipped post-epoch spike must keep overhang bin active (pre-fix control)')
+
+
+    def test_clipped_spikes_mask_overhang_bin_with_only_post_epoch_spikes(self):
+        """Same clip-then-mask sequence as ``_do_custom_decode_epochs``: overhang bin 1 becomes inactive and NaN-filled."""
+        decoder_result, global_spikes_df, _epochs_to_decode_df, neuron_ids, ensure_dataframe, add_epochs_id_identity = self._build_overhang_decode_result_and_spikes()
+        filter_epochs_df: pd.DataFrame = ensure_dataframe(decoder_result.filter_epochs).reset_index(drop=True)
+        clipped_global_spikes_df: pd.DataFrame = deepcopy(global_spikes_df)
+        if (len(clipped_global_spikes_df) > 0) and (len(filter_epochs_df) > 0):
+            clipped_global_spikes_df = add_epochs_id_identity(clipped_global_spikes_df, filter_epochs_df, epoch_id_key_name='_custom_decode_temp_epoch_id', epoch_label_column_name=None, no_interval_fill_value=-1)
+            clipped_global_spikes_df = clipped_global_spikes_df[clipped_global_spikes_df['_custom_decode_temp_epoch_id'] != -1].drop(columns=['_custom_decode_temp_epoch_id'])
+        elif len(filter_epochs_df) == 0:
+            clipped_global_spikes_df = clipped_global_spikes_df.iloc[0:0].copy()
+        masked_result, mask_index_tuple = decoder_result.mask_computed_DecodedFilterEpochsResult_by_required_spike_counts_per_time_bin(spikes_df=clipped_global_spikes_df, min_num_spikes_per_bin_to_be_considered_active=1, min_num_unique_active_neurons_per_time_bin=1, masked_bin_fill_mode='nan_filled', included_neuron_ids=neuron_ids)
+        is_time_bin_active_list, *_rest = mask_index_tuple
+        self.assertTrue(bool(is_time_bin_active_list[0][0]))
+        self.assertFalse(bool(is_time_bin_active_list[0][1]), 'overhang bin with only post-epoch spikes must be masked inactive after epoch clipping')
+        self.assertTrue(np.isnan(float(masked_result.most_likely_positions_list[0][1])))
+
 
 if __name__ == '__main__':
 

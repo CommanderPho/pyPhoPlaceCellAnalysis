@@ -44,7 +44,7 @@ from neuropy.utils.misc import capitalize_after_underscore
 from neuropy.utils.mixins.binning_helpers import get_bin_centers, find_minimum_time_bin_duration
 from neuropy.analyses.placefields import PfND
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder
-from neuropy.utils.mixins.time_slicing import TimeColumnAliasesProtocol
+from neuropy.utils.mixins.time_slicing import TimeColumnAliasesProtocol, add_epochs_id_identity
 
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder # used for `complete_directional_pfs_computations`
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult # needed in DirectionalPseudo2DDecodersResult
@@ -5697,9 +5697,17 @@ def _do_custom_decode_epochs(global_spikes_df: pd.DataFrame, global_measured_pos
     ## INPUTS: global_spikes_df, train_lap_specific_pf1D_Decoder_dict, test_epochs_dict, laps_decoding_time_bin_size
     decoder_result: DecodedFilterEpochsResult = pfND_Decoder.decode_specific_epochs(spikes_df=deepcopy(global_spikes_df), filter_epochs=deepcopy(epochs_to_decode_df), decoding_time_bin_size=decoding_time_bin_size, debug_print=debug_print)
     ## Mask low-firing bins (insufficient unique aclus / spikes) so they don't confound lap position-decoding performance — same gate as PBEs:
+    ## Clip spikes to filter_epochs first so overhanging spanning bins past epoch.stop (which decode_specific_epochs also clips) cannot be marked active by post-epoch spikes.
     is_time_bin_active_list: Optional[List[NDArray]] = None
     if should_mask_by_required_spike_counts:
-        decoder_result, _mask_index_tuple = decoder_result.mask_computed_DecodedFilterEpochsResult_by_required_spike_counts_per_time_bin(spikes_df=deepcopy(global_spikes_df),
+        filter_epochs_df: pd.DataFrame = ensure_dataframe(decoder_result.filter_epochs).reset_index(drop=True)
+        clipped_global_spikes_df: pd.DataFrame = deepcopy(global_spikes_df)
+        if (len(clipped_global_spikes_df) > 0) and (len(filter_epochs_df) > 0):
+            clipped_global_spikes_df = add_epochs_id_identity(clipped_global_spikes_df, filter_epochs_df, epoch_id_key_name='_custom_decode_temp_epoch_id', epoch_label_column_name=None, no_interval_fill_value=-1)
+            clipped_global_spikes_df = clipped_global_spikes_df[clipped_global_spikes_df['_custom_decode_temp_epoch_id'] != -1].drop(columns=['_custom_decode_temp_epoch_id'])
+        elif len(filter_epochs_df) == 0:
+            clipped_global_spikes_df = clipped_global_spikes_df.iloc[0:0].copy()
+        decoder_result, _mask_index_tuple = decoder_result.mask_computed_DecodedFilterEpochsResult_by_required_spike_counts_per_time_bin(spikes_df=clipped_global_spikes_df,
                                                                                                                                          min_num_spikes_per_bin_to_be_considered_active=min_num_spikes_per_bin_to_be_considered_active,
                                                                                                                                          min_num_unique_active_neurons_per_time_bin=min_num_unique_active_neurons_per_time_bin,
                                                                                                                                          masked_bin_fill_mode=masked_bin_fill_mode,
