@@ -11250,15 +11250,37 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
             return [float(v) for v in vals if np.isfinite(v)]
 
 
+        def _subfn_format_wrapped_bin_err_label(bin_err_values: List[float], max_lines: int = 4, preferred_fontsize: float = 8.25, min_fontsize: float = 3.5, chars_budget_at_preferred: int = 22) -> Tuple[str, float]:
+            """Wrap tbin errors into <= ``max_lines`` balanced lines; shrink fontsize when the longest line still exceeds the cell char budget."""
+            tokens: List[str] = [f'{float(v):.1f}' for v in bin_err_values]
+            n: int = int(len(tokens))
+            if n == 0:
+                return '', float(preferred_fontsize)
+            n_lines: int = int(min(int(max_lines), n))
+            base_count, rem = divmod(n, n_lines)
+            lines: List[str] = []
+            idx: int = 0
+            for line_i in range(n_lines):
+                take: int = int(base_count + (1 if line_i < rem else 0))
+                lines.append(', '.join(tokens[idx:idx + take]))
+                idx += take
+            ## END for line_i in range(n_lines)...
+            wrapped: str = '\n'.join(lines)
+            max_line_len: int = int(max((len(line) for line in lines), default=1))
+            scale: float = min(1.0, float(chars_budget_at_preferred) / float(max(1, max_line_len)))
+            fontsize: float = float(max(float(min_fontsize), float(preferred_fontsize) * scale))
+            return wrapped, fontsize
+
+
         def _subfn_draw_pos_err_metrics_cell(ax, lap_id, err_value: Optional[float], vmin: float, vmax: float, metric_col: str, bin_err_values: Optional[List[float]] = None):
-            """viridis_r color cell + whole-lap median + smaller-font valid per-bin errors underneath (~75% of whole-lap fontsize)."""
+            """viridis_r color cell + whole-lap median + wrapped valid per-bin errors underneath (max 4 lines; shrink font to fit)."""
             ax.set_xticks([])
             ax.set_yticks([])
             for spine in ax.spines.values():
                 spine.set_visible(False)
             ## END for spine in ax.spines.values()...
             _whole_lap_fontsize: float = 11.0
-            _bin_err_fontsize: float = 0.75 * _whole_lap_fontsize  # ~8.25
+            _bin_err_fontsize_preferred: float = 0.75 * _whole_lap_fontsize  # ~8.25
             _txt_color = 'black'
             if err_value is None or (not np.isfinite(err_value)):
                 ax.set_facecolor('#bdbdbd')
@@ -11271,8 +11293,8 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
                 _txt_color = 'white' if (_norm > 0.55) else 'black'
                 ax.text(0.5, 0.62, f'{err_value:.1f}', ha='center', va='center', fontsize=_whole_lap_fontsize, color=_txt_color, transform=ax.transAxes, fontweight='bold')
             if bin_err_values is not None and (len(bin_err_values) > 0):
-                _bin_txt = ', '.join([f'{float(v):.1f}' for v in bin_err_values])
-                ax.text(0.5, 0.28, _bin_txt, ha='center', va='center', fontsize=_bin_err_fontsize, color=_txt_color, transform=ax.transAxes, wrap=True)
+                _bin_txt, _bin_err_fontsize = _subfn_format_wrapped_bin_err_label(list(bin_err_values), max_lines=4, preferred_fontsize=_bin_err_fontsize_preferred, min_fontsize=3.5, chars_budget_at_preferred=22)
+                ax.text(0.5, 0.30, _bin_txt, ha='center', va='center', fontsize=_bin_err_fontsize, color=_txt_color, transform=ax.transAxes, linespacing=1.05, clip_on=True)
             _lap_label = f'Lap {lap_id}' if (lap_id is not None) else 'Lap'
             ax.text(0.5, 0.92, _lap_label, ha='center', va='top', fontsize=8, color=_txt_color, transform=ax.transAxes)
             ax.text(0.5, 0.08, 'test', ha='center', va='bottom', fontsize=7, color=_txt_color, transform=ax.transAxes, style='italic')
