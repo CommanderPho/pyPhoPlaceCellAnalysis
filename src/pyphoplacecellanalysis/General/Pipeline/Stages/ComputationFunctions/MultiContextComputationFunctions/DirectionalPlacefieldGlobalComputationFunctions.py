@@ -11011,12 +11011,24 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
             ax.add_patch(rect)
             return rect
 
-        def _subfn_dim_non_groundtruth_axis(ax, dim_color: str = 'dimgrey', linewidth: float = 0.8):
+        def _subfn_dim_non_groundtruth_axis(ax, dim_color: str = 'dimgrey', linewidth: float = 0.8, content_alpha: float = 0.85):
+            """Dim non-GT decoder spines/ticks and fade posterior content to `content_alpha` (default 0.85)."""
             set_ax_emphasis_color(ax, emphasis_color=dim_color, defer_draw=True)
             for spine in ax.spines.values():
                 spine.set_linewidth(linewidth)
                 spine.set_color(dim_color)
             ## END for spine in ax.spines.values()...
+            for img in ax.images:
+                img.set_alpha(float(content_alpha))
+            ## END for img in ax.images...
+            for line in ax.lines:
+                _prev = line.get_alpha()
+                line.set_alpha(float(content_alpha) if (_prev is None) else (float(_prev) * float(content_alpha)))
+            ## END for line in ax.lines...
+            for coll in ax.collections:
+                _prev = coll.get_alpha()
+                coll.set_alpha(float(content_alpha) if (_prev is None) else (float(_prev) * float(content_alpha)))
+            ## END for coll in ax.collections...
 
 
         def _subfn_compute_low_firing_mask_rgba_for_time_bin_container(spikes_df: pd.DataFrame, time_bin_container, min_num_spikes_per_bin_to_be_considered_active: int, min_num_unique_active_neurons_per_time_bin: int) -> Tuple[NDArray, NDArray, float, float]:
