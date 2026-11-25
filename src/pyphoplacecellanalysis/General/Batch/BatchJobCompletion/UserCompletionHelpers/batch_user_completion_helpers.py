@@ -3152,9 +3152,10 @@ def generalized_decode_epochs_dict_and_export_results_completion_function(self, 
     # TrainTestSplit held-out lap position error (alongside perfmnc context metrics)
     _tt_tbin: float = float(train_test_laps_decoding_time_bin_size) if (train_test_laps_decoding_time_bin_size is not None) else float(decoding_time_bin_size)
     try:
-        train_test_pos_err_csv_paths, _train_test_pos_err_df, _train_test_pos_err_agg_df = export_kdiba_train_test_position_error_csvs(curr_active_pipeline=curr_active_pipeline, parent_output_path=active_export_parent_output_path, active_laps_decoding_time_bin_size=_tt_tbin, output_date_str=getattr(self, 'BATCH_DATE_TO_USE', None), force_recompute_directional_train_test_split_result=False, debug_print=bool(debug_print))
+        train_test_pos_err_csv_paths, _train_test_pos_err_df, _train_test_pos_err_agg_df, _train_test_pos_err_bins_df = export_kdiba_train_test_position_error_csvs(curr_active_pipeline=curr_active_pipeline, parent_output_path=active_export_parent_output_path, active_laps_decoding_time_bin_size=_tt_tbin, output_date_str=getattr(self, 'BATCH_DATE_TO_USE', None), force_recompute_directional_train_test_split_result=False, debug_print=bool(debug_print))
         across_session_results_extended_dict['generalized_decode_epochs_dict_and_export_results_completion_function']['train_test_pos_err_csv_paths'] = deepcopy(train_test_pos_err_csv_paths)
         across_session_results_extended_dict['generalized_decode_epochs_dict_and_export_results_completion_function']['train_test_pos_err_df'] = _train_test_pos_err_df
+        across_session_results_extended_dict['generalized_decode_epochs_dict_and_export_results_completion_function']['train_test_pos_err_bins_df'] = _train_test_pos_err_bins_df
         across_session_results_extended_dict['generalized_decode_epochs_dict_and_export_results_completion_function']['train_test_pos_err_error'] = None
         csv_save_paths_dict = {**csv_save_paths_dict, **{f'train_test_{k}': v for k, v in train_test_pos_err_csv_paths.items()}}
         across_session_results_extended_dict['generalized_decode_epochs_dict_and_export_results_completion_function']['csv_save_paths_dict'] = deepcopy(csv_save_paths_dict)
@@ -3162,6 +3163,7 @@ def generalized_decode_epochs_dict_and_export_results_completion_function(self, 
     except Exception as e:
         print(f'WARN: TrainTestSplit position-error export failed for {curr_session_context}: {e}')
         across_session_results_extended_dict['generalized_decode_epochs_dict_and_export_results_completion_function']['train_test_pos_err_csv_paths'] = None
+        across_session_results_extended_dict['generalized_decode_epochs_dict_and_export_results_completion_function']['train_test_pos_err_bins_df'] = None
         across_session_results_extended_dict['generalized_decode_epochs_dict_and_export_results_completion_function']['train_test_pos_err_error'] = repr(e)
         if getattr(self, 'fail_on_exception', False):
             raise
@@ -3291,10 +3293,10 @@ def compute_and_export_kdiba_train_test_position_error_completion_function(self,
     """Ensure ``TrainTestSplit`` (compute-if-missing), decode held-out lap test segments, export position-error CSVs.
 
     Writes under ``self.collected_outputs_path``:
-      ``*(train_test_pos_err)_tbin-{size}.csv``
+      ``*(train_test_pos_err)_tbin-{size}.csv`` (per-bin long table)
       ``*(train_test_pos_err_agg)_tbin-{size}.csv``
 
-    Stashes in-memory ``train_test_pos_err_df`` / ``train_test_pos_err_agg_df`` on callback_outputs for figure joins.
+    Stashes in-memory ``train_test_pos_err_df`` / ``train_test_pos_err_agg_df`` / ``train_test_pos_err_bins_df`` on callback_outputs (epoch DF for figure joins).
     Low-firing masking kwargs (default ``min_num_unique_active_neurons_per_time_bin=1``) are forwarded to ``export_kdiba_train_test_position_error_csvs``.
 
     from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import compute_and_export_kdiba_train_test_position_error_completion_function
@@ -3310,14 +3312,15 @@ def compute_and_export_kdiba_train_test_position_error_completion_function(self,
     assert self.collected_outputs_path.exists()
     apply_export_filename_extra_suffix_parts_to_pipeline(curr_active_pipeline, export_filename_extra_suffix_parts=export_filename_extra_suffix_parts)
 
-    callback_outputs = {'train_test_pos_err_csv_paths': None, 'train_test_pos_err_df': None, 'train_test_pos_err_agg_df': None, 'active_laps_decoding_time_bin_size': float(active_laps_decoding_time_bin_size), 'min_num_unique_active_neurons_per_time_bin': min_num_unique_active_neurons_per_time_bin, 'error': None}
+    callback_outputs = {'train_test_pos_err_csv_paths': None, 'train_test_pos_err_df': None, 'train_test_pos_err_agg_df': None, 'train_test_pos_err_bins_df': None, 'active_laps_decoding_time_bin_size': float(active_laps_decoding_time_bin_size), 'min_num_unique_active_neurons_per_time_bin': min_num_unique_active_neurons_per_time_bin, 'error': None}
     try:
-        train_test_pos_err_csv_paths, train_test_pos_err_df, train_test_pos_err_agg_df = export_kdiba_train_test_position_error_csvs(curr_active_pipeline=curr_active_pipeline, parent_output_path=self.collected_outputs_path.resolve(), active_laps_decoding_time_bin_size=float(active_laps_decoding_time_bin_size), output_date_str=getattr(self, 'BATCH_DATE_TO_USE', None), force_recompute_directional_train_test_split_result=bool(force_recompute_directional_train_test_split_result),
+        train_test_pos_err_csv_paths, train_test_pos_err_df, train_test_pos_err_agg_df, train_test_pos_err_bins_df = export_kdiba_train_test_position_error_csvs(curr_active_pipeline=curr_active_pipeline, parent_output_path=self.collected_outputs_path.resolve(), active_laps_decoding_time_bin_size=float(active_laps_decoding_time_bin_size), output_date_str=getattr(self, 'BATCH_DATE_TO_USE', None), force_recompute_directional_train_test_split_result=bool(force_recompute_directional_train_test_split_result),
                                                                                    should_mask_by_required_spike_counts=bool(should_mask_by_required_spike_counts), min_num_spikes_per_bin_to_be_considered_active=int(min_num_spikes_per_bin_to_be_considered_active),
                                                                                    min_num_unique_active_neurons_per_time_bin=min_num_unique_active_neurons_per_time_bin, masked_bin_fill_mode=str(masked_bin_fill_mode), debug_print=bool(debug_print))
         callback_outputs['train_test_pos_err_csv_paths'] = train_test_pos_err_csv_paths
         callback_outputs['train_test_pos_err_df'] = train_test_pos_err_df
         callback_outputs['train_test_pos_err_agg_df'] = train_test_pos_err_agg_df
+        callback_outputs['train_test_pos_err_bins_df'] = train_test_pos_err_bins_df
         callback_outputs['error'] = None
         print(f'train_test_pos_err_csv_paths: {train_test_pos_err_csv_paths}')
     except Exception as e:
@@ -3325,6 +3328,7 @@ def compute_and_export_kdiba_train_test_position_error_completion_function(self,
         callback_outputs['train_test_pos_err_csv_paths'] = None
         callback_outputs['train_test_pos_err_df'] = None
         callback_outputs['train_test_pos_err_agg_df'] = None
+        callback_outputs['train_test_pos_err_bins_df'] = None
         callback_outputs['error'] = repr(e)
         across_session_results_extended_dict[_callback_key] = callback_outputs
         if getattr(self, 'fail_on_exception', False):

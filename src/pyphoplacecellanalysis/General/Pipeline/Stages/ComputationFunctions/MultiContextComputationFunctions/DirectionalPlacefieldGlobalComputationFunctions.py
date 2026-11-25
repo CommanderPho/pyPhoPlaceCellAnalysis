@@ -5199,6 +5199,7 @@ class MeasuredDecodedPositionComparison(UnpackableMixin, object):
     measured_positions_dfs_list: List[pd.DataFrame] = field()
     decoded_positions_df_list: List[pd.DataFrame] = field()
     decoded_measured_diff_df: pd.DataFrame = field()
+    decoded_measured_bin_diff_df: pd.DataFrame = field(factory=pd.DataFrame)  # long per-time-bin rows within test epochs (all bins; see is_valid)
     
 @define(slots=False)
 class CustomDecodeEpochsResult(UnpackableMixin):
@@ -5277,6 +5278,7 @@ class CustomDecodeEpochsResult(UnpackableMixin):
         measured_positions_dfs_list = []
         decoded_positions_df_list = [] # one per epoch
         decoded_measured_diff_rows = [] # one per epoch
+        decoded_measured_bin_diff_rows = [] # one per time bin within each test epoch
 
         for epoch_idx, a_sample_times in enumerate(decoded_time_bin_centers_list):
             interpolated_measured_df = TrainTestLapsSplitting.interpolate_positions(global_measured_position_df, a_sample_times, additional_interp_column_names=additional_interp_column_names)
@@ -5290,16 +5292,18 @@ class CustomDecodeEpochsResult(UnpackableMixin):
             if not is_native_1D_decode:
                 assert np.ndim(decoded_positions) < 2, f" the new decoded positions should now be 1D but instead: np.ndim(decoded_positions): {np.ndim(decoded_positions)}, and np.shape(decoded_positions): {np.shape(decoded_positions)}"
             assert len(a_sample_times) == len(decoded_positions), f"len(a_sample_times): {len(a_sample_times)} == len(decoded_positions): {len(decoded_positions)}"
-            
+            decoded_positions = np.asarray(decoded_positions, dtype=float).reshape(-1)
 
-            interpolated_measured_x = interpolated_measured_df[measured_pos_column_name].to_numpy()
+            interpolated_measured_x = interpolated_measured_df[measured_pos_column_name].to_numpy(dtype=float)
 
             ## Only non-masked bins with finite decoded+measured positions enter error terms (same gate as PBE leave-one-out position performance):
-            timebin_is_valid_for_both: NDArray = np.logical_and(np.isfinite(decoded_positions), np.isfinite(interpolated_measured_x)) # bool array of valid indicies for both
+            timebin_is_finite: NDArray = np.logical_and(np.isfinite(decoded_positions), np.isfinite(interpolated_measured_x))
             if is_time_bin_active_list is not None:
                 is_time_bin_active = np.asarray(is_time_bin_active_list[epoch_idx]).astype(bool)
                 assert len(is_time_bin_active) == len(a_sample_times), f"Epoch[{epoch_idx}]: len(is_time_bin_active): {len(is_time_bin_active)} != len(a_sample_times): {len(a_sample_times)}"
-                timebin_is_valid_for_both = np.logical_and(timebin_is_valid_for_both, is_time_bin_active)
+            else:
+                is_time_bin_active = np.ones(len(a_sample_times), dtype=bool)
+            timebin_is_valid_for_both: NDArray = np.logical_and(timebin_is_finite, is_time_bin_active)
             num_valid_timebins = np.sum(timebin_is_valid_for_both)
             n_total_timebins: int = int(len(a_sample_times))
             
@@ -5308,17 +5312,57 @@ class CustomDecodeEpochsResult(UnpackableMixin):
             a_valid_interpolated_measured_x = interpolated_measured_x[timebin_is_valid_for_both]
             assert len(a_valid_sample_times) == len(a_valid_decoded_positions), f"len(a_valid_sample_times): {len(a_valid_sample_times)} == len(a_valid_decoded_positions): {len(a_valid_decoded_positions)}"
             
-            ## one for each decoder:
-            # test_decoded_positions_df = pd.DataFrame({'t':a_sample_times, 'x':decoded_positions, 'is_timebin_valid_for_both': timebin_is_valid_for_both})
-
-            ## only get valid bins: do we need all bins?
+            ## only get valid bins for legacy decoded_positions_df_list:
             test_decoded_positions_df = pd.DataFrame({'t':a_valid_sample_times, 'x':a_valid_decoded_positions})
             center_epoch_time = np.mean(a_sample_times)
 
             decoded_positions_df_list.append(test_decoded_positions_df)
-            # compute the diff error:
-            # mean_squared_error(y_true, y_pred)
-            
+
+            ## Epoch identity for epoch + per-bin rows:
+            epoch_identity = {}
+            try:
+                _epochs_df = ensure_dataframe(a_decoder_decoding_result.active_filter_epochs)
+                if (0 <= int(epoch_idx) < len(_epochs_df)):
+                    _epoch_row = _epochs_df.iloc[int(epoch_idx)]
+                    if 'lap_id' in _epochs_df.columns:
+                        epoch_identity['lap_id'] = _epoch_row['lap_id']
+                    elif 'lap_idx' in _epochs_df.columns:
+                        epoch_identity['lap_id'] = int(_epoch_row['lap_idx']) + 1
+                    if 'start' in _epochs_df.columns:
+                        epoch_identity['start'] = float(_epoch_row['start'])
+                    if 'stop' in _epochs_df.columns:
+                        epoch_identity['stop'] = float(_epoch_row['stop'])
+                    elif 'end' in _epochs_df.columns:
+                        epoch_identity['stop'] = float(_epoch_row['end'])
+            except Exception:
+                pass
+
+            ## Per-bin long rows (all bins in this test epoch; is_valid marks those entering epoch aggregates):
+            abs_err_all = np.abs(decoded_positions - interpolated_measured_x)
+            abs_err_all = np.where(timebin_is_finite, abs_err_all, np.nan)
+            interpolated_measured_lin_pos = None
+            abs_err_1D_all = None
+            if should_compute_1D_lin_pos_comparison and is_native_1D_decode and ('lin_pos' in interpolated_measured_df.columns):
+                interpolated_measured_lin_pos = interpolated_measured_df['lin_pos'].to_numpy(dtype=float)
+                _finite_1D = np.logical_and(np.isfinite(decoded_positions), np.isfinite(interpolated_measured_lin_pos))
+                abs_err_1D_all = np.where(_finite_1D, np.abs(decoded_positions - interpolated_measured_lin_pos), np.nan)
+            for bin_i in range(n_total_timebins):
+                bin_row = {
+                    't': float(a_sample_times[bin_i]),
+                    'time_bin_index': int(bin_i),
+                    'epoch_idx': int(epoch_idx),
+                    'measured': float(interpolated_measured_x[bin_i]) if np.isfinite(interpolated_measured_x[bin_i]) else np.nan,
+                    'decoded': float(decoded_positions[bin_i]) if np.isfinite(decoded_positions[bin_i]) else np.nan,
+                    'abs_err_cm': float(abs_err_all[bin_i]) if np.isfinite(abs_err_all[bin_i]) else np.nan,
+                    'is_valid': bool(timebin_is_valid_for_both[bin_i]),
+                    'is_active': bool(is_time_bin_active[bin_i]),
+                }
+                bin_row.update(epoch_identity)
+                if interpolated_measured_lin_pos is not None:
+                    bin_row['measured_lin_pos'] = float(interpolated_measured_lin_pos[bin_i]) if np.isfinite(interpolated_measured_lin_pos[bin_i]) else np.nan
+                    bin_row['abs_err_cm_1D'] = float(abs_err_1D_all[bin_i]) if (abs_err_1D_all is not None and np.isfinite(abs_err_1D_all[bin_i])) else np.nan
+                decoded_measured_bin_diff_rows.append(bin_row)
+            ## END for bin_i in range(n_total_timebins)...
 
             if (num_valid_timebins == 0):
                 print(f'WARN: encountered epoch[{epoch_idx}] with no valid timebins.')
@@ -5335,9 +5379,6 @@ class CustomDecodeEpochsResult(UnpackableMixin):
                     
             else:
                 ## has some timebins that are valid:
-
-                # test_decoded_measured_diff_df = (interpolated_measured_df[['x']] - pd.DataFrame({'x':v.most_likely_positions_list[epoch_idx]})) ## error at each point
-                # test_decoded_measured_diff: float = mean_squared_error(interpolated_measured_df['x'].to_numpy(), decoded_positions) # single float error
                 test_decoded_measured_diff: float = mean_squared_error(a_valid_interpolated_measured_x, a_valid_decoded_positions) # single float error
                 test_decoded_measured_diff_cm: float = np.sqrt(test_decoded_measured_diff)
                 abs_errs = np.abs(a_valid_decoded_positions - a_valid_interpolated_measured_x)
@@ -5345,23 +5386,7 @@ class CustomDecodeEpochsResult(UnpackableMixin):
                 abs_err_cm_median = float(np.median(abs_errs))
 
             diff_row = {'t': center_epoch_time, 'sq_err': test_decoded_measured_diff, 'err_cm': test_decoded_measured_diff_cm, 'abs_err_cm_mean': abs_err_cm_mean, 'abs_err_cm_median': abs_err_cm_median, 'n_valid_timebins': int(num_valid_timebins), 'n_total_timebins': n_total_timebins}
-            ## Copy epoch identity (lap_id / start / stop) when present on active_filter_epochs for figure joins:
-            try:
-                _epochs_df = ensure_dataframe(a_decoder_decoding_result.active_filter_epochs)
-                if (0 <= int(epoch_idx) < len(_epochs_df)):
-                    _epoch_row = _epochs_df.iloc[int(epoch_idx)]
-                    if 'lap_id' in _epochs_df.columns:
-                        diff_row['lap_id'] = _epoch_row['lap_id']
-                    elif 'lap_idx' in _epochs_df.columns:
-                        diff_row['lap_id'] = int(_epoch_row['lap_idx']) + 1
-                    if 'start' in _epochs_df.columns:
-                        diff_row['start'] = float(_epoch_row['start'])
-                    if 'stop' in _epochs_df.columns:
-                        diff_row['stop'] = float(_epoch_row['stop'])
-                    elif 'end' in _epochs_df.columns:
-                        diff_row['stop'] = float(_epoch_row['end'])
-            except Exception:
-                pass
+            diff_row.update(epoch_identity)
             if is_multi_dimensional_decode:
                 decoded_xy = raw_decoded_positions_arr if raw_decoded_positions_arr.ndim >= 2 else raw_decoded_positions_arr.reshape(-1, 1)
                 if decoded_xy.shape[0] != len(a_sample_times) and decoded_xy.shape[1] == len(a_sample_times) and decoded_xy.shape[0] >= 2:
@@ -5389,7 +5414,8 @@ class CustomDecodeEpochsResult(UnpackableMixin):
                     diff_row['abs_err_cm_2D_mean'] = float(np.mean(abs_err_per_bin_2D))
                     diff_row['abs_err_cm_2D_median'] = float(np.median(abs_err_per_bin_2D))
             if should_compute_1D_lin_pos_comparison and is_native_1D_decode:
-                interpolated_measured_lin_pos = interpolated_measured_df['lin_pos'].to_numpy()
+                if interpolated_measured_lin_pos is None:
+                    interpolated_measured_lin_pos = interpolated_measured_df['lin_pos'].to_numpy()
                 timebin_is_valid_for_both_1D: NDArray = np.logical_and(np.isfinite(decoded_positions), np.isfinite(interpolated_measured_lin_pos))
                 if is_time_bin_active_list is not None:
                     timebin_is_valid_for_both_1D = np.logical_and(timebin_is_valid_for_both_1D, is_time_bin_active)
@@ -5410,11 +5436,11 @@ class CustomDecodeEpochsResult(UnpackableMixin):
                     diff_row['abs_err_cm_1D_median'] = float(np.median(abs_errs_1D))
             decoded_measured_diff_rows.append(diff_row)
 
-            ## END FOR
+        ## END for epoch_idx, a_sample_times in enumerate(decoded_time_bin_centers_list)...
         decoded_measured_diff_df: pd.DataFrame = pd.DataFrame(decoded_measured_diff_rows)
+        decoded_measured_bin_diff_df: pd.DataFrame = pd.DataFrame(decoded_measured_bin_diff_rows)
 
-        # return measured_positions_dfs_list, decoded_positions_df_list, decoded_measured_diff_df
-        return MeasuredDecodedPositionComparison(measured_positions_dfs_list, decoded_positions_df_list, decoded_measured_diff_df)
+        return MeasuredDecodedPositionComparison(measured_positions_dfs_list, decoded_positions_df_list, decoded_measured_diff_df, decoded_measured_bin_diff_df)
 
 
     @classmethod
@@ -5437,7 +5463,7 @@ class CustomDecodeEpochsResult(UnpackableMixin):
 
         for k, a_decoder_decoding_result in test_laps_decoder_results_dict.items():
             # Using `build_single_measured_decoded_position_comparison`
-            measured_positions_dfs_list, decoded_positions_df_list, decoded_measured_diff_df = cls.build_single_measured_decoded_position_comparison(a_decoder_decoding_result, global_measured_position_df=global_measured_position_df, measured_pos_column_name=measured_pos_column_name)
+            measured_positions_dfs_list, decoded_positions_df_list, decoded_measured_diff_df, _decoded_measured_bin_diff_df = cls.build_single_measured_decoded_position_comparison(a_decoder_decoding_result, global_measured_position_df=global_measured_position_df, measured_pos_column_name=measured_pos_column_name)
             test_measured_positions_dfs_dict[k] = measured_positions_dfs_list
             test_decoded_positions_df_dict[k] = decoded_positions_df_list
             test_decoded_measured_diff_df_dict[k] = decoded_measured_diff_df
@@ -5925,11 +5951,12 @@ def _do_train_test_split_decode_and_evaluate(curr_active_pipeline, active_laps_d
 @function_attributes(short_name=None, tags=['TrainTestSplit', 'position', 'error', 'CSV', 'KDIBA'], input_requires=[], output_provides=[], uses=['_do_train_test_split_decode_and_evaluate'], used_by=['export_kdiba_train_test_position_error_csvs'], creation_date='2026-11-20 17:50', related_items=[])
 def compute_kdiba_train_test_position_error_dfs(curr_active_pipeline, active_laps_decoding_time_bin_size: float = 0.075, force_recompute_directional_train_test_split_result: bool = False,
                                                 should_mask_by_required_spike_counts: bool = True, min_num_spikes_per_bin_to_be_considered_active: int = 1, min_num_unique_active_neurons_per_time_bin: Optional[int] = 1, masked_bin_fill_mode: str = 'nan_filled',
-                                                debug_print: bool = False) -> Tuple[pd.DataFrame, pd.DataFrame]:
-    """Ensure TrainTestSplit, decode held-out test lap segments, return (train_test_pos_err_df, train_test_pos_err_agg_df).
+                                                debug_print: bool = False) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    """Ensure TrainTestSplit, decode held-out test lap segments, return (train_test_pos_err_df, train_test_pos_err_agg_df, train_test_pos_err_bins_df).
 
     ``train_test_pos_err_df``: per-epoch rows with ``decoder_name``, ``session_name``, ``time_bin_size``, ``t``, ``sq_err``, ``err_cm``, ``abs_err_cm_mean``, ``abs_err_cm_median`` (+ optional ``*_1D``/``*_2D``; ``lap_id``/``start``/``stop`` when present on test epochs).
     ``train_test_pos_err_agg_df``: per-``decoder_name`` mean/median of RMSE and abs-error columns and counts for session QC.
+    ``train_test_pos_err_bins_df``: long per-time-bin rows within each held-out test epoch (all bins; ``is_valid`` / ``is_active`` mark those entering epoch aggregates).
     Low-firing masking kwargs are forwarded to ``_do_train_test_split_decode_and_evaluate`` (default ``min_num_unique_active_neurons_per_time_bin=1``).
     """
     _out = _do_train_test_split_decode_and_evaluate(curr_active_pipeline=curr_active_pipeline, active_laps_decoding_time_bin_size=float(active_laps_decoding_time_bin_size), force_recompute_directional_train_test_split_result=force_recompute_directional_train_test_split_result, compute_separate_decoder_results=True, included_neuron_IDs=None,
@@ -5952,6 +5979,21 @@ def compute_kdiba_train_test_position_error_dfs(curr_active_pipeline, active_lap
     assert len(per_decoder_dfs) > 0, "train_decoded_measured_diff_df_dict was empty"
     train_test_pos_err_df: pd.DataFrame = pd.concat(per_decoder_dfs, axis='index', ignore_index=True)
 
+    per_decoder_bin_dfs: List[pd.DataFrame] = []
+    for decoder_name, a_custom_result in _test_decoder_results_dict.items():
+        a_bin_df = deepcopy(a_custom_result.measured_decoded_position_comparion.decoded_measured_bin_diff_df)
+        if (a_bin_df is None) or (len(a_bin_df) == 0):
+            continue
+        a_bin_df['decoder_name'] = str(decoder_name)
+        a_bin_df['session_name'] = session_name
+        a_bin_df['time_bin_size'] = tbin
+        per_decoder_bin_dfs.append(a_bin_df)
+    ## END for decoder_name, a_custom_result in _test_decoder_results_dict.items()...
+    if len(per_decoder_bin_dfs) > 0:
+        train_test_pos_err_bins_df: pd.DataFrame = pd.concat(per_decoder_bin_dfs, axis='index', ignore_index=True)
+    else:
+        train_test_pos_err_bins_df = pd.DataFrame()
+
     agg_kwargs = dict(err_cm_mean=('err_cm', 'mean'), err_cm_median=('err_cm', 'median'), sq_err_mean=('sq_err', 'mean'),
                       abs_err_cm_mean_mean=('abs_err_cm_mean', 'mean'), abs_err_cm_mean_median=('abs_err_cm_mean', 'median'),
                       abs_err_cm_median_mean=('abs_err_cm_median', 'mean'), abs_err_cm_median_median=('abs_err_cm_median', 'median'),
@@ -5969,31 +6011,32 @@ def compute_kdiba_train_test_position_error_dfs(curr_active_pipeline, active_lap
     train_test_pos_err_agg_df: pd.DataFrame = train_test_pos_err_df.groupby(['decoder_name'], dropna=False).agg(**agg_kwargs).reset_index()
     train_test_pos_err_agg_df['session_name'] = session_name
     train_test_pos_err_agg_df['time_bin_size'] = tbin
-    return train_test_pos_err_df, train_test_pos_err_agg_df
+    return train_test_pos_err_df, train_test_pos_err_agg_df, train_test_pos_err_bins_df
 
 
 
 @function_attributes(short_name=None, tags=['TrainTestSplit', 'position', 'error', 'CSV', 'KDIBA', 'export'], input_requires=[], output_provides=[], uses=['compute_kdiba_train_test_position_error_dfs', 'build_complete_session_identifier_filename_string'], used_by=['generalized_decode_epochs_dict_and_export_results_completion_function'], creation_date='2026-11-20 17:50', related_items=[])
 def export_kdiba_train_test_position_error_csvs(curr_active_pipeline, parent_output_path: Path, active_laps_decoding_time_bin_size: float = 0.025, output_date_str: Optional[str] = None, force_recompute_directional_train_test_split_result: bool = False,
                                                 should_mask_by_required_spike_counts: bool = True, min_num_spikes_per_bin_to_be_considered_active: int = 1, min_num_unique_active_neurons_per_time_bin: Optional[int] = 1, masked_bin_fill_mode: str = 'nan_filled',
-                                                debug_print: bool = False) -> Tuple[Dict[str, Path], pd.DataFrame, pd.DataFrame]:
+                                                debug_print: bool = False) -> Tuple[Dict[str, Path], pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """Compute held-out lap position errors and write parseable collected_outputs CSVs.
 
-    Filenames: ``*(train_test_pos_err)_tbin-{size}.csv`` and ``*(train_test_pos_err_agg)_tbin-{size}.csv``.
+    Filenames: ``*(train_test_pos_err)_tbin-{size}.csv`` (per-bin long table) and ``*(train_test_pos_err_agg)_tbin-{size}.csv`` (epoch aggregates).
     Low-firing masking kwargs are forwarded to ``compute_kdiba_train_test_position_error_dfs`` (default ``min_num_unique_active_neurons_per_time_bin=1``).
 
-    Returns ``(out_paths, train_test_pos_err_df, train_test_pos_err_agg_df)``.
+    Returns ``(out_paths, train_test_pos_err_df, train_test_pos_err_agg_df, train_test_pos_err_bins_df)``.
+    Non-agg CSV is written from ``train_test_pos_err_bins_df``; epoch DF is still returned for figure metrics.
     """
     parent_output_path = Path(parent_output_path).resolve()
     parent_output_path.mkdir(parents=True, exist_ok=True)
     if output_date_str is None:
         output_date_str = get_now_rounded_time_str(rounded_minutes=10)
-    train_test_pos_err_df, train_test_pos_err_agg_df = compute_kdiba_train_test_position_error_dfs(curr_active_pipeline=curr_active_pipeline, active_laps_decoding_time_bin_size=float(active_laps_decoding_time_bin_size), force_recompute_directional_train_test_split_result=force_recompute_directional_train_test_split_result,
+    train_test_pos_err_df, train_test_pos_err_agg_df, train_test_pos_err_bins_df = compute_kdiba_train_test_position_error_dfs(curr_active_pipeline=curr_active_pipeline, active_laps_decoding_time_bin_size=float(active_laps_decoding_time_bin_size), force_recompute_directional_train_test_split_result=force_recompute_directional_train_test_split_result,
                                                                                                    should_mask_by_required_spike_counts=should_mask_by_required_spike_counts, min_num_spikes_per_bin_to_be_considered_active=min_num_spikes_per_bin_to_be_considered_active,
                                                                                                    min_num_unique_active_neurons_per_time_bin=min_num_unique_active_neurons_per_time_bin, masked_bin_fill_mode=masked_bin_fill_mode, debug_print=debug_print)
     tbin_str: str = str(float(active_laps_decoding_time_bin_size))
     out_paths: Dict[str, Path] = {}
-    for file_type_key, export_df in (('train_test_pos_err', train_test_pos_err_df), ('train_test_pos_err_agg', train_test_pos_err_agg_df)):
+    for file_type_key, export_df in (('train_test_pos_err', train_test_pos_err_bins_df), ('train_test_pos_err_agg', train_test_pos_err_agg_df)):
         data_identifier_str: str = f'({file_type_key})_tbin-{tbin_str}'
         out_path, _out_filename, _out_basename = curr_active_pipeline.build_complete_session_identifier_filename_string(output_date_str=output_date_str, data_identifier_str=data_identifier_str, parent_output_path=parent_output_path, out_extension='.csv')
         export_df.to_csv(out_path, index=False)
@@ -6003,9 +6046,9 @@ def export_kdiba_train_test_position_error_csvs(curr_active_pipeline, parent_out
             curr_active_pipeline.register_output_file(output_path=out_paths[file_type_key], output_metadata=dict(kind=file_type_key, time_bin_size=float(active_laps_decoding_time_bin_size), source_fn='export_kdiba_train_test_position_error_csvs'))
         except Exception as e:
             print(f'WARN: register_output_file failed for {out_paths[file_type_key]}: {e}')
-    ## END for file_type_key, export_df in (('train_test_pos_err', train_test_pos_err_df), ('train_test_pos_err_agg', train_test_pos_err_agg_df))...
+    ## END for file_type_key, export_df in (('train_test_pos_err', train_test_pos_err_bins_df), ('train_test_pos_err_agg', train_test_pos_err_agg_df))...
 
-    return out_paths, train_test_pos_err_df, train_test_pos_err_agg_df
+    return out_paths, train_test_pos_err_df, train_test_pos_err_agg_df, train_test_pos_err_bins_df
 
 
 
