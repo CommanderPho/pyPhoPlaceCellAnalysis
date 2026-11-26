@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from copy import deepcopy
-from typing import TYPE_CHECKING, Optional, Tuple
+from pathlib import Path
+from typing import TYPE_CHECKING, Optional, Tuple, Union
 
 if TYPE_CHECKING:
     from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult
@@ -13,13 +14,14 @@ import xarray as xr
 from nptyping import NDArray
 from neuropy.utils.dynamic_container import DynamicContainer
 from neuropy.utils.mixins.binning_helpers import BinningInfo, BinningContainer, compute_spanning_bins
-from replay_trajectory_classification import ClusterlessClassifier
+from replay_trajectory_classification import ClusterlessClassifier, ClusterlessDecoder, RandomWalk, estimate_movement_var
 from pyphocorehelpers.print_helpers import WrappingMessagePrinter
 
 from pyphoplacecellanalysis.Analysis.Decoder.rtc_clusterless_adapters import (
     ClusterlessDecodingParameters,
     _get_multiunit_electrode_keep_mask,
     build_clusterless_training_data_from_pfnd,
+    build_multiunits_from_spike_events,
     build_rtc_environment_from_pfnd,
     epochs_multiunits,
     rtc_posterior_flat_p_x_given_n,
@@ -133,8 +135,22 @@ class ClusterlessRTCPositionDecoder(SerializedAttributesAllowBlockSpecifyingClas
 
 
     @property
+    def spikes_df(self) -> Optional[pd.DataFrame]:
+        return None
+
+
+    @property
     def num_neurons(self) -> int:
-        raise NotImplementedError("Clusterless decoding uses multiunits, not individual neurons (num_neurons).")
+        return 0
+
+
+    @property
+    def num_electrodes(self) -> int:
+        if self.multiunit_electrode_keep_mask is not None:
+            return int(np.sum(self.multiunit_electrode_keep_mask))
+        if self.multiunits is not None and np.ndim(self.multiunits) == 3:
+            return int(self.multiunits.shape[2])
+        return 0
 
 
     def setup(self):
@@ -160,6 +176,48 @@ class ClusterlessRTCPositionDecoder(SerializedAttributesAllowBlockSpecifyingClas
         return isinstance(decoder, cls)
 
 
+    @classmethod
+    def from_session(cls, sess, ndim: int = 2, pf=None, clusterless_spike_events=None, clusterless_params: Optional[ClusterlessDecodingParameters] = None, computation_config=None, included_epochs=None, setup_on_init: bool = True, should_compute_all: bool = False, debug_print: bool = False) -> "ClusterlessRTCPositionDecoder":
+        """Build a standalone ClusterlessRTCPositionDecoder directly from a NeuroPy DataSession (works with 0 sorted units)."""
+        from neuropy.analyses.placefields import PfND, PlacefieldComputationParameters
+        from neuropy.core.clusterless_spike_events import default_clusterless_spike_events_path, load_clusterless_spike_events
+
+        if clusterless_spike_events is None:
+            clusterless_spike_events = getattr(sess, 'clusterless_spike_events', None)
+        if clusterless_spike_events is None:
+            session_basedir = Path(getattr(sess, 'basepath', None) or Path(sess.filePrefix).parent)
+            session_name = getattr(getattr(sess, 'config', None), 'session_name', None) or getattr(sess, 'name', None) or Path(sess.filePrefix).stem
+            clusterless_events_path = default_clusterless_spike_events_path(session_basedir, session_name)
+            if clusterless_events_path.is_file():
+                clusterless_spike_events = load_clusterless_spike_events(clusterless_events_path)
+                sess.clusterless_spike_events = clusterless_spike_events
+        if clusterless_spike_events is None:
+            raise ValueError("ClusterlessRTCPositionDecoder.from_session() requires clusterless_spike_events on sess or on disk.")
+        active_events = load_clusterless_spike_events(clusterless_spike_events) if isinstance(clusterless_spike_events, (str, Path)) else clusterless_spike_events
+        if pf is None:
+            if computation_config is None:
+                computation_config = PlacefieldComputationParameters()
+            empty_spikes_df = pd.DataFrame({'aclu': pd.Series(dtype=np.int64), 't_seconds': pd.Series(dtype=np.float64), 't': pd.Series(dtype=np.float64), 't_rel_seconds': pd.Series(dtype=np.float64), 'neuron_type': pd.Series(dtype=object)})
+            active_pos = deepcopy(sess.position)
+            if ndim == 1:
+                if not active_pos.has_linear_pos:
+                    active_pos.compute_linearized_position(method=getattr(computation_config, 'linearization_method', 'isomap') or 'isomap')
+                target_pos = deepcopy(active_pos.linear_pos_obj)
+            else:
+                active_pos.drop_dimensions_above(desired_ndim=2)
+                target_pos = active_pos
+            pf = PfND.from_config_values(empty_spikes_df, position=target_pos, epochs=included_epochs, speed_thresh=computation_config.speed_thresh, frate_thresh=computation_config.frate_thresh, grid_bin=computation_config.grid_bin, grid_bin_bounds=computation_config.grid_bin_bounds, smooth=computation_config.smooth)
+        pos_sampling_rate_Hz = float((getattr(sess.position, 'metadata', None) or {}).get('sampling_rate', getattr(sess, 'position_sampling_rate', 120.0)))
+        params = deepcopy(clusterless_params) if clusterless_params is not None else ClusterlessDecodingParameters(position_sampling_frequency_Hz=pos_sampling_rate_Hz)
+        pos_df = pf.filtered_pos_df
+        source_times = pos_df['t'].to_numpy(dtype=float) if 't' in pos_df.columns else pos_df['t_seconds'].to_numpy(dtype=float)
+        pf_multiunits, pf_rtc_time = build_multiunits_from_spike_events(active_events, t_start=float(source_times.min()), t_end=float(source_times.max()), sampling_frequency_hz=params.clusterless_sampling_frequency_hz)
+        decoder = cls(pf=pf, sampling_frequency_hz=params.clusterless_sampling_frequency_hz, multiunits=pf_multiunits, rtc_time=pf_rtc_time, clusterless_params=params, setup_on_init=setup_on_init, post_load_on_init=False, debug_print=debug_print)
+        if should_compute_all:
+            decoder.compute_all(debug_print=debug_print)
+        return decoder
+
+
     def replacing_computation_epochs(self, epochs, preserve_source_neuron_IDs: bool = False):
         """Return a train-epoch copy without dropping clusterless multiunit state."""
         from neuropy.core.epoch import Epoch, ensure_dataframe
@@ -167,8 +225,10 @@ class ClusterlessRTCPositionDecoder(SerializedAttributesAllowBlockSpecifyingClas
         new_epochs_obj = Epoch(ensure_dataframe(deepcopy(epochs)).epochs.get_valid_df()).get_non_overlapping()
         updated_decoder = deepcopy(self)
         updated_decoder.pf = self.pf.replacing_computation_epochs(deepcopy(new_epochs_obj), preserve_source_neuron_IDs=preserve_source_neuron_IDs)
-        for attr_name in ('classifier', 'rtc_results', 'p_x_given_n', 'flat_p_x_given_n', 'most_likely_positions', 'revised_most_likely_positions', 'most_likely_position_flat_indicies', 'most_likely_position_indicies', 'time_binning_container', 'is_training_mask', 'rtc_position_bin_centers', 'estimated_log_likelihood_memory_bytes', 'marginal'):
+        for attr_name in ('classifier', 'rtc_results', 'p_x_given_n', 'flat_p_x_given_n', 'most_likely_positions', 'revised_most_likely_positions', 'most_likely_position_flat_indicies', 'most_likely_position_indicies', 'time_binning_container', 'is_training_mask', 'multiunit_electrode_keep_mask', 'rtc_position_bin_centers', 'estimated_log_likelihood_memory_bytes', 'marginal'):
             setattr(updated_decoder, attr_name, None)
+        ## END for attr_name in ('classifier', 'rtc_results', 'p_x_given_n', 'flat_p_x_given_n', 'most_likely_positions', 'revised_most_likely_positions', 'most_likely_position_flat_indicies', 'most_likely_position_indicies', 'time_binning_container', 'is_training_mask', 'multiunit_electrode_keep_mask', 'rtc_position_bin_centers', 'estimated_log_likelihood_memory_bytes', 'marginal')...
+
         return updated_decoder
 
 
@@ -178,17 +238,17 @@ class ClusterlessRTCPositionDecoder(SerializedAttributesAllowBlockSpecifyingClas
 
 
     def _reshape_output(self, flat_p_x_given_n: np.ndarray) -> np.ndarray:
-        return np.reshape(flat_p_x_given_n, (*self.original_position_data_shape, flat_p_x_given_n.shape[-1]), order='F')
+        return np.reshape(flat_p_x_given_n, (*self.original_position_data_shape, flat_p_x_given_n.shape[-1]), order='C')
 
 
     def _flatten_output(self, p_x_given_n: np.ndarray) -> np.ndarray:
-        return np.reshape(p_x_given_n, (self.flat_position_size, p_x_given_n.shape[-1]), order='F')
+        return np.reshape(p_x_given_n, (self.flat_position_size, p_x_given_n.shape[-1]), order='C')
 
 
     def _format_decoder_posterior_outputs(self, flat_p_x_given_n: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         p_x_given_n = self._reshape_output(flat_p_x_given_n)
         most_likely_position_flat_indicies, most_likely_position_indicies = self.perform_compute_most_likely_positions(flat_p_x_given_n, self.original_position_data_shape)
-        most_likely_positions = self.perform_lookup_most_likely_positions(most_likely_position_indicies, xbin_centers=self.pf.xbin_centers, ybin_centers=self.pf.ybin_centers, ndim=int(self.ndim))
+        most_likely_positions = self.perform_lookup_most_likely_positions(most_likely_position_indicies, xbin_centers=self.pf.xbin_centers, ybin_centers=(self.pf.ybin_centers if int(self.ndim) > 1 else None), ndim=int(self.ndim))
         return p_x_given_n, flat_p_x_given_n, most_likely_positions, most_likely_position_flat_indicies, most_likely_position_indicies
 
 
@@ -221,14 +281,13 @@ class ClusterlessRTCPositionDecoder(SerializedAttributesAllowBlockSpecifyingClas
             return most_likely_positions, p_x_given_n_out, most_likely_position_indicies, flat_outputs_container
 
 
-    def decode_specific_epochs(self, spikes_df: pd.DataFrame, filter_epochs, decoding_time_bin_size: float = 0.05, use_single_time_bin_per_epoch: bool = False, slideby: Optional[float] = None, debug_print=False) -> "DecodedFilterEpochsResult":
+    def decode_specific_epochs(self, spikes_df: Optional[pd.DataFrame] = None, filter_epochs=None, decoding_time_bin_size: float = 0.05, use_single_time_bin_per_epoch: bool = False, slideby: Optional[float] = None, debug_print=False) -> "DecodedFilterEpochsResult":
         """Decode clusterless multiunits for each provided epoch.
 
-        ``spikes_df`` is intentionally ignored: clusterless RTC decoding uses ``self.multiunits`` and ``self.rtc_time``.
+        ``spikes_df`` is accepted for drop-in compatibility with ``BasePositionDecoder`` and intentionally ignored:
+        clusterless RTC decoding uses ``self.multiunits`` and ``self.rtc_time``.
         """
         from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult
-
-        assert (spikes_df is None), f"spikes_df MUST be None, it will not be used for Clusterless-decoding."
 
         if self.multiunits is None or self.rtc_time is None:
             raise ValueError("ClusterlessRTCPositionDecoder.decode_specific_epochs() requires self.multiunits and self.rtc_time.")
@@ -290,7 +349,7 @@ class ClusterlessRTCPositionDecoder(SerializedAttributesAllowBlockSpecifyingClas
         if debug_print:
             print(f"ClusterlessRTCPositionDecoder.decode_specific_epochs(): decoded {num_filter_epochs} epochs, nbins={nbins}")
 
-        result_kwargs = dict(decoding_time_bin_size=decoding_time_bin_size, slideby=slideby, filter_epochs=filter_epochs_df, num_filter_epochs=num_filter_epochs,
+        result_kwargs = dict(decoding_time_bin_size=decoding_time_bin_size, decoding_slideby=slideby, filter_epochs=filter_epochs_df, num_filter_epochs=num_filter_epochs,
                              most_likely_positions_list=most_likely_positions_list, p_x_given_n_list=p_x_given_n_list,
                              marginal_x_list=marginal_x_list, marginal_y_list=marginal_y_list, marginal_z_list=marginal_z_list,
                              most_likely_position_indicies_list=most_likely_position_indicies_list, spkcount=decoded_multiunits_list, nbins=nbins,
@@ -342,7 +401,7 @@ class ClusterlessRTCPositionDecoder(SerializedAttributesAllowBlockSpecifyingClas
         return use_gpu
 
 
-    def _ensure_fitted_classifier(self, multiunits_for_fit=None, rtc_time_for_fit=None, debug_print: bool = False) -> Tuple[ClusterlessClassifier, np.ndarray]:
+    def _ensure_fitted_classifier(self, multiunits_for_fit=None, rtc_time_for_fit=None, debug_print: bool = False) -> Tuple[Union[ClusterlessDecoder, ClusterlessClassifier], np.ndarray]:
         if self.classifier is not None and self.rtc_position_bin_centers is not None:
             return self.classifier, self.rtc_position_bin_centers
         training_multiunits = self.multiunits if self.multiunits is not None else multiunits_for_fit
@@ -352,15 +411,24 @@ class ClusterlessRTCPositionDecoder(SerializedAttributesAllowBlockSpecifyingClas
         params = self.clusterless_params if self.clusterless_params is not None else ClusterlessDecodingParameters(clusterless_sampling_frequency_hz=self.sampling_frequency_hz)
         place_bin_size_override = params.rtc_place_bin_size_override if self.ndim == 1 else (params.rtc_2d_place_bin_size_override if params.rtc_2d_place_bin_size_override is not None else params.rtc_place_bin_size_override)
         environment = build_rtc_environment_from_pfnd(self.pf, environment_name=params.rtc_environment_name, place_bin_size_override=place_bin_size_override)
-        self.classifier = ClusterlessClassifier(environments=[environment], clusterless_algorithm="multiunit_likelihood", clusterless_algorithm_params={"mark_std": params.rtc_mark_std, "position_std": params.rtc_position_std})
         position_train, multiunits_train, is_training = build_clusterless_training_data_from_pfnd(self.pf, training_multiunits, training_rtc_time, self.sampling_frequency_hz)
         self.is_training_mask = is_training
         self.multiunit_electrode_keep_mask = _get_multiunit_electrode_keep_mask(multiunits_train, time_mask=is_training)
         multiunits_train = multiunits_train[:, :, self.multiunit_electrode_keep_mask]
-        if self.multiunits is not None:
-            self.multiunits = np.asarray(self.multiunits, dtype=float)[:len(multiunits_train), :, self.multiunit_electrode_keep_mask]
+        if params.rtc_model_type == "classifier":
+            self.classifier = ClusterlessClassifier(environments=[environment], clusterless_algorithm="multiunit_likelihood", clusterless_algorithm_params={"mark_std": params.rtc_mark_std, "position_std": params.rtc_position_std})
+        else:
+            movement_var = params.rtc_movement_var
+            if movement_var is None:
+                try:
+                    pos_for_var = position_train[is_training] if np.any(is_training) else position_train
+                    est_var = float(estimate_movement_var(pos_for_var, sampling_frequency=self.sampling_frequency_hz))
+                    movement_var = est_var if (np.isfinite(est_var) and est_var > 0.0) else 6.0
+                except Exception:
+                    movement_var = 6.0
+            self.classifier = ClusterlessDecoder(environment=environment, transition_type=RandomWalk(movement_var=float(movement_var)), clusterless_algorithm="multiunit_likelihood", clusterless_algorithm_params={"mark_std": params.rtc_mark_std, "position_std": params.rtc_position_std})
         self.classifier.fit(position_train, multiunits_train, is_training=is_training)
-        fitted_environment = self.classifier.environments[0]
+        fitted_environment = self.classifier.environments[0] if hasattr(self.classifier, 'environments') else self.classifier.environment
         n_position_bins = int(np.prod(self.original_position_data_shape))
         self.rtc_position_bin_centers = np.asarray(fitted_environment.place_bin_centers_)
         self.estimated_log_likelihood_memory_bytes = self.estimate_log_likelihood_memory_bytes(n_time=len(multiunits_train), n_position_bins=n_position_bins, dtype=np.float32)
@@ -372,7 +440,7 @@ class ClusterlessRTCPositionDecoder(SerializedAttributesAllowBlockSpecifyingClas
         classifier, _rtc_position_bin_centers = self._ensure_fitted_classifier(multiunits_for_fit=multiunits_for_fit, rtc_time_for_fit=rtc_time_for_fit, debug_print=debug_print)
         params = self.clusterless_params if self.clusterless_params is not None else ClusterlessDecodingParameters(clusterless_sampling_frequency_hz=self.sampling_frequency_hz)
         multiunits = np.asarray(multiunits, dtype=float)
-        if self.multiunit_electrode_keep_mask is not None:
+        if self.multiunit_electrode_keep_mask is not None and multiunits.shape[2] == len(self.multiunit_electrode_keep_mask):
             multiunits = multiunits[:, :, self.multiunit_electrode_keep_mask]
         rtc_time = np.asarray(rtc_time, dtype=float)
         n_position_bins = int(np.prod(self.original_position_data_shape))
@@ -393,8 +461,14 @@ class ClusterlessRTCPositionDecoder(SerializedAttributesAllowBlockSpecifyingClas
         if self.multiunits is None or self.rtc_time is None:
             raise ValueError("ClusterlessRTCPositionDecoder requires multiunits and rtc_time before compute_all().")
         self.p_x_given_n, self.flat_p_x_given_n, self.most_likely_positions, self.most_likely_position_flat_indicies, self.most_likely_position_indicies = self._predict_clusterless_posterior(self.multiunits, self.rtc_time, multiunits_for_fit=self.multiunits, rtc_time_for_fit=self.rtc_time, is_compute_acausal=is_compute_acausal, use_gpu=use_gpu, debug_print=(debug_print or self.debug_print))
-        self.revised_most_likely_positions = self.most_likely_positions.copy()
+        self.revised_most_likely_positions = self.perform_compute_forward_filled_positions(self.most_likely_positions, self.is_non_firing_time_bin)
         curr_unit_marginal_x, curr_unit_marginal_y, curr_unit_marginal_z = self.perform_build_marginals(self.p_x_given_n, self.most_likely_positions, debug_print=(debug_print or self.debug_print))
+        if self.ndim == 1:
+            curr_unit_marginal_x.revised_most_likely_positions_1D = np.atleast_1d(self.revised_most_likely_positions).T
+        elif self.ndim >= 2:
+            curr_unit_marginal_x.revised_most_likely_positions_1D = self.revised_most_likely_positions[:, 0].T
+            if curr_unit_marginal_y is not None:
+                curr_unit_marginal_y.revised_most_likely_positions_1D = self.revised_most_likely_positions[:, 1].T
         self.marginal = DynamicContainer(x=curr_unit_marginal_x, y=curr_unit_marginal_y, z=curr_unit_marginal_z)
         time_window_edges, time_window_edges_binning_info = compute_spanning_bins(self.rtc_time, bin_size=self.time_bin_size)
         self.time_binning_container = BinningContainer(edges=time_window_edges, edge_info=time_window_edges_binning_info)

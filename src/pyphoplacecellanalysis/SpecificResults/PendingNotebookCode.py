@@ -4062,9 +4062,9 @@ def _resolve_maze_epoch_names_for_multi_context_eval(curr_active_pipeline, maze_
             continue
         computed_data = curr_active_pipeline.computation_results[a_name].computed_data
         ## DynamicParameters raises KeyError (not AttributeError) for missing keys — use .get(), not hasattr/attr access
-        if computed_data.get('pf2D_Decoder', None) is None:
+        if (computed_data.get('pf2D_Decoder', None) is None) and (computed_data.get('pf2D_SpyglassClusterlessDecoder', None) is None) and (computed_data.get('pf2D_ClusterlessDecoder', None) is None):
             if debug_print:
-                print(f'  skipping {a_name!r}: missing pf2D_Decoder')
+                print(f'  skipping {a_name!r}: missing pf2D_Decoder / clusterless decoder')
             continue
         resolved_names.append(a_name)
 
@@ -4366,8 +4366,8 @@ def evaluate_context_decoder_performance(curr_active_pipeline, maze_epoch_names:
 
     # ── 1. Build merged pseudo-context decoder ────────────────────────────────
     pf2D_Decoder_dict, contextual_pf2D, contextual_pf2D_Decoder = build_contextual_pf2D_decoder(curr_active_pipeline, epochs_to_create_global_from_names=maze_epoch_names, use_clusterless_decoders=use_clusterless_decoders)
-    from pyphoplacecellanalysis.Analysis.Decoder.rtc_clusterless_decoder import ClusterlessRTCPositionDecoder
-    is_clusterless_context_decode: bool = any(ClusterlessRTCPositionDecoder.is_clusterless_decoder(dec) for dec in pf2D_Decoder_dict.values())
+    from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import is_clusterless_position_decoder
+    is_clusterless_context_decode: bool = any(is_clusterless_position_decoder(dec) for dec in pf2D_Decoder_dict.values())
 
     if included_neuron_IDs is not None:
         if is_clusterless_context_decode:
@@ -11387,7 +11387,8 @@ def build_contextual_pf2D_decoder(curr_active_pipeline, epochs_to_create_global_
             print(f'k: {k}: did_update_bins: {did_update_bins}')
 
     contextual_pf2D: PfND = PfND.build_merged_directional_placefields(contextual_pf2D_dict, debug_print=False)
-    contextual_pf2D_Decoder: BasePositionDecoder = BasePositionDecoder(contextual_pf2D, setup_on_init=True, post_load_on_init=True, debug_print=False)
+    has_units = (contextual_pf2D.ratemap.n_neurons > 0)
+    contextual_pf2D_Decoder: BasePositionDecoder = BasePositionDecoder(contextual_pf2D, setup_on_init=has_units, post_load_on_init=has_units, debug_print=False)
     # return (contextual_pf2D_dict, contextual_pf2D, contextual_pf2D_Decoder)
     ## OUTPUTS: contextual_pf2D_dict, contextual_pf2D, contextual_pf2D_Decoder
 
@@ -19204,6 +19205,8 @@ def _resolve_bapun_position_decoder(computed_data, decoder_dim: str, use_cluster
         active_key, active_decoder = standard_key, standard_decoder
     elif standard_decoder is not None:
         active_key, active_decoder = standard_key, standard_decoder
+    elif spyglass_clusterless_decoder is not None:
+        active_key, active_decoder = spyglass_clusterless_key, spyglass_clusterless_decoder
     else:
         active_key, active_decoder = clusterless_key, clusterless_decoder
     if active_decoder is None:

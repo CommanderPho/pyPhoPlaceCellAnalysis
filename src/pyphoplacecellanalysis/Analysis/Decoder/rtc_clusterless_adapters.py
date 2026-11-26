@@ -27,6 +27,8 @@ class ClusterlessDecodingParameters:
     rtc_mark_std: float = 24.0
     rtc_position_std: float = 6.0
     rtc_environment_name: str = ""
+    rtc_model_type: str = "continuous"  # "continuous" (ClusterlessDecoder) or "classifier" (ClusterlessClassifier)
+    rtc_movement_var: Optional[float] = None
     state_index_for_posterior: Optional[int] = None
     max_log_likelihood_memory_gib: Optional[float] = 36.0 ## 36 GB
     should_match_pf_grid: bool = True
@@ -367,7 +369,7 @@ def _rtc_posterior_spatial_time_values(rtc_results: xr.Dataset, state_index: Opt
 
 def rtc_posterior_flat_p_x_given_n(rtc_results: xr.Dataset, pf: PfND, state_index: Optional[int] = None) -> np.ndarray:
     posterior_values = _rtc_posterior_spatial_time_values(rtc_results, state_index=state_index)
-    return posterior_values.reshape((int(np.prod(posterior_values.shape[:-1])), posterior_values.shape[-1]), order="F")
+    return posterior_values.reshape((int(np.prod(posterior_values.shape[:-1])), posterior_values.shape[-1]), order="C")
 
 
 def rtc_posterior_to_p_x_given_n(rtc_results: xr.Dataset, pf: PfND, state_index: Optional[int] = None, should_match_pf_grid: bool = True) -> np.ndarray:
@@ -376,9 +378,9 @@ def rtc_posterior_to_p_x_given_n(rtc_results: xr.Dataset, pf: PfND, state_index:
     n_time = posterior_values.shape[-1]
     flat_size = int(np.prod(posterior_values.shape[:-1]))
     pf_flat_size = int(np.prod(position_shape))
-    if flat_size == pf_flat_size:
-        return posterior_values.reshape((*position_shape, n_time), order="F")
-    flat_p_x_given_n = posterior_values.reshape((flat_size, n_time), order="F")
+    if flat_size == pf_flat_size and tuple(posterior_values.shape[:-1]) == position_shape:
+        return posterior_values
+    flat_p_x_given_n = posterior_values.reshape((flat_size, n_time), order="C")
     if not should_match_pf_grid:
         warnings.warn(f"RTC posterior flat size {flat_size} != PfND occupancy size {pf_flat_size}; returning RTC spatial shape {posterior_values.shape}.", stacklevel=2)
         return posterior_values
@@ -390,7 +392,7 @@ def rtc_posterior_to_p_x_given_n(rtc_results: xr.Dataset, pf: PfND, state_index:
         padded = np.zeros((pf_flat_size, n_time), dtype=posterior_values.dtype)
         padded[:flat_size, :] = flat_p_x_given_n
         flat_p_x_given_n = padded
-    return flat_p_x_given_n.reshape((*position_shape, n_time), order="F")
+    return flat_p_x_given_n.reshape((*position_shape, n_time), order="C")
 
 
 def most_likely_positions_from_posterior(p_x_given_n: np.ndarray, pf: PfND, place_bin_centers: Optional[np.ndarray] = None) -> np.ndarray:
