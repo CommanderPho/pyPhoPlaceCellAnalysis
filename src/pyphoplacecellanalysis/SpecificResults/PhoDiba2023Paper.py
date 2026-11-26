@@ -710,6 +710,7 @@ class HierarchicalSessionInventory:
                 all_sessions_laps_df=all_sessions_laps_df,
                 all_sessions_laps_time_bin_df=all_sessions_laps_time_bin_df,
             ),
+            neuron_stats_df=all_neuron_stats_table,  # optional: adds long_LR/RL + short_LR/RL place-cell counts (session rowspan)
         )
         table  # Jupyter: rowspan-merged HTML table
     """
@@ -721,6 +722,10 @@ class HierarchicalSessionInventory:
     }
     _EPOCH_KIND_ORDER: Tuple[str, ...] = ('Laps', 'PBEs')
     _PRE_POST_ORDER: Tuple[str, ...] = ('pre-delta', 'post-delta')
+    # Per-session 1D decoder place-cell counts (same for pre/post-delta; HTML rowspan merges them)
+    _DECODER_N_CELLS_ORDER: Tuple[str, ...] = ('long_LR', 'long_RL', 'short_LR', 'short_RL')
+    _DECODER_N_CELLS_PEAK_COL_SUFFIX: str = 'pf1D_peak'
+    _DECODER_N_CELLS_COL_LABELS: Tuple[str, ...] = tuple(f'{d} cells' for d in ('long_LR', 'long_RL', 'short_LR', 'short_RL'))
     _EDGE_COLOR: str = '#c5c5c5'
     _NODE_COLORS: Tuple[str, ...] = ('#1f77b4', '#ff7f0e', '#2ca02c', '#d62728')
     _DEPTH_X_STEP: float = 1.45
@@ -1589,6 +1594,75 @@ class HierarchicalSessionInventory:
 
 
     @classmethod
+    def build_per_session_decoder_n_place_cells_df(cls, neuron_stats_df: pd.DataFrame, *, animal_col: str = 'animal', session_col: str = 'session_name', session_uid_col: str = 'session_uid', peak_col_suffix: Optional[str] = None) -> pd.DataFrame:
+        """Count place cells included in each of the 4 1D decoders per animal/session (non-null ``*_pf1D_peak``).
+
+        Returns one row per animal × session with columns ``long_LR cells``, ``long_RL cells``, ``short_LR cells``, ``short_RL cells``.
+        These counts are session-constant (decoders are built once and used for both pre- and post-delta).
+        """
+        from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionIdentityDataframeAccessor  # for split_session_key_col...
+
+        peak_col_suffix = peak_col_suffix if peak_col_suffix is not None else cls._DECODER_N_CELLS_PEAK_COL_SUFFIX
+        peak_cols = [f'{d}_{peak_col_suffix}' for d in cls._DECODER_N_CELLS_ORDER]
+        missing_peaks = [c for c in peak_cols if c not in neuron_stats_df.columns]
+        if len(missing_peaks) > 0:
+            raise KeyError(f'neuron_stats_df missing 1D peak columns {missing_peaks}. Available: {list(neuron_stats_df.columns)}')
+
+        work = neuron_stats_df.copy()
+        if (animal_col not in work.columns) or (session_col not in work.columns):
+            if session_uid_col in work.columns:
+                work = work.across_session_identity.split_session_key_col_to_fmt_animal_exper_cols(session_key_col=session_uid_col, separator='|')
+            elif 'session_key' in work.columns:
+                work = work.across_session_identity.split_session_key_col_to_fmt_animal_exper_cols(session_key_col='session_key')
+            elif session_col in work.columns:
+                # Full session keys in session_name (kdiba_gor01_one_...); split if animal missing
+                if animal_col not in work.columns:
+                    work = work.across_session_identity.split_session_key_col_to_fmt_animal_exper_cols(session_key_col=session_col)
+            else:
+                raise KeyError(f'Need ({animal_col!r}, {session_col!r}) or {session_uid_col!r} on neuron_stats_df; got {list(work.columns)}')
+
+        # If session_name still looks like a full key, take the trailing datetime token
+        if session_col in work.columns:
+            sess = work[session_col].astype(str)
+            split_sess = sess.map(lambda x: x.split('_', maxsplit=3)[-1] if x.count('_') >= 3 and not x[:4].isdigit() else x)
+            # Prefer explicit short session_name when already a date-like token; else use split from full key
+            work['_session_match'] = split_sess
+        else:
+            raise KeyError(f'{session_col!r} missing after identity split')
+
+        grouped = work.groupby([animal_col, '_session_match'], dropna=False)[peak_cols].count().reset_index()  # count excludes NaN → # place cells per decoder
+        grouped = grouped.rename(columns={animal_col: 'animal', '_session_match': 'session', **{peak: f'{d} cells' for d, peak in zip(cls._DECODER_N_CELLS_ORDER, peak_cols)}})
+        for c in cls._DECODER_N_CELLS_COL_LABELS:
+            grouped[c] = grouped[c].astype(int)
+        ## END for c in cls._DECODER_N_CELLS_COL_LABELS...
+        return grouped[['animal', 'session', *cls._DECODER_N_CELLS_COL_LABELS]].sort_values(['animal', 'session'], kind='mergesort').reset_index(drop=True)
+
+
+    @classmethod
+    def _merge_decoder_n_place_cells_into_table_df(cls, table_df: pd.DataFrame, decoder_n_cells_df: pd.DataFrame) -> pd.DataFrame:
+        """Left-merge session-constant decoder place-cell counts onto the inventory table (duplicated on pre/post rows)."""
+        out = table_df.copy()
+        merge_cols = ['animal', 'session']
+        missing = [c for c in merge_cols if c not in decoder_n_cells_df.columns]
+        if len(missing) > 0:
+            raise KeyError(f'decoder_n_cells_df missing {missing}')
+        value_cols = [c for c in cls._DECODER_N_CELLS_COL_LABELS if c in decoder_n_cells_df.columns]
+        if len(value_cols) == 0:
+            raise KeyError(f'decoder_n_cells_df has none of {list(cls._DECODER_N_CELLS_COL_LABELS)}')
+        # Drop any prior decoder cols before merge
+        out = out.drop(columns=[c for c in cls._DECODER_N_CELLS_COL_LABELS if c in out.columns], errors='ignore')
+        out = out.merge(decoder_n_cells_df[merge_cols + value_cols], on=merge_cols, how='left')
+        for c in value_cols:
+            out[c] = out[c].fillna(0).astype(int)
+        ## END for c in value_cols...
+        # Keep decoder cols after Laps/PBEs count columns
+        id_cols = ['animal', 'session', 'pre_post']
+        event_cols = [c for c in out.columns if c not in id_cols and c not in cls._DECODER_N_CELLS_COL_LABELS]
+        ordered = id_cols + event_cols + [c for c in cls._DECODER_N_CELLS_COL_LABELS if c in out.columns]
+        return out.reindex(columns=ordered)
+
+
+    @classmethod
     def _format_hierarchy_inventory_table_df(cls, counts_df: pd.DataFrame, *, animal_col: str, session_col: str, condition_col: str, epoch_kind_col: str) -> pd.DataFrame:
         """Pivot leaf counts into one row per animal/session/condition with Laps|PBEs side-by-side columns."""
         work = counts_df.copy()
@@ -1658,10 +1732,14 @@ class HierarchicalSessionInventory:
 
     @classmethod
     def _style_hierarchy_inventory_table(cls, table_df: pd.DataFrame, *, title: Optional[str] = None) -> Any:
-        """HTML table with rowspan-merged animal/session labels (vertically centered) and every-other-row zebra striping."""
+        """HTML table with rowspan-merged animal/session labels (vertically centered) and every-other-row zebra striping.
+
+        Session-constant numeric columns (``long_LR cells``, …) also use ``rowspan`` across pre/post rows.
+        """
         from html import escape
 
-        count_cols = [c for c in table_df.columns if c not in ('animal', 'session', 'pre_post')]
+        session_level_num_cols = [c for c in cls._DECODER_N_CELLS_COL_LABELS if c in table_df.columns]
+        per_row_count_cols = [c for c in table_df.columns if c not in ('animal', 'session', 'pre_post', *session_level_num_cols)]
         animals = table_df['animal'].astype(str).tolist()
         sessions = list(zip(animals, table_df['session'].astype(str).tolist()))  # span session within animal
         animal_spans = cls._rowspan_runs(animals)
@@ -1703,9 +1781,16 @@ class HierarchicalSessionInventory:
                 session_bg = merge_shade if session_rs > 1 else bg
                 parts.append(f'<td{rs_attr} style="{td_label}background-color:{session_bg};">{escape(str(row["session"]))}</td>')
             parts.append(f'<td style="{td_label}background-color:{bg};">{escape(str(row["pre_post"]))}</td>')
-            for c in count_cols:
+            for c in per_row_count_cols:
                 parts.append(f'<td style="{td_num}background-color:{bg};">{int(row[c]):,}</td>')
-            ## END for c in count_cols...
+            ## END for c in per_row_count_cols...
+            # Decoder n-cells: emit once per session (rowspan across pre/post), same span as session label
+            if emit_session:
+                rs_attr = f' rowspan="{session_rs}"' if session_rs > 1 else ''
+                sess_num_bg = merge_shade if session_rs > 1 else bg
+                for c in session_level_num_cols:
+                    parts.append(f'<td{rs_attr} style="{td_num}background-color:{sess_num_bg};">{int(row[c]):,}</td>')
+                ## END for c in session_level_num_cols...
             parts.append('</tr>')
         ## END for pos in range(len(table_df))...
         parts.append('</tbody></table>')
@@ -1728,11 +1813,15 @@ class HierarchicalSessionInventory:
 
     @function_attributes(short_name=None, tags=['ACTIVE', 'table', 'good'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-11-05 17:04', related_items=[])
     @classmethod
-    def build_original_df_dict_hierarchy_inventory_table(cls, original_df_dict: Dict[str, pd.DataFrame], *, animal_col: str = 'animal', session_col: str = 'session_name', condition_col: str = 'pre_post_delta_category', epoch_kind_col: str = 'epoch_kind', title: Optional[str] = 'Original data hierarchy — time bins & events') -> Tuple[pd.DataFrame, Any]:
+    def build_original_df_dict_hierarchy_inventory_table(cls, original_df_dict: Dict[str, pd.DataFrame], *, animal_col: str = 'animal', session_col: str = 'session_name', condition_col: str = 'pre_post_delta_category', epoch_kind_col: str = 'epoch_kind', title: Optional[str] = 'Original data hierarchy — time bins & events', neuron_stats_df: Optional[pd.DataFrame] = None, decoder_n_cells_df: Optional[pd.DataFrame] = None) -> Tuple[pd.DataFrame, Any]:
         """Same inventory leaf counts as the Graphviz/Plotly builders, shown as a compact styled table.
 
         One row per animal / session / pre-post, with Laps and PBEs side-by-side (time bins + events).
         Repeated ``animal`` / ``session`` labels are merged with ``rowspan`` and vertically centered.
+
+        Optional ``neuron_stats_df`` (e.g. ``all_neuron_stats_table``) or precomputed ``decoder_n_cells_df``
+        adds four session-constant columns: ``long_LR cells``, ``long_RL cells``, ``short_LR cells``, ``short_RL cells``
+        (HTML rowspan across pre/post).
 
         Returns ``(counts_df, table)``. In Jupyter, display ``table``. Use ``table.data`` for the plain DataFrame.
         """
@@ -1746,6 +1835,10 @@ class HierarchicalSessionInventory:
         table_df = cls._format_hierarchy_inventory_table_df(
             counts_df, animal_col=animal_col, session_col=session_col, condition_col=condition_col, epoch_kind_col=epoch_kind_col,
         )
+        if decoder_n_cells_df is None and neuron_stats_df is not None:
+            decoder_n_cells_df = cls.build_per_session_decoder_n_place_cells_df(neuron_stats_df, animal_col=animal_col, session_col=session_col)
+        if decoder_n_cells_df is not None:
+            table_df = cls._merge_decoder_n_place_cells_into_table_df(table_df, decoder_n_cells_df)
         table = cls._style_hierarchy_inventory_table(table_df, title=title)
         return counts_df, table
 
