@@ -423,7 +423,8 @@ def build_slurm_job_name(curr_session_context: Union[IdentifyingContext, str], j
 # the failed phase without re-running completed earlier phases (pickles kept). Windows uses sequential python.exe       #
 # chains (submit_phase_chains_*.ps1 / retry_from_*.ps1) instead of bash/sbatch.                                          #
 # Public: build_session_phase_script_map, write_chained_submit_script,                                                   #
-#         write_all_retry_from_phase_scripts, print_chain_status_hint, submit_slurm_script (optional auto-submit).       #
+#         write_all_retry_from_phase_scripts, print_chain_status_hint, find_matching_chained_submit_scripts,             #
+#         run_matching_chained_submit_mode, submit_slurm_script (optional auto-submit).                                  #
 # ==================================================================================================================== #
 
 
@@ -971,6 +972,95 @@ def print_chain_status_hint(job_ids: Optional[List[int]] = None, execution_backe
     print('Cancel remaining jobs from this batch (safe if already gone):')
     print("  bash submit_phase_chains_<stamp>.sh --cancel")
     print('On failure: identify the failed phase, then bash retry_from_<phase>_<session>.sh (earlier pickles kept).')
+
+
+def find_matching_chained_submit_scripts(scripts_output_path: Union[str, Path], host_suffix: str, job_suffix: str,
+                                         batch_date_to_use: Optional[str] = None, extensions: Optional[List[str]] = None) -> List[Path]:
+    """Find `submit_phase_chains_*` scripts whose name ends with `{host_suffix}{job_suffix}{ext}` (newest mtime first).
+
+    Example match: `submit_phase_chains_2026-10-28_02-30PM_GL_withNormalComputedReplays-qclu_1246789-frateThresh_2.0_tbin_75ms.sh`
+    with `host_suffix='_GL'` and `job_suffix='_withNormalComputedReplays-qclu_1246789-frateThresh_2.0_tbin_75ms'`.
+
+    When `batch_date_to_use` is set, prefer scripts whose sibling `.json` manifest has that `batch_date_to_use`;
+    if none match the manifest filter, fall back to all name matches.
+    """
+    scripts_output_path = Path(scripts_output_path)
+    if extensions is None:
+        extensions = ['.sh', '.ps1']
+    name_tail: str = f'{host_suffix}{job_suffix}'
+    matches: List[Path] = []
+    for ext in extensions:
+        for path in scripts_output_path.glob(f'submit_phase_chains_*{ext}'):
+            if path.name.endswith(f'{name_tail}{ext}'):
+                matches.append(path)
+        ## END for path in scripts_output_path.glob(f'submit_phase_chains_*{ext}')...
+    ## END for ext in extensions...
+    matches = sorted(matches, key=lambda p: p.stat().st_mtime if p.exists() else 0.0, reverse=True)
+    if (batch_date_to_use is None) or (len(matches) == 0):
+        return matches
+    date_filtered: List[Path] = []
+    for path in matches:
+        manifest_path = path.with_suffix('.json')
+        if not manifest_path.exists():
+            continue
+        try:
+            with open(manifest_path, 'r', encoding='utf-8') as f:
+                manifest = json.load(f)
+        except (OSError, json.JSONDecodeError):
+            continue
+        if str(manifest.get('batch_date_to_use') or '') == str(batch_date_to_use):
+            date_filtered.append(path)
+    ## END for path in matches...
+    return date_filtered if len(date_filtered) > 0 else matches
+
+
+def run_matching_chained_submit_mode(scripts_output_path: Union[str, Path], host_suffix: str, job_suffix: str,
+                                     mode: Literal['status', 'cancel'], batch_date_to_use: Optional[str] = None,
+                                     execution_backend: Literal['slurm', 'bash', 'powershell'] = 'slurm') -> Optional[Path]:
+    """Locate the newest matching chained submit script and run it with `--status` or `--cancel` (Slurm only).
+
+    Returns the submit script path that was invoked, or None if none matched / mode unsupported for this backend.
+    """
+    if mode not in ('status', 'cancel'):
+        raise ValueError(f"mode must be 'status' or 'cancel', got {mode!r}")
+    matches = find_matching_chained_submit_scripts(scripts_output_path, host_suffix=host_suffix, job_suffix=job_suffix, batch_date_to_use=batch_date_to_use)
+    if len(matches) == 0:
+        print(f'No matching submit_phase_chains_* script under {scripts_output_path} for host_suffix={host_suffix!r} job_suffix={job_suffix!r}' + (f' batch_date_to_use={batch_date_to_use!r}' if batch_date_to_use else ''))
+        print('Generate a chain first (same --computer / --tbin / job suffix), then re-run with --status / --cancel.')
+        return None
+    submit_path = matches[0]
+    if len(matches) > 1:
+        print(f'Found {len(matches)} matching submit scripts; using newest:')
+        for i, path in enumerate(matches[:5]):
+            print(f'  [{"*" if i == 0 else " "}] {path}')
+        ## END for i, path in enumerate(matches[:5])...
+        if len(matches) > 5:
+            print(f'  ... and {len(matches) - 5} more')
+    else:
+        print(f'Matched submit script: {submit_path}')
+    ## END if len(matches) > 1...
+
+    # Prefer backend recorded in the sibling manifest when present:
+    manifest_path = submit_path.with_suffix('.json')
+    resolved_backend: str = execution_backend
+    if manifest_path.exists():
+        try:
+            with open(manifest_path, 'r', encoding='utf-8') as f:
+                manifest = json.load(f)
+            resolved_backend = str(manifest.get('execution_backend') or execution_backend)
+        except (OSError, json.JSONDecodeError) as e:
+            print(f'WARN: could not read manifest {manifest_path} ({type(e).__name__}: {e}); using execution_backend={execution_backend!r}')
+    ## END if manifest_path.exists()...
+
+    if resolved_backend != 'slurm':
+        print(f'--{mode} is only supported for Slurm chained submit scripts (this match has execution_backend={resolved_backend!r}).')
+        print_chain_status_hint(execution_backend=resolved_backend)  # type: ignore[arg-type]
+        return None
+
+    shell_cmd: str = f"bash '{submit_path}' --{mode}"
+    try_copy_to_clipboard(shell_cmd, label=f'chained_{mode}')
+    try_execute_shell_command(shell_cmd, label=f'chained_{mode}')
+    return submit_path
 
 # END Batch process phase chaining ___________________________________________________________________________________ #
 
