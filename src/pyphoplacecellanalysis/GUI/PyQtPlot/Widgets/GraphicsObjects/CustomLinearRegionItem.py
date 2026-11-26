@@ -252,6 +252,26 @@ class CustomLinearRegionItem(DraggableGraphicsWidgetMixin, LinearRegionItem):
         # setMovable when done, which updates the lines
         self.setMovable(lineKwds.get('movable', True))
 
+
+    def setRegion(self, rgn):
+        """Set the values for the edges of the region while emitting `sigRegionChanged` only once (fixing PyQtGraph's 3x duplicate emission)."""
+        if self.lines[0].value() == rgn[0] and self.lines[1].value() == rgn[1]:
+            return
+        self.blockLineSignal = True
+        try:
+            self.lines[0].setValue(rgn[0])
+            self.lines[1].setValue(rgn[1])
+            if self.lines[0].value() > self.lines[1].value():
+                if self.swapMode == 'block':
+                    self.lines[1].setValue(self.lines[0].value())
+                elif self.swapMode == 'push':
+                    self.lines[1].setValue(self.lines[0].value())
+        finally:
+            self.blockLineSignal = False
+        self.prepareGeometryChange()
+        self.sigRegionChanged.emit(self)
+        self.lineMoveFinished()
+
         
     def mouseDragEvent(self, ev):
         drag_criteria_fn = self.custom_mouse_drag_criteria_fn

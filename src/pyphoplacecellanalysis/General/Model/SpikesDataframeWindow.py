@@ -59,6 +59,9 @@ class SpikesDataframeWindow(LiveWindowedData):
     def window_duration(self) -> float:
         """The window_duration property."""
         return self.timeWindow.window_duration
+    @window_duration.setter
+    def window_duration(self, value: float) -> None:
+        self.timeWindow.window_duration = value
     
     @property
     def active_window_end_time(self) -> float:

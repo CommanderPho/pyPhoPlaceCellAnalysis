@@ -112,9 +112,8 @@ class TiledPosteriorHeatmapItem(GraphicsObject):
 
         lut = np.zeros((259, 4), dtype=np.uint8)
         lut[0:256] = np.asarray(resolved_cmap(np.linspace(0.0, 1.0, 256), bytes=True), dtype=np.uint8)
-        lut[256] = np.asarray(resolved_cmap(-1.0, bytes=True), dtype=np.uint8)
-        lut[257] = np.asarray(resolved_cmap(2.0, bytes=True), dtype=np.uint8)
-        lut[258] = np.asarray(resolved_cmap(np.nan, bytes=True), dtype=np.uint8)
+        special_rgba = np.asarray(resolved_cmap(np.array([-1.0, 2.0, np.nan]), bytes=True), dtype=np.uint8)
+        lut[256:259] = special_rgba[0:3]
         return np.ascontiguousarray(lut)
 
 

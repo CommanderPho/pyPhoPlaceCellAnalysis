@@ -226,8 +226,8 @@ class Render2DScrollWindowPlotMixin:
             window_item.setData(self.plots_data.all_spots)
 
 
-    @pyqtExceptionPrintingSlot()
-    def _Render2DScrollWindowPlot_on_linear_region_item_update(self) -> None:
+    @pyqtExceptionPrintingSlot(object)
+    def _Render2DScrollWindowPlot_on_linear_region_item_update(self, *args) -> None:
         """self when the region moves.zoom_Change plotter area"""
         min_x, max_x = self.ui.scroll_window_region.getRegion() # get the current region
         min_x = float(min_x)

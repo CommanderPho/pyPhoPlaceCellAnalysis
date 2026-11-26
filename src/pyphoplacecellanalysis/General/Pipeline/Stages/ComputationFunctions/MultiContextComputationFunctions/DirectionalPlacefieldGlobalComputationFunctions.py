@@ -12048,19 +12048,41 @@ class AddNewDecodedPosteriors_MatplotlibPlotCommand(BaseMenuCommand):
 
     @function_attributes(short_name=None, tags=['row', 'posterior'], input_requires=[], output_provides=[], uses=['add_new_matplotlib_render_plot_widget', 'plot_1D_most_likely_position_comparsions'], used_by=['prepare_and_perform_add_add_pseudo2D_decoder_decoded_epochs'], creation_date='2024-12-18 08:53', related_items=[])
     @classmethod
-    def _perform_add_new_decoded_posterior_row(cls, curr_active_pipeline, active_2d_plot, a_dock_config, a_decoder_name: str, a_position_decoder: BasePositionDecoder, time_window_centers, a_1D_posterior, extended_dock_title_info: Optional[str]=None):
-        """ used with `add_pseudo2D_decoder_decoded_epochs` - adds a single decoded row to the matplotlib dynamic output
-        
-        # a_decoder_name: str = "long_LR"
-        
-        USES: a_position_decoder.xbin
-        UNUSED: curr_active_pipeline, 
-
-        """
+    def _perform_add_new_decoded_posterior_row(cls, curr_active_pipeline, active_2d_plot, a_dock_config, a_decoder_name: str, a_position_decoder: BasePositionDecoder, time_window_centers, a_1D_posterior, extended_dock_title_info: Optional[str]=None, plotting_backend: Optional[str]=None):
+        """ used with `add_pseudo2D_decoder_decoded_epochs` - adds a single decoded row (defaults to native PyQtGraph `TiledPosteriorHeatmapItem` for 0 ms scrolling; pass `plotting_backend='matplotlib'` for legacy fallback) """
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_1D_most_likely_position_comparsions
         from neuropy.utils.matplotlib_helpers import get_heatmap_cmap
         from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import FixedCustomColormaps
         from pyphocorehelpers.gui.Qt.color_helpers import ColormapHelpers
+
+        if plotting_backend is None:
+            plotting_backend = active_2d_plot.params.get('decoded_tracks_plotting_backend', 'pyqtgraph') if hasattr(active_2d_plot, 'params') else 'pyqtgraph'
+
+        if str(plotting_backend).lower() != 'matplotlib' and hasattr(active_2d_plot, '_build_pyqtgraph_decoded_posterior_track_internal'):
+            identifier_name: str = f'ContinuousDecode_{a_decoder_name}'
+            if extended_dock_title_info is not None:
+                identifier_name += extended_dock_title_info
+            measured_pos_df = curr_active_pipeline.sess.position.to_dataframe() if (curr_active_pipeline is not None and getattr(curr_active_pipeline, 'sess', None) is not None) else None
+            active_bins = np.asarray(a_position_decoder.xbin) if (a_position_decoder is not None and getattr(a_position_decoder, 'xbin', None) is not None) else None
+            cmap_obj = get_heatmap_cmap(cmap='viridis', bad_color='black', under_color='white', over_color='red')
+            identifier_name, widget, root_gfx, plot_items, dDisplayItem = active_2d_plot._build_pyqtgraph_decoded_posterior_track_internal(
+                identifier_name=identifier_name,
+                variable_name=a_decoder_name,
+                a_dock_config=a_dock_config,
+                dockSize=(65, 200),
+                time_window_centers=time_window_centers,
+                a_1D_posterior=a_1D_posterior,
+                xbin=active_bins,
+                measured_position_df=measured_pos_df,
+                measured_position_col_name='lin_pos',
+                cmap=cmap_obj,
+                vmin=0.0,
+                vmax=1.0,
+                extended_dock_title_info=extended_dock_title_info,
+            )
+            if a_position_decoder is not None:
+                widget.plots_data.a_decoder = a_position_decoder
+            return identifier_name, widget, root_gfx, plot_items, dDisplayItem
         
 
         ## ✅ Add a new row for each of the four 1D directional decoders:
@@ -12486,14 +12508,35 @@ class AddNewDecodedEpochMarginal_MatplotlibPlotCommand(AddNewDecodedPosteriors_M
 
     @function_attributes(short_name=None, tags=['private'], input_requires=[], output_provides=[], uses=['plot_1D_most_likely_position_comparsions', 'get_heatmap_cmap'], used_by=['cls.prepare_and_perform_add_pseudo2D_decoder_decoded_epoch_marginals'], creation_date='2025-06-02 09:55', related_items=[])
     @classmethod
-    def _perform_add_new_decoded_posterior_marginal_row(cls, curr_active_pipeline, active_2d_plot, a_dock_config, a_variable_name: str, time_window_centers, xbin, a_1D_posterior, extended_dock_title_info: Optional[str]=None):
-        """ used with `add_pseudo2D_decoder_decoded_epoch_marginals` - adds a single decoded row to the matplotlib dynamic output
-        
-        # a_decoder_name: str = "long_LR"
-
-        """
+    def _perform_add_new_decoded_posterior_marginal_row(cls, curr_active_pipeline, active_2d_plot, a_dock_config, a_variable_name: str, time_window_centers, xbin, a_1D_posterior, extended_dock_title_info: Optional[str]=None, y_bin_labels: Optional[List[str]]=None, plotting_backend: Optional[str]=None):
+        """ used with `add_pseudo2D_decoder_decoded_epoch_marginals` - adds a single marginal row (defaults to native PyQtGraph `TiledPosteriorHeatmapItem` for 0 ms scrolling) """
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_1D_most_likely_position_comparsions
         from neuropy.utils.matplotlib_helpers import get_heatmap_cmap
+
+        if plotting_backend is None:
+            plotting_backend = active_2d_plot.params.get('decoded_tracks_plotting_backend', 'pyqtgraph') if hasattr(active_2d_plot, 'params') else 'pyqtgraph'
+
+        if str(plotting_backend).lower() != 'matplotlib' and hasattr(active_2d_plot, '_build_pyqtgraph_decoded_posterior_track_internal'):
+            identifier_name: str = f'{a_variable_name}_ContinuousDecode'
+            if extended_dock_title_info is not None:
+                identifier_name += extended_dock_title_info
+            cmap_obj = get_heatmap_cmap(cmap='Oranges', bad_color='black', under_color='white', over_color='red')
+            identifier_name, widget, root_gfx, plot_items, _dock_item = active_2d_plot._build_pyqtgraph_decoded_posterior_track_internal(
+                identifier_name=identifier_name,
+                variable_name=a_variable_name,
+                a_dock_config=a_dock_config,
+                dockSize=(25, 200),
+                time_window_centers=time_window_centers,
+                a_1D_posterior=a_1D_posterior,
+                xbin=xbin,
+                measured_position_df=None,
+                cmap=cmap_obj,
+                vmin=0.0,
+                vmax=1.0,
+                y_bin_labels=y_bin_labels,
+                extended_dock_title_info=extended_dock_title_info,
+            )
+            return identifier_name, widget, root_gfx, plot_items
         
 
         ## ✅ Add a new row for each of the four 1D directional decoders:
@@ -12585,19 +12628,27 @@ class AddNewDecodedEpochMarginal_MatplotlibPlotCommand(AddNewDecodedPosteriors_M
             if enable_non_marginalized_raw_result:
                 a_posterior_name: str = 'non_marginalized_raw_result'
                 assert non_marginalized_raw_result.shape[0] == n_context_bins, f"expected {n_context_bins} context bins but found non_marginalized_raw_result.shape: {non_marginalized_raw_result.shape}"
-                output_dict[a_posterior_name] = cls._perform_add_new_decoded_posterior_marginal_row(curr_active_pipeline=curr_active_pipeline, active_2d_plot=active_2d_plot, a_dock_config=dock_configs[a_posterior_name], a_variable_name=a_posterior_name, xbin=np.arange(n_context_bins), time_window_centers=time_window_centers, a_1D_posterior=non_marginalized_raw_result, extended_dock_title_info=info_string)
+                lbls_arg = context_y_bin_labels if enable_marginal_labels else None
+                output_dict[a_posterior_name] = cls._perform_add_new_decoded_posterior_marginal_row(curr_active_pipeline=curr_active_pipeline, active_2d_plot=active_2d_plot, a_dock_config=dock_configs[a_posterior_name], a_variable_name=a_posterior_name, xbin=np.arange(n_context_bins), time_window_centers=time_window_centers, a_1D_posterior=non_marginalized_raw_result, extended_dock_title_info=info_string, y_bin_labels=lbls_arg)
                 if enable_marginal_labels:
                     identifier_name, widget, matplotlib_fig, matplotlib_fig_axes = output_dict[a_posterior_name]
-                    label_artists_dict = {ax: PlottingHelpers.helper_matplotlib_add_pseudo2D_marginal_labels(ax, y_bin_labels=context_y_bin_labels, enable_draw_decoder_colored_lines=False, enable_draw_separator_lines=True) for ax in matplotlib_fig_axes}
+                    if hasattr(widget, 'is_matplotlib_based') and widget.is_matplotlib_based():
+                        label_artists_dict = {ax: PlottingHelpers.helper_matplotlib_add_pseudo2D_marginal_labels(ax, y_bin_labels=context_y_bin_labels, enable_draw_decoder_colored_lines=False, enable_draw_separator_lines=True) for ax in matplotlib_fig_axes}
+                    else:
+                        label_artists_dict = {}
                     output_dict[a_posterior_name] = (identifier_name, widget, matplotlib_fig, matplotlib_fig_axes, label_artists_dict)
 
             if enable_marginal_over_track_ID:
                 a_posterior_name: str = 'marginal_over_track_ID'
                 assert marginal_over_track_ID.shape[0] == n_context_bins, f"expected {n_context_bins} context bins but found marginal_over_track_ID.shape: {marginal_over_track_ID.shape}"
-                output_dict[a_posterior_name] = cls._perform_add_new_decoded_posterior_marginal_row(curr_active_pipeline=curr_active_pipeline, active_2d_plot=active_2d_plot, a_dock_config=dock_configs[a_posterior_name], a_variable_name=a_posterior_name, xbin=np.arange(n_context_bins), time_window_centers=time_window_centers, a_1D_posterior=marginal_over_track_ID, extended_dock_title_info=info_string)
+                lbls_arg = context_y_bin_labels if enable_marginal_labels else None
+                output_dict[a_posterior_name] = cls._perform_add_new_decoded_posterior_marginal_row(curr_active_pipeline=curr_active_pipeline, active_2d_plot=active_2d_plot, a_dock_config=dock_configs[a_posterior_name], a_variable_name=a_posterior_name, xbin=np.arange(n_context_bins), time_window_centers=time_window_centers, a_1D_posterior=marginal_over_track_ID, extended_dock_title_info=info_string, y_bin_labels=lbls_arg)
                 if enable_marginal_labels:
                     identifier_name, widget, matplotlib_fig, matplotlib_fig_axes = output_dict[a_posterior_name]
-                    label_artists_dict = {ax: PlottingHelpers.helper_matplotlib_add_pseudo2D_marginal_labels(ax, y_bin_labels=context_y_bin_labels, enable_draw_decoder_colored_lines=False, enable_draw_separator_lines=True) for ax in matplotlib_fig_axes}
+                    if hasattr(widget, 'is_matplotlib_based') and widget.is_matplotlib_based():
+                        label_artists_dict = {ax: PlottingHelpers.helper_matplotlib_add_pseudo2D_marginal_labels(ax, y_bin_labels=context_y_bin_labels, enable_draw_decoder_colored_lines=False, enable_draw_separator_lines=True) for ax in matplotlib_fig_axes}
+                    else:
+                        label_artists_dict = {}
                     output_dict[a_posterior_name] = (identifier_name, widget, matplotlib_fig, matplotlib_fig_axes, label_artists_dict)
         else:
             pseudo2D_decoder_continuously_decoded_result = pseudo2D_raw
@@ -12608,28 +12659,40 @@ class AddNewDecodedEpochMarginal_MatplotlibPlotCommand(AddNewDecodedPosteriors_M
             if enable_non_marginalized_raw_result:
                 a_posterior_name: str = 'non_marginalized_raw_result'
                 assert non_marginalized_raw_result.shape[0] == 4, f"expected the 4 pseudo-y bins for the decoder in non_marginalized_raw_result.shape[1]. but found non_marginalized_raw_result.shape: {non_marginalized_raw_result.shape}"
-                output_dict[a_posterior_name] = cls._perform_add_new_decoded_posterior_marginal_row(curr_active_pipeline=curr_active_pipeline, active_2d_plot=active_2d_plot, a_dock_config=dock_configs[a_posterior_name], a_variable_name=a_posterior_name, xbin=np.arange(4), time_window_centers=time_window_centers, a_1D_posterior=non_marginalized_raw_result, extended_dock_title_info=info_string)
+                lbls_4 = ['long_LR', 'long_RL', 'short_LR', 'short_RL'] if enable_marginal_labels else None
+                output_dict[a_posterior_name] = cls._perform_add_new_decoded_posterior_marginal_row(curr_active_pipeline=curr_active_pipeline, active_2d_plot=active_2d_plot, a_dock_config=dock_configs[a_posterior_name], a_variable_name=a_posterior_name, xbin=np.arange(4), time_window_centers=time_window_centers, a_1D_posterior=non_marginalized_raw_result, extended_dock_title_info=info_string, y_bin_labels=lbls_4)
                 if enable_marginal_labels:
                     identifier_name, widget, matplotlib_fig, matplotlib_fig_axes = output_dict[a_posterior_name]
-                    label_artists_dict = {ax: PlottingHelpers.helper_matplotlib_add_pseudo2D_marginal_labels(ax, y_bin_labels=['long_LR', 'long_RL', 'short_LR', 'short_RL'], enable_draw_decoder_colored_lines=False, enable_draw_separator_lines=True) for ax in matplotlib_fig_axes}
+                    if hasattr(widget, 'is_matplotlib_based') and widget.is_matplotlib_based():
+                        label_artists_dict = {ax: PlottingHelpers.helper_matplotlib_add_pseudo2D_marginal_labels(ax, y_bin_labels=['long_LR', 'long_RL', 'short_LR', 'short_RL'], enable_draw_decoder_colored_lines=False, enable_draw_separator_lines=True) for ax in matplotlib_fig_axes}
+                    else:
+                        label_artists_dict = {}
                     output_dict[a_posterior_name] = (identifier_name, widget, matplotlib_fig, matplotlib_fig_axes, label_artists_dict)
 
             if enable_marginal_over_direction:
                 a_posterior_name: str = 'marginal_over_direction'
                 assert marginal_over_direction.shape[0] == 2, f"expected the 2 marginalized pseudo-y bins for the decoder in marginal_over_direction.shape[1]. but found marginal_over_direction.shape: {marginal_over_direction.shape}"
-                output_dict[a_posterior_name] = cls._perform_add_new_decoded_posterior_marginal_row(curr_active_pipeline=curr_active_pipeline, active_2d_plot=active_2d_plot, a_dock_config=dock_configs[a_posterior_name], a_variable_name=a_posterior_name, xbin=np.arange(2), time_window_centers=time_window_centers, a_1D_posterior=marginal_over_direction, extended_dock_title_info=info_string)
+                lbls_dir = ['LR', 'RL'] if enable_marginal_labels else None
+                output_dict[a_posterior_name] = cls._perform_add_new_decoded_posterior_marginal_row(curr_active_pipeline=curr_active_pipeline, active_2d_plot=active_2d_plot, a_dock_config=dock_configs[a_posterior_name], a_variable_name=a_posterior_name, xbin=np.arange(2), time_window_centers=time_window_centers, a_1D_posterior=marginal_over_direction, extended_dock_title_info=info_string, y_bin_labels=lbls_dir)
                 if enable_marginal_labels:
                     identifier_name, widget, matplotlib_fig, matplotlib_fig_axes = output_dict[a_posterior_name]
-                    label_artists_dict = {ax: PlottingHelpers.helper_matplotlib_add_pseudo2D_marginal_labels(ax, y_bin_labels=['LR', 'RL'], enable_draw_decoder_colored_lines=False, enable_draw_separator_lines=True) for ax in matplotlib_fig_axes}
+                    if hasattr(widget, 'is_matplotlib_based') and widget.is_matplotlib_based():
+                        label_artists_dict = {ax: PlottingHelpers.helper_matplotlib_add_pseudo2D_marginal_labels(ax, y_bin_labels=['LR', 'RL'], enable_draw_decoder_colored_lines=False, enable_draw_separator_lines=True) for ax in matplotlib_fig_axes}
+                    else:
+                        label_artists_dict = {}
                     output_dict[a_posterior_name] = (identifier_name, widget, matplotlib_fig, matplotlib_fig_axes, label_artists_dict)
 
             if enable_marginal_over_track_ID:
                 a_posterior_name: str = 'marginal_over_track_ID'
                 assert marginal_over_track_ID.shape[0] == 2, f"expected the 2 marginalized pseudo-y bins for the decoder in marginal_over_track_ID.shape[1]. but found marginal_over_track_ID.shape: {marginal_over_track_ID.shape}"
-                output_dict[a_posterior_name] = cls._perform_add_new_decoded_posterior_marginal_row(curr_active_pipeline=curr_active_pipeline, active_2d_plot=active_2d_plot, a_dock_config=dock_configs[a_posterior_name], a_variable_name=a_posterior_name, xbin=np.arange(2), time_window_centers=time_window_centers, a_1D_posterior=marginal_over_track_ID, extended_dock_title_info=info_string)
+                lbls_track = ['long', 'short'] if enable_marginal_labels else None
+                output_dict[a_posterior_name] = cls._perform_add_new_decoded_posterior_marginal_row(curr_active_pipeline=curr_active_pipeline, active_2d_plot=active_2d_plot, a_dock_config=dock_configs[a_posterior_name], a_variable_name=a_posterior_name, xbin=np.arange(2), time_window_centers=time_window_centers, a_1D_posterior=marginal_over_track_ID, extended_dock_title_info=info_string, y_bin_labels=lbls_track)
                 if enable_marginal_labels:
                     identifier_name, widget, matplotlib_fig, matplotlib_fig_axes = output_dict[a_posterior_name]
-                    label_artists_dict = {ax: PlottingHelpers.helper_matplotlib_add_pseudo2D_marginal_labels(ax, y_bin_labels=['long', 'short'], enable_draw_decoder_colored_lines=False, enable_draw_separator_lines=True) for ax in matplotlib_fig_axes}
+                    if hasattr(widget, 'is_matplotlib_based') and widget.is_matplotlib_based():
+                        label_artists_dict = {ax: PlottingHelpers.helper_matplotlib_add_pseudo2D_marginal_labels(ax, y_bin_labels=['long', 'short'], enable_draw_decoder_colored_lines=False, enable_draw_separator_lines=True) for ax in matplotlib_fig_axes}
+                    else:
+                        label_artists_dict = {}
                     output_dict[a_posterior_name] = (identifier_name, widget, matplotlib_fig, matplotlib_fig_axes, label_artists_dict)
 
         return output_dict

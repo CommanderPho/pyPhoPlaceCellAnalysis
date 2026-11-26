@@ -392,26 +392,8 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
     
 
     @function_attributes(short_name=None, tags=['track'], input_requires=[], output_provides=[], uses=['plot_slices_1D_most_likely_position_comparsions', '', ''], used_by=['add_docked_decoded_posterior_track_from_result'], creation_date='2025-05-12 12:18', related_items=[])
-    def add_docked_decoded_posterior_slices_track(self, name: str, slices_time_window_centers: List[NDArray], slices_posteriors: List[NDArray], xbin: Optional[NDArray]=None, measured_position_df: Optional[pd.DataFrame]=None, a_variable_name: Optional[str]=None, a_dock_config: Optional[CustomDockDisplayConfig]=None, extended_dock_title_info: Optional[str]=None, should_defer_render:bool=False, **kwargs):
-        """ adds a decoded 1D posterior 
-
-        Aims to replace `AddNewDecodedPosteriors_MatplotlibPlotCommand._perform_add_new_decoded_posterior_row`
-        
-        
-        Usage 0:
-            time_bin_size = epochs_decoding_time_bin_size
-            info_string: str = f" - t_bin_size: {time_bin_size}"
-            identifier_name, widget, matplotlib_fig, matplotlib_fig_axes, dock_item = active_2d_plot.add_docked_decoded_posterior_slices_track(name='non-PBE_marginal_over_track_ID',
-                                                                                                    slices_time_window_centers=[v.centers for v in long_results_obj.time_bin_containers], slices_posteriors=long_results_obj.p_x_given_n_list,
-                                                                                                    xbin = deepcopy(a_position_decoder.xbin), measured_position_df=deepcopy(curr_active_pipeline.sess.position.to_dataframe()),
-                                                                                                    extended_dock_title_info=info_string)
-                                                                                                    
-        Usage 1:
-            _out_tuple = active_2d_plot.add_docked_decoded_posterior_slices_track(name=f'DirectionalDecodersDecoded[{a_decoder_name}]', a_dock_config=a_dock_config,
-                                                                                            slices_time_window_centers=a_1D_continuous_decoded_result.time_bin_container.centers, slices_posteriors=long_results_obj.p_x_given_n_list,
-                                                                                            xbin = deepcopy(a_1D_decoder.xbin), measured_position_df=deepcopy(curr_active_pipeline.sess.position.to_dataframe()),
-                                                                                            extended_dock_title_info=info_string)
-        """
+    def add_docked_decoded_posterior_slices_track(self, name: str, slices_time_window_centers: List[NDArray], slices_posteriors: List[NDArray], xbin: Optional[NDArray]=None, measured_position_df: Optional[pd.DataFrame]=None, a_variable_name: Optional[str]=None, a_dock_config: Optional[CustomDockDisplayConfig]=None, extended_dock_title_info: Optional[str]=None, should_defer_render:bool=False, plotting_backend: Optional[str]=None, **kwargs):
+        """ adds a decoded 1D posterior from epoch slices (defaults to native PyQtGraph `TiledPosteriorHeatmapItem` for 0 ms scrolling) """
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_slices_1D_most_likely_position_comparsions
         from neuropy.utils.matplotlib_helpers import get_heatmap_cmap
         
@@ -423,8 +405,6 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
             a_dock_config = CustomCyclicColorsDockDisplayConfig(showCloseButton=True, named_color_scheme=NamedColorScheme.grey)
             a_dock_config.dock_group_names = [override_dock_group_name] # , 'non-PBE Continuous Decoding'
 
-        # ((59, 2, 66), (59, 2, 102), (59, 2, 226), ...)
-        # TODO: get flattened posterior instead of the first slice only
         a_1D_posterior = slices_posteriors[0]
         n_xbins, n_t_bins = np.shape(a_1D_posterior)
 
@@ -437,22 +417,46 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
             
         dockSize = kwargs.pop('dockSize', (65, 200)) 
         
-        ## ✅ Add a new row for each of the four 1D directional decoders:
         identifier_name: str = name
         if extended_dock_title_info is not None:
             identifier_name += extended_dock_title_info ## add extra info like the time_bin_size in ms
-        # print(f'identifier_name: {identifier_name}')
+
+        if plotting_backend is None:
+            plotting_backend = self.params.get('decoded_tracks_plotting_backend', 'pyqtgraph') if hasattr(self, 'params') else 'pyqtgraph'
+
+        posterior_heatmap_imshow_kwargs = kwargs.pop('posterior_heatmap_imshow_kwargs', dict(
+            cmap = get_heatmap_cmap(cmap='viridis', bad_color='black', under_color='white', over_color='red'),
+        ))
+
+        if str(plotting_backend).lower() != 'matplotlib':
+            cmap_val = posterior_heatmap_imshow_kwargs.get('cmap', 'viridis')
+            vmin_val = float(posterior_heatmap_imshow_kwargs.get('vmin', 0.0))
+            vmax_val = float(posterior_heatmap_imshow_kwargs.get('vmax', 1.0))
+            y_lbls = list(reversed(xbin_labels)) if xbin_labels is not None else kwargs.pop('y_bin_labels', None)
+            sync_mode = kwargs.pop('sync_mode', None)
+            return self._build_pyqtgraph_decoded_posterior_track_internal(
+                identifier_name=identifier_name,
+                variable_name=a_variable_name,
+                a_dock_config=a_dock_config,
+                dockSize=dockSize,
+                a_1D_posterior=a_1D_posterior,
+                slices_time_window_centers=slices_time_window_centers,
+                slices_posteriors=slices_posteriors,
+                xbin=xbin,
+                measured_position_df=measured_position_df,
+                cmap=cmap_val,
+                vmin=vmin_val,
+                vmax=vmax_val,
+                y_bin_labels=y_lbls,
+                extended_dock_title_info=extended_dock_title_info,
+                sync_mode=sync_mode,
+            )
+
         widget, matplotlib_fig, matplotlib_fig_axes, dock_item = self.add_new_matplotlib_render_plot_widget(name=identifier_name, dockSize=dockSize, display_config=a_dock_config)
         an_ax = matplotlib_fig_axes[0]
 
         variable_name: str = a_variable_name
-        
-        # active_most_likely_positions = active_marginals.most_likely_positions_1D # Raw decoded positions
         slices_active_most_likely_positions_1D = None
-        
-        posterior_heatmap_imshow_kwargs = kwargs.pop('posterior_heatmap_imshow_kwargs', dict(
-            cmap = get_heatmap_cmap(cmap='viridis', bad_color='black', under_color='white', over_color='red'),
-        ))
 
         # most_likely_positions_mode: 'standard'|'corrected'
         ## Actual plotting portion:
