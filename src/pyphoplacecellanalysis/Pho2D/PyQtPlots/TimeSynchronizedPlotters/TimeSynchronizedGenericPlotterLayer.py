@@ -334,7 +334,24 @@ a_plotter
         included = getattr(self.parent, 'last_included_posterior_bin_indices', None)
         if included is not None and len(included) > 0:
             if len(included) > 1:
-                image = np.nansum(main_data[:, :, included], axis=-1).copy()
+                s_lo = int(included[0])
+                s_hi = int(included[-1]) + 1
+                is_contiguous = ((s_hi - s_lo) == len(included))
+                if is_contiguous:
+                    acc = np.zeros(main_data.shape[:2], dtype=np.float64)
+                    has_finite = np.zeros(main_data.shape[:2], dtype=bool)
+                    chunk_step = 256
+                    for c0 in range(s_lo, s_hi, chunk_step):
+                        chunk = main_data[:, :, c0:min(c0 + chunk_step, s_hi)]
+                        finite_mask = np.isfinite(chunk)
+                        has_finite |= finite_mask.any(axis=-1)
+                        acc += np.where(finite_mask, chunk, 0.0).sum(axis=-1)
+                    ## END for c0 in range(s_lo, s_hi, chunk_step)....
+
+                    acc[~has_finite] = np.nan
+                    image = acc
+                else:
+                    image = np.nansum(main_data[:, :, included], axis=-1).copy()
                 tot = float(np.nansum(image))
                 if tot > 0.0 and np.isfinite(tot):
                     image = image / tot

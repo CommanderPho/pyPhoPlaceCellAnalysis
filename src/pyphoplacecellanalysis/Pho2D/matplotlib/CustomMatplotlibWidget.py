@@ -332,8 +332,8 @@ class CustomMatplotlibWidget(CrosshairsTracingMixin, ToastShowingWidgetMixin, Pl
                 # Check if the event is spontaneous to identify the first time the widget is shown
                 # self.on_first_show()
 
-        if self.isVisible():
-            # IMPORTANT: It seems that the title must not be updated until after ui.mw.show() is called or else it crashes the Jupyter kernel! This is why we check for the first show and make sure that the window is visible
+        if self.isVisible() and self.isWindow() and getattr(self.params, 'window_title', None):
+            # Only set top-level window title when this widget IS the top-level window (never overwrite parent Spike3DRasterWindowWidget title!)
             self.window().setWindowTitle(self.params.window_title)
     
         # Call the base class implementation

@@ -5,6 +5,7 @@ from attrs import define, field, fields, asdict, astuple
 
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
+from pyphocorehelpers.gui.Qt.ExceptionPrintingSlot import pyqtExceptionPrintingSlot
 from neuropy.utils.mixins.time_slicing import TimeColumnAliasesProtocol
 from neuropy.core.flattened_spiketrains import SpikesAccessor
 from neuropy.utils.mixins.dict_representable import get_dict_subset
@@ -12,6 +13,7 @@ from neuropy.utils.mixins.dict_representable import get_dict_subset
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsObjects.CustomLinearRegionItem import CustomLinearRegionItem
+from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsObjects.FastCullableSpikeRasterItem import FastCullableSpikeRasterItem
 
 from pyphoplacecellanalysis.General.Model.Datasources.Datasources import DataframeDatasource
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.ReprPrintableWidgetMixin import ReprPrintableItemMixin
@@ -103,20 +105,25 @@ class Render2DScrollWindowPlotMixin:
         vtick.lineTo(0, 0.5)
         
         #############################
-        ## Bottom Windowed Scroll Plot/Widget:
-        scroll_window_plot_downsampling_rate: int = self.params.setdefault('scroll_window_plot_downsampling_rate', 5) ## reduced downsample rate from 100 -> 5 after noticing that it was very desceptive how many spikes it was missing
-        
-        # ALL Spikes in the preview window:
-        # curr_spike_x, curr_spike_y, curr_spike_pens, _all_scatterplot_tooltips_kwargs, self.plots_data.all_spots, curr_n = self._build_all_spikes_data_values(should_return_data_tooltips_kwargs=False, downsampling_rate=scroll_window_plot_downsampling_rate) #TODO 2023-06-28 21:18: - [ ] Could use returned tooltips to set the spike hover text
-        
-        curr_spike_x, _, curr_spike_pens, _all_scatterplot_tooltips_kwargs, self.plots_data.all_spots_downsampled, curr_n = self._build_all_spikes_data_values(should_return_data_tooltips_kwargs=False, downsampling_rate=scroll_window_plot_downsampling_rate) # downsampled all_spots
-        curr_spike_x, curr_spike_y, curr_spike_pens, _all_scatterplot_tooltips_kwargs, self.plots_data.all_spots, curr_n = self._build_all_spikes_data_values(should_return_data_tooltips_kwargs=False, downsampling_rate=1) ## all spots
+        ## Bottom Windowed Scroll Plot/Widget (uses FastCullableSpikeRasterItem tiled RGBA density LOD, zero dropped spikes):
+        spike_t, spike_y, palette_rgba, spike_pal_idx = FastCullableSpikeRasterItem.build_spike_arrays_from_df(
+            self.spikes_window.df,
+            config_fragile_linear_neuron_IDX_map=self.config_fragile_linear_neuron_IDX_map,
+            downsampling_rate=1,
+        )
+        curr_spike_y = spike_y
+        self.plots_data.all_spots_downsampled = []
+        self.plots_data.all_spots = []
 
-        self.plots.preview_overview_scatter_plot = pg.ScatterPlotItem(name='spikeRasterOverviewWindowScatterPlotItem', pxMode=True, symbol=vtick, size=5, pen={'color': 'w', 'width': 1}, hoverable=False, )
-        self.plots.preview_overview_scatter_plot.setObjectName('preview_overview_scatter_plot') # this seems necissary, the 'name' parameter in addPlot(...) seems to only change some internal property related to the legend AND drastically slows down the plotting
-        self.plots.preview_overview_scatter_plot.opts['useCache'] = True
-        # self.plots.preview_overview_scatter_plot.addPoints(self.plots_data.all_spots) # , hoverable=True
-        self.plots.preview_overview_scatter_plot.addPoints(self.plots_data.all_spots_downsampled)
+        # Remove any stale scatter item that may already exist on background_static_scroll_window_plot
+        for existing_item in list(background_static_scroll_window_plot.items):
+            if isinstance(existing_item, (pg.ScatterPlotItem, FastCullableSpikeRasterItem)):
+                background_static_scroll_window_plot.removeItem(existing_item)
+        ## END for existing_item in list(background_static_scroll_window_plot.items)....
+
+        self.plots.preview_overview_scatter_plot = FastCullableSpikeRasterItem(name='spikeRasterOverviewWindowScatterPlotItem', pxMode=True, symbol=vtick, size=5, pen={'color': 'w', 'width': 1}, hoverable=False, force_lod_only=True)
+        self.plots.preview_overview_scatter_plot.setObjectName('preview_overview_scatter_plot')
+        self.plots.preview_overview_scatter_plot.setSpikeArrays(spike_t, spike_y, palette_rgba, spike_pal_idx)
         background_static_scroll_window_plot.addItem(self.plots.preview_overview_scatter_plot)
         
         # Add the linear region overlay:
@@ -184,27 +191,63 @@ class Render2DScrollWindowPlotMixin:
         
 
     def update_rasters(self):
-        """ updates all rasters (which are scatter plots) from the self.plots_data.all_spots variable """
-        # Update preview_overview_scatter_plot
-        self.plots.preview_overview_scatter_plot.setData(self.plots_data.all_spots)
-        if self.Includes2DActiveWindowScatter:
-            self.plots.scatter_plot.setData(self.plots_data.all_spots)
-            
-            
+        """ updates all rasters (which are scatter plots) from the current spikes_df / config_fragile_linear_neuron_IDX_map or self.plots_data.all_spots """
+        overview_item = getattr(self.plots, 'preview_overview_scatter_plot', None)
+        window_item = getattr(self.plots, 'scatter_plot', None) if self.Includes2DActiveWindowScatter else None
 
-    @QtCore.pyqtSlot()
+        if isinstance(overview_item, FastCullableSpikeRasterItem) or isinstance(window_item, FastCullableSpikeRasterItem):
+            spike_t, spike_y, palette_rgba, spike_pal_idx = FastCullableSpikeRasterItem.build_spike_arrays_from_df(
+                self.spikes_window.df,
+                config_fragile_linear_neuron_IDX_map=self.config_fragile_linear_neuron_IDX_map,
+                downsampling_rate=1,
+            )
+            if isinstance(overview_item, FastCullableSpikeRasterItem):
+                overview_item.setSpikeArrays(spike_t, spike_y, palette_rgba, spike_pal_idx)
+            if isinstance(window_item, FastCullableSpikeRasterItem):
+                # If docked `rasters[raster_window]` uses NewSimpleRaster [0.5 .. N-0.5] Y positions, preserve its Y axis mapping:
+                docked_rw_widget = getattr(self.ui, 'matplotlib_view_widgets', {}).get('rasters[raster_window]', None) if hasattr(self, 'ui') else None
+                new_sorted_raster = getattr(getattr(docked_rw_widget, 'plots_data', None), 'new_sorted_raster', None) if docked_rw_widget is not None else None
+                if (new_sorted_raster is not None) and ('aclu' in self.spikes_window.df.columns):
+                    y_map = new_sorted_raster.neuron_y_pos
+                    aclus = self.spikes_window.df['aclu'].to_numpy()
+                    docked_y = np.array([y_map.get(a, np.nan) for a in aclus], dtype=np.float64)
+                    window_item.setSpikeArrays(spike_t, docked_y, palette_rgba, spike_pal_idx)
+                else:
+                    window_item.setSpikeArrays(spike_t, spike_y, palette_rgba, spike_pal_idx)
+            return
+
+        # Legacy ScatterPlotItem fallback:
+        overview_spots = getattr(self.plots_data, 'all_spots_downsampled', None)
+        if overview_spots is None or len(overview_spots) == 0:
+            overview_spots = self.plots_data.all_spots
+        if overview_item is not None:
+            overview_item.setData(overview_spots)
+        if window_item is not None:
+            window_item.setData(self.plots_data.all_spots)
+
+
+    @pyqtExceptionPrintingSlot()
     def _Render2DScrollWindowPlot_on_linear_region_item_update(self) -> None:
         """self when the region moves.zoom_Change plotter area"""
-        # self.ui.scroll_window_region.setZValue(10) # bring to the front
         min_x, max_x = self.ui.scroll_window_region.getRegion() # get the current region
+        min_x = float(min_x)
+        max_x = float(max_x)
+        if (not np.isfinite(min_x)) or (not np.isfinite(max_x)):
+            return
+        if max_x < min_x:
+            min_x, max_x = max_x, min_x
+        last_region = getattr(self, '_last_emitted_scroll_region', None)
+        if (last_region is not None) and (abs(min_x - last_region[0]) <= 1e-9) and (abs(max_x - last_region[1]) <= 1e-9):
+            return
+        self._last_emitted_scroll_region = (min_x, max_x)
         self.window_scrolled.emit(min_x, max_x) # emit this mixin's own window_scrolled function
-        
-        
+
 
     @QtCore.pyqtSlot()
     def Render2DScrollWindowPlot_on_init():
         """ perform any parameters setting/checking during init """
         pass
+
 
     @QtCore.pyqtSlot()
     def Render2DScrollWindowPlot_on_setup():
@@ -213,16 +256,23 @@ class Render2DScrollWindowPlotMixin:
         # self.ui.scroll_window_region.sigRegionChanged.connect(self.update_zoom_plotter)
         pass
 
+
     @QtCore.pyqtSlot()
     def Render2DScrollWindowPlot_on_destroy():
         """ perfrom teardown/destruction of anything that needs to be manually removed or released """
         pass
 
-    @QtCore.pyqtSlot(float, float)
+
+    @pyqtExceptionPrintingSlot(float, float)
     def Render2DScrollWindowPlot_on_window_update(self, new_start=None, new_end=None):
         """ called to perform updates when the active window changes. Redraw, recompute data, etc. """
+        if (new_start is None) or (new_end is None) or (not np.isfinite(new_start)) or (not np.isfinite(new_end)):
+            return
+        cur_min, cur_max = self.ui.scroll_window_region.getRegion()
+        if (abs(float(new_start) - float(cur_min)) <= 1e-9) and (abs(float(new_end) - float(cur_max)) <= 1e-9):
+            return
         # Make sure that the scroller isn't too tiny to grab.
-        self.ui.scroll_window_region.setRegion([new_start, new_end]) # adjust scroll control
+        self.ui.scroll_window_region.setRegion([float(new_start), float(new_end)]) # adjust scroll control
     
     
     # ==================================================================================================================== #

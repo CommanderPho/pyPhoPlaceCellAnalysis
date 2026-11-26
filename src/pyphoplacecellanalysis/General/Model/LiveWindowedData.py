@@ -50,10 +50,11 @@ class LiveWindowedData(SimplePrintable, PrettyPrintable, QtCore.QObject):
         """ """
         return np.ceil(float(self.timeWindow.window_duration)/2.0) # 10 by default 
     
-    def __init__(self, time_window: TimeWindow, dataSource: DataframeDatasource):
+    def __init__(self, time_window: TimeWindow, dataSource: DataframeDatasource, enable_eager_window_slicing: bool = False):
         QtCore.QObject.__init__(self)
         # DO store the datasource on the other hand:
         self.dataSource = dataSource
+        self.enable_eager_window_slicing = bool(enable_eager_window_slicing)
         
         ## TODO: alternative mode, store the time window (hopefully a reference)
         self.timeWindow = time_window
@@ -66,19 +67,14 @@ class LiveWindowedData(SimplePrintable, PrettyPrintable, QtCore.QObject):
     @pyqtExceptionPrintingSlot(float, float, float)
     def on_window_duration_changed(self, start_t, end_t, duration):
         """ changes self.half_render_window_duration """
-        # print(f'LiveWindowedData.on_window_duration_changed(start_t: {start_t}, end_t: {end_t}, duration: {duration})')
-        # Get the data value from the internal data source
-        data_value = self.dataSource.get_updated_data_window(start_t, end_t) # can return any value so long as it's an object
+        # Avoid redundant DataFrame slicing here because TimeWindow always emits window_changed_signal immediately afterward
+        data_value = self.dataSource.get_updated_data_window(start_t, end_t) if self.enable_eager_window_slicing else None
         self.windowed_data_window_duration_changed_signal.emit(start_t, end_t, duration, data_value)
         
     @pyqtExceptionPrintingSlot(float, float)
     def on_window_changed(self, start_t, end_t):
         # called when the window is updated
-        # if self.enable_debug_print:
-        #     print(f'LiveWindowedData.on_window_changed(start_t: {start_t}, end_t: {end_t})')
-        
-        # Get the data value from the internal data source
-        data_value = self.dataSource.get_updated_data_window(start_t, end_t) # can return any value so long as it's an object
+        data_value = self.dataSource.get_updated_data_window(start_t, end_t) if self.enable_eager_window_slicing else None
         self.windowed_data_window_updated_signal.emit(start_t, end_t, data_value)
         
     ## Called to update its internal TimeWindow

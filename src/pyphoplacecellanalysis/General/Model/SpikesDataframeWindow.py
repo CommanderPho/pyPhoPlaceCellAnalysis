@@ -121,9 +121,12 @@ class SpikesDataframeWindow(LiveWindowedData):
         # TimeWindow.__init__(self, window_duration=window_duration, window_start_time=window_start_time)
         # self._df = spikes_df
         spikes_df = spikes_df.spikes.fixing_time_column()
-        # TODO: Time window needs to be passed in or kept a reference to:
-        curr_time_window = TimeWindow(window_duration=window_duration, window_start_time=window_start_time)
         spikes_dataSource = SpikesDataframeDatasource(spikes_df)
+        t_start_end = spikes_dataSource.total_df_start_end_times
+        total_dur = float(t_start_end[1] - t_start_end[0]) if ((t_start_end is not None) and (len(t_start_end) >= 2) and np.isfinite(t_start_end[1] - t_start_end[0])) else None
+        max_allowed_dur = max(1.0, total_dur * 1.05) if (total_dur is not None and total_dur > 0.0) else None
+        # TODO: Time window needs to be passed in or kept a reference to:
+        curr_time_window = TimeWindow(window_duration=window_duration, window_start_time=window_start_time, min_duration=0.005, max_duration=max_allowed_dur)
         LiveWindowedData.__init__(self, curr_time_window, spikes_dataSource) # Call base class
 
         # self.spikes_dataSource.source_data_changed_signal.connect(self.spike_dataframe_changed_signal)
@@ -133,6 +136,11 @@ class SpikesDataframeWindow(LiveWindowedData):
     @pyqtExceptionPrintingSlot(object)
     def on_general_datasource_changed(self, datasource):
         """ emit our own custom signal when the general datasource update method returns """
+        t_start_end = self.dataSource.total_df_start_end_times
+        if (t_start_end is not None) and (len(t_start_end) >= 2) and np.isfinite(t_start_end[1] - t_start_end[0]):
+            total_dur = float(t_start_end[1] - t_start_end[0])
+            if total_dur > 0.0:
+                self.timeWindow.max_duration = max(1.0, total_dur * 1.05)
         self.spike_dataframe_changed_signal.emit()
     
     def debug_print_spikes_window(self, prefix_string='spikes_window.', indent_string = '\t'):

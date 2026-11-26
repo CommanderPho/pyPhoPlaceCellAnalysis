@@ -709,8 +709,12 @@ class NewSimpleRaster:
         # config_fragile_linear_neuron_IDX_map values are of the form: (i, fragile_linear_neuron_IDX, curr_pen, self._series_identity_lower_y_values[i], self._series_identity_upper_y_values[i])
         # Emphasis/Deemphasis-Dependent Pens:
         # curr_spike_pens = [config_fragile_linear_neuron_IDX_map[a_fragile_linear_neuron_IDX][2][a_spike_emphasis_state] for a_fragile_linear_neuron_IDX, a_spike_emphasis_state in zip(filtered_spikes_df['fragile_linear_neuron_IDX'].to_numpy(), filtered_spikes_df['visualization_raster_emphasis_state'].to_numpy())] # get the pens for each spike from the configs map
-        curr_spike_pens = [pg.mkPen(self.neuron_colors[aclu], width=1) for aclu, a_spike_emphasis_state in zip(filtered_spikes_df['aclu'].to_numpy(), filtered_spikes_df['visualization_raster_emphasis_state'].to_numpy())] # ignores emphasis state ## 2024-11-05 12:36 AttributeError: 'NewSimpleRaster' object has no attribute 'neuron_colors'
-        curr_spikes_brushes = [pg.mkBrush(self.neuron_colors[aclu]) for aclu, a_spike_emphasis_state in zip(filtered_spikes_df['aclu'].to_numpy(), filtered_spikes_df['visualization_raster_emphasis_state'].to_numpy())] # ignores emphasis state
+        # Cache 1 QPen and 1 QBrush per unique neuron `aclu` so SymbolAtlas stays O(N_cells) instead of O(N_spikes):
+        pen_cache = {aclu: pg.mkPen(col, width=1) for aclu, col in self.neuron_colors.items()}
+        brush_cache = {aclu: pg.mkBrush(col) for aclu, col in self.neuron_colors.items()}
+        aclu_arr = filtered_spikes_df['aclu'].to_numpy()
+        curr_spike_pens = [pen_cache[aclu] for aclu in aclu_arr] # ignores emphasis state
+        curr_spikes_brushes = [brush_cache[aclu] for aclu in aclu_arr] # ignores emphasis state
 
         curr_n = len(curr_spike_t) # curr number of spikes
         # builds the 'all_spots' tuples suitable for setting self.plots_data.all_spots from ALL Spikes
@@ -750,6 +754,7 @@ def new_plot_raster_plot(spikes_df: pd.DataFrame, included_neuron_ids, unit_sort
 
     """
     downsampling_rate: int = kwargs.pop('downsampling_rate', None)
+    use_fast_raster_item: bool = kwargs.pop('use_fast_raster_item', True)
     
     needs_create_new = ((win is None) or (plots_data is None) or (plots is None))
     if needs_create_new:
@@ -764,40 +769,63 @@ def new_plot_raster_plot(spikes_df: pd.DataFrame, included_neuron_ids, unit_sort
     assert len(unit_sort_order) == len(included_neuron_ids)
     active_sorted_neuron_ids = included_neuron_ids[unit_sort_order]
     plots_data.new_sorted_raster = NewSimpleRaster.init_from_neuron_ids(active_sorted_neuron_ids, neuron_colors=unit_colors_list) ## about data, not hte plot itself
-    # self.plots.scatter_plot.opts['useCache'] = True
     
     ## Add the source data (spikes_df) to the plot_data
     plots_data.spikes_df = deepcopy(spikes_df)    
     # Update the dataframe
     plots_data.spikes_df = plots_data.new_sorted_raster.update_spikes_df_visualization_columns(spikes_df=plots_data.spikes_df)
-    ## Build the spots for the raster plot:
-    plots_data.all_spots, plots_data.all_scatterplot_tooltips_kwargs = plots_data.new_sorted_raster.build_spikes_all_spots_from_df(spikes_df=plots_data.spikes_df, should_return_data_tooltips_kwargs=True, generate_debug_tuples=False, downsampling_rate=downsampling_rate)
-    # self.plots.scatter_plot.opts['useCache'] = True
-    
-    # Add header label
-    if add_debug_header_label:
-        # plots.debug_header_label = pg.LabelItem(justify='right', text='debug_header_label')
-        # win.addItem(plots.debug_header_label)
-        plots.debug_header_label = win.addLabel("debug_header_label") # , row=1, colspan=4
-        win.nextRow()
-        # plots.debug_label2 = win.addLabel("Label2") # , col=1, colspan=4
-        # win.nextRow()
-    
-    # # Actually setup the plot:
-    if (not plots.has_attr('root_plot')):
-        plots.root_plot = win.addPlot(title="Raster") # this seems to be the equivalent to an 'axes'
 
     if scatter_plot_kwargs is None:
         scatter_plot_kwargs = {} ## make them empty at least
+    wants_hover_tooltips: bool = bool(scatter_plot_kwargs.get('hoverable', False))
 
+    # Add header label
+    if add_debug_header_label:
+        plots.debug_header_label = win.addLabel("debug_header_label") # , row=1, colspan=4
+        win.nextRow()
+    
+    # Actually setup the plot:
+    if (not plots.has_attr('root_plot')):
+        plots.root_plot = win.addPlot(title="Raster") # this seems to be the equivalent to an 'axes'
+
+    # Remove any prior scatter_plot item on root_plot so repeated calls never stack duplicate spikes:
+    if plots.has_attr('scatter_plot') and (plots.scatter_plot is not None):
+        try:
+            plots.root_plot.removeItem(plots.scatter_plot)
+        except Exception:
+            pass
 
     scatter_plot_kwargs = build_scatter_plot_kwargs(scatter_plot_kwargs=scatter_plot_kwargs, tick_width=scatter_plot_kwargs.pop('tick_width', 0.1), tick_height=scatter_plot_kwargs.pop('tick_height', 1.0))
-    
-    plots.scatter_plot = pg.ScatterPlotItem(**scatter_plot_kwargs)
-    plots.scatter_plot.setObjectName('scatter_plot') # this seems necissary, the 'name' parameter in addPlot(...) seems to only change some internal property related to the legend AND drastically slows down the plotting
-    plots.scatter_plot.opts['useCache'] = True
-    plots.scatter_plot.addPoints(plots_data.all_spots, **(plots_data.all_scatterplot_tooltips_kwargs or {})) # , hoverable=True
-    plots.root_plot.addItem(plots.scatter_plot)
+
+    if use_fast_raster_item and (not wants_hover_tooltips):
+        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsObjects.FastCullableSpikeRasterItem import FastCullableSpikeRasterItem
+        plots_data.all_spots = []
+        plots_data.all_scatterplot_tooltips_kwargs = None
+        spike_t, spike_y, palette_rgba, spike_pal_idx = FastCullableSpikeRasterItem.build_spike_arrays_from_df(
+            plots_data.spikes_df,
+            neuron_colors_by_aclu=plots_data.new_sorted_raster.neuron_colors,
+            downsampling_rate=downsampling_rate if (downsampling_rate is not None) else 1,
+        )
+        plots.scatter_plot = FastCullableSpikeRasterItem(**scatter_plot_kwargs)
+        plots.scatter_plot.setObjectName('scatter_plot')
+        plots.scatter_plot.opts['useCache'] = True
+        y_vals_list = list(plots_data.new_sorted_raster.neuron_y_pos.values())
+        y_bounds = (float(min(y_vals_list)) - 0.5, float(max(y_vals_list)) + 0.5) if len(y_vals_list) > 0 else None
+        plots.scatter_plot.setSpikeArrays(spike_t, spike_y, palette_rgba, spike_pal_idx, y_bounds=y_bounds)
+        plots.root_plot.addItem(plots.scatter_plot)
+    else:
+        ## Build the spots for the raster plot:
+        plots_data.all_spots, plots_data.all_scatterplot_tooltips_kwargs = plots_data.new_sorted_raster.build_spikes_all_spots_from_df(
+            spikes_df=plots_data.spikes_df,
+            should_return_data_tooltips_kwargs=wants_hover_tooltips,
+            generate_debug_tuples=False,
+            downsampling_rate=downsampling_rate,
+        )
+        plots.scatter_plot = pg.ScatterPlotItem(**scatter_plot_kwargs)
+        plots.scatter_plot.setObjectName('scatter_plot')
+        plots.scatter_plot.opts['useCache'] = True
+        plots.scatter_plot.addPoints(plots_data.all_spots, **(plots_data.all_scatterplot_tooltips_kwargs or {}))
+        plots.root_plot.addItem(plots.scatter_plot)
 
     # build the y-axis grid to separate the units
     plots.grid = _build_units_y_grid(plots.root_plot)

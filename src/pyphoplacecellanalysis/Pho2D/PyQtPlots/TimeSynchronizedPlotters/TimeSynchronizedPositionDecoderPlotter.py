@@ -28,6 +28,7 @@ from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import 
 from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.Mixins.AnimalTrajectoryPlottingMixin import AnimalTrajectoryPlottingMixin
 from attrs import define, field, Factory
 from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.Mixins.UserEditableROIMixin import UserEditableROIMixin, Rois
+from pyphocorehelpers.gui.Qt.ExceptionPrintingSlot import pyqtExceptionPrintingSlot
 
 from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.TimeSynchronizedGenericPlotterLayer import TimeSynchronizedGenericPlotterLayer, LayerDisplayConfig
 
@@ -62,12 +63,13 @@ def _included_posterior_bin_indices_for_viewport(active_one_step_decoder, center
     """Decoded bin indices with [left,right] strictly inside [viewport_start, viewport_end]; if none, single bin from clamped searchsorted(viewport_start). Used for viewport aggregation when TimeSynchronizedPositionDecoderPlotter.use_all_active_viewport_timebins is True."""
     centers = np.asarray(centers, dtype=float)
     n = len(centers)
-    if n == 0:
+    if (n == 0) or (not np.isfinite(viewport_start)) or (not np.isfinite(viewport_end)):
         return np.array([], dtype=np.intp)
     left, right = _decoder_bin_left_right_edges(active_one_step_decoder, centers)
-    strict = [i for i in range(n) if left[i] >= viewport_start and right[i] <= viewport_end]
-    if strict:
-        return np.asarray(strict, dtype=np.intp)
+    lo = int(np.searchsorted(left, viewport_start, side='left'))
+    hi = int(np.searchsorted(right, viewport_end, side='right'))
+    if hi > lo:
+        return np.arange(lo, hi, dtype=np.intp)
     i0 = int(np.searchsorted(centers, viewport_start, side='left'))
     i0 = max(0, min(i0, n - 1))
     return np.array([i0], dtype=np.intp)
@@ -90,7 +92,7 @@ class TimeSynchronizedPositionDecoderPlotter(UserEditableROIMixin, AnimalTraject
     applicationName = 'TimeSynchronizedPositionDecoderPlotterApp'
     windowName = 'TimeSynchronizedPositionDecoderPlotterWindow'
     
-    enable_debug_print = True
+    enable_debug_print = False
     
     
     @property
@@ -144,7 +146,7 @@ class TimeSynchronizedPositionDecoderPlotter(UserEditableROIMixin, AnimalTraject
         self.active_two_step_decoder = active_two_step_decoder
         
         self.setup()
-        self.params.debug_print = True # self.enable_debug_print
+        self.params.debug_print = param_kwargs.pop('debug_print', False)
         self.params.needs_background_image = param_kwargs.pop('needs_background_image', False) # creates `self.ui.bg_imv` IFF this is true. Useful for creating the track shapes.
         self.params.show_posteriors = param_kwargs.pop('show_posteriors', True)
         self.params.decoded_time_bins_info_df = param_kwargs.pop('decoded_time_bins_info_df', None) ## 
@@ -414,9 +416,11 @@ class TimeSynchronizedPositionDecoderPlotter(UserEditableROIMixin, AnimalTraject
     # QT Slots                                                                                                             #
     # ==================================================================================================================== #
 
-    @QtCore.Slot(float, float)
+    @pyqtExceptionPrintingSlot(float, float)
     def on_window_changed(self, start_t, end_t):
         # called when the window is updated
+        if (start_t is None) or (end_t is None) or (not np.isfinite(start_t)) or (not np.isfinite(end_t)):
+            return
         if self.params.debug_print:
             print(f'TimeSynchronizedPositionDecoderPlotter.on_window_changed(start_t: {start_t}, end_t: {end_t})')
         centers = np.asarray(self.time_window_centers, dtype=float)

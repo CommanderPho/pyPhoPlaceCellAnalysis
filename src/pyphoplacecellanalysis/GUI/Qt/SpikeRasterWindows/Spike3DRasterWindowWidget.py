@@ -63,8 +63,7 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
     
     # enable_debug_print = True
     enable_debug_print = False
-    enable_interaction_events_debug_print = True
-    # enable_interaction_events_debug_print = False
+    enable_interaction_events_debug_print = False
     
     enable_smooth_scrolling_animation = False # if True, scrolling will be animated
     
@@ -470,27 +469,27 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
 
     @function_attributes(short_name=None, tags=['interactivity', 'event', 'scrolling', 'children'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-18 10:29', related_items=[])
     def update_scrolling_event_filters(self, debug_print=False):
-        """ enables scrollability in the added matplotlib views just like the two upper views 
-        
-        Needs to be done when any new child widget is added, right?
-        
-        """
-        #   .installEventFilter(self)
-        ## Install the event filter in the 2D View to enable scroll wheel events:
+        """ enables scrollability in the added matplotlib and pyqtgraph docked views just like the upper views """
         if self.ui.spike_raster_plt_2d is not None: 
             if self.ui.spike_raster_plt_2d.ui.matplotlib_view_widgets is not None:
                 for a_name, a_time_sync_widget in self.ui.spike_raster_plt_2d.ui.matplotlib_view_widgets.items():
                     if debug_print:
                         print(f'a_name: {a_name}')
-                        
+                    # Skip overview scroller so wheel scrolling over docked active-window tracks drives timeline smoothly:
+                    if a_name in ('rasters[raster_overview]', 'interval_overview'):
+                        continue
                     try:
-                        # a_time_sync_widget.installEventFilter(self) # plots.preview_overview_scatter_plot is a ScatterPlotItem ... does it have to be a pyqtgraph subclass to do this? I'm worried it does
-                        a_time_sync_widget.ui.canvas.installEventFilter(self)
-                    except (KeyError, AttributeError) as e:
-                        ## expect `KeyError: 'canvas'` for pyqtgraph-based sync widgets (as opposed to matplotlib-based ones)
-                        pass ## just skip
-                    except Exception as e:
+                        if hasattr(a_time_sync_widget, 'is_pyqtgraph_based') and a_time_sync_widget.is_pyqtgraph_based():
+                            root_gfx = a_time_sync_widget.getRootGraphicsLayoutWidget()
+                            if (root_gfx is not None) and (root_gfx.viewport() is not None):
+                                root_gfx.viewport().installEventFilter(self)
+                        else:
+                            a_time_sync_widget.ui.canvas.installEventFilter(self)
+                    except (KeyError, AttributeError):
+                        pass
+                    except Exception:
                         raise
+                ## END for a_name, a_time_sync_widget in self.ui.spike_raster_plt_2d.ui.matplotlib_view_widgets.items()....
 
 
 
@@ -699,26 +698,27 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
     def on_render_window_duration_valueChanged(self, updated_val):
         if self.enable_debug_print:
             print(f'Spike3DRasterWindowWidget.on_render_window_duration_valueChanged(updated_val: {updated_val})')
-
-        # Add a guard to prevent circular updates
-        if abs(self.render_window_duration - updated_val) < 1e-6:
-            # Skip if value is essentially the same
+        if getattr(self, '_updating_window_programmatically', False):
             return
-            
-        old_value = deepcopy(self.render_window_duration)
-        self.render_window_duration = updated_val
-        
-        window_duration = float(updated_val)
-        if window_duration is not None:
-            if abs(window_duration - self.animation_active_time_window.window_duration) > 1e-6:
-                if self.enable_debug_print:
-                    print(f'\ton_render_window_duration_valueChanged(updated_val: {updated_val}): window_duration changed: new_window_duration {window_duration} != self.animation_active_time_window.window_duration: {self.animation_active_time_window.window_duration}')
-                # Block programmatic updates from triggering more signals
-                self._updating_window_programmatically = True
-                try:
-                    self.animation_active_time_window.timeWindow.window_duration = window_duration
-                finally:
-                    self._updating_window_programmatically = False
+        try:
+            window_duration = float(updated_val)
+        except (TypeError, ValueError):
+            return
+        if not np.isfinite(window_duration):
+            return
+        max_dur = max(1.0, float(self.total_data_duration) * 1.05) if np.isfinite(self.total_data_duration) and (self.total_data_duration > 0) else 100000.0
+        window_duration = float(np.clip(window_duration, 0.005, max_dur))
+        # Add a guard to prevent circular updates
+        if abs(self.render_window_duration - window_duration) < 1e-6:
+            return
+        self._updating_window_programmatically = True
+        try:
+            curr_start = float(self.animation_active_time_window.active_window_start_time)
+            next_end = curr_start + window_duration
+            self.spike_raster_plt_2d.update_scroll_window_region(curr_start, next_end, block_signals=True)
+            self.spike_raster_plt_2d.window_scrolled.emit(curr_start, next_end)
+        finally:
+            self._updating_window_programmatically = False
                     
 
         # old_value = deepcopy(self.render_window_duration)
@@ -889,15 +889,16 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         """
         if self.enable_debug_print:
             print(f'Spike3DRasterWindowWidget.perform_jump_specific_timestamp(next_start_timestamp: {next_start_timestamp}, window_duration: {window_duration})')
-        
-        # Set the window_duration first so it fits the window:
-        if window_duration is not None:
-            if window_duration != self.animation_active_time_window.window_duration:
-                if self.enable_debug_print:
-                    print(f'perform_jump_specific_timestamp(): window_duration changed: new_window_duration {window_duration} != self.animation_active_time_window.window_duration: {self.animation_active_time_window.window_duration}')
-                self.animation_active_time_window.timeWindow.window_duration = window_duration
-                # TODO 2023-03-29 19:18: - [ ] See if anything needs to be updated manually when window duration changes.
-        self.update_animation(next_start_timestamp)
+        if (next_start_timestamp is None) or (not np.isfinite(next_start_timestamp)):
+            return
+        if (window_duration is not None) and np.isfinite(window_duration) and (window_duration > 0.0):
+            max_dur = max(1.0, float(self.total_data_duration) * 1.05) if np.isfinite(self.total_data_duration) and (self.total_data_duration > 0) else 100000.0
+            clamped_dur = float(np.clip(window_duration, 0.005, max_dur))
+            next_end_timestamp = float(next_start_timestamp) + clamped_dur
+            self.spike_raster_plt_2d.update_scroll_window_region(float(next_start_timestamp), next_end_timestamp, block_signals=True)
+            self.spike_raster_plt_2d.window_scrolled.emit(float(next_start_timestamp), next_end_timestamp)
+            return
+        self.update_animation(float(next_start_timestamp))
         
 
 

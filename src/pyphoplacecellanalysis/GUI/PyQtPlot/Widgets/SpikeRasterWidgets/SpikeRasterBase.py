@@ -99,10 +99,17 @@ self._update_plots()
 
 
 def trap_exc_during_debug(*args):
-    # when app raises uncaught exception, print info
-    print(args)
-    if _GLOBAL_spike_raster_logger is not None:
-        _GLOBAL_spike_raster_logger.error(f'in trap_exc_during_debug(*args: {args})\n this was installed as the sys.excepthook in SpikeRasterBase above the main class.')
+    # when app raises uncaught exception, print info (must never raise or PyQt5 calls qFatal -> abort)
+    try:
+        import traceback
+        if len(args) == 3:
+            traceback.print_exception(*args)
+        else:
+            print(args)
+        if _GLOBAL_spike_raster_logger is not None:
+            _GLOBAL_spike_raster_logger.error(f'in trap_exc_during_debug(*args: {args})\n this was installed as the sys.excepthook in SpikeRasterBase above the main class.')
+    except Exception:
+        pass
 
 # install exception hook: without this, uncaught exception would cause application to exit
 sys.excepthook = trap_exc_during_debug
@@ -173,7 +180,12 @@ class SpikeRasterBase(LoggingBaseClassLoggerOwningMixin, UnitSortableMixin, Data
     @property
     def fragile_linear_neuron_IDXs(self):
         """The fragile_linear_neuron_IDXs from the whole df (not just the current window)"""
-        return np.unique(self.spikes_window.df['fragile_linear_neuron_IDX'].to_numpy())
+        df_ref = self.spikes_window.df
+        if (getattr(self, '_cached_fragile_linear_neuron_IDXs', None) is None) or (getattr(self, '_cached_neuron_idxs_df_id', None) != id(df_ref)) or (getattr(self, '_cached_neuron_idxs_df_len', None) != len(df_ref)):
+            self._cached_fragile_linear_neuron_IDXs = np.unique(df_ref['fragile_linear_neuron_IDX'].to_numpy())
+            self._cached_neuron_idxs_df_id = id(df_ref)
+            self._cached_neuron_idxs_df_len = len(df_ref)
+        return self._cached_fragile_linear_neuron_IDXs
     
     @property
     def ordered_fragile_linear_neuron_IDXs(self):
@@ -202,7 +214,12 @@ class SpikeRasterBase(LoggingBaseClassLoggerOwningMixin, UnitSortableMixin, Data
     @property
     def cell_ids(self):
         """ e.g. the list of valid cell_ids (unique aclu values) """
-        return np.unique(self.spikes_window.df['aclu'].to_numpy()) 
+        df_ref = self.spikes_window.df
+        if (getattr(self, '_cached_cell_ids', None) is None) or (getattr(self, '_cached_cell_ids_df_id', None) != id(df_ref)) or (getattr(self, '_cached_cell_ids_df_len', None) != len(df_ref)):
+            self._cached_cell_ids = np.unique(df_ref['aclu'].to_numpy())
+            self._cached_cell_ids_df_id = id(df_ref)
+            self._cached_cell_ids_df_len = len(df_ref)
+        return self._cached_cell_ids 
 
     @property
     def ordered_neuron_ids(self):
@@ -281,7 +298,9 @@ class SpikeRasterBase(LoggingBaseClassLoggerOwningMixin, UnitSortableMixin, Data
         """
         super(SpikeRasterBase, self).__init__(**kwargs)
         # Initialize member variables:
-        _GLOBAL_spike_raster_logger = build_logger('Spike3D.display.SpikeRasterBase', file_logging_dir=None, debug_print=False) # Only now do we build the module logger. This way it isn't made when the SpikeRaster plots aren't even used.
+        global _GLOBAL_spike_raster_logger
+        if _GLOBAL_spike_raster_logger is None:
+            _GLOBAL_spike_raster_logger = build_logger('Spike3D.display.SpikeRasterBase', file_logging_dir=None, debug_print=False) # Only now do we build the module logger. This way it isn't made when the SpikeRaster plots aren't even used.
         self._logger = _GLOBAL_spike_raster_logger
         self.logger.info(f'SpikeRasterBase.__init__(...)')
         
@@ -337,6 +356,7 @@ class SpikeRasterBase(LoggingBaseClassLoggerOwningMixin, UnitSortableMixin, Data
         
         # Connect window update signals
         # Only subscribe to the more advanced LiveWindowedData-style window update signals that also provide data
+        self.spikes_window.spike_dataframe_changed_signal.connect(self.on_spikes_df_changed)
         self.spikes_window.windowed_data_window_duration_changed_signal.connect(self.on_windowed_data_window_duration_changed)
         self.spikes_window.windowed_data_window_updated_signal.connect(self.on_windowed_data_window_changed)
         
@@ -637,6 +657,8 @@ class SpikeRasterBase(LoggingBaseClassLoggerOwningMixin, UnitSortableMixin, Data
             self.fragile_linear_neuron_IDXs
             self.n_full_cell_grid
         """
+        self._cached_fragile_linear_neuron_IDXs = None
+        self._cached_cell_ids = None
         if self.enable_debug_print:
             print(f'SpikeRasterBase.on_spikes_df_changed()')
         

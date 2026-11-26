@@ -383,12 +383,15 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
         Returns:
             tuple[int, int, int, int]: A tuple containing hours, minutes, seconds, and milliseconds.
         """
+        if (total_seconds is None) or (not np.isfinite(total_seconds)):
+            return 0, 0, 0, 0
+        total_seconds = float(np.clip(total_seconds, 0.0, 86399.999))
         hours = int(total_seconds // 3600)
         total_seconds %= 3600
         minutes = int(total_seconds // 60)
         total_seconds %= 60
         seconds = int(total_seconds)
-        milliseconds = int((total_seconds - seconds) * 1000)
+        milliseconds = int(np.clip(round((total_seconds - seconds) * 1000), 0, 999))
         return hours, minutes, seconds, milliseconds
 
     @property
@@ -416,10 +419,15 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
         return time_fractional_seconds
     @time_fractional_seconds.setter
     def time_fractional_seconds(self, value):
+        if self.time_edit is None:
+            return
         time_tuple = self.decompose_fractional_seconds(value)
         assert len(time_tuple) == 4
         # Create a QTime object from the tuple
         time_obj = QTime(time_tuple[0], time_tuple[1], time_tuple[2], time_tuple[3])
+        if not time_obj.isValid():
+            time_obj = QTime(0, 0, 0, 0)
+        self.time_edit.blockSignals(True)
         try:
             # Set the QTimeEdit's time
             self.time_edit.setTime(time_obj)
@@ -732,6 +740,7 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
         self.ui.doubleSpinBox_ActiveWindowEndTime.setFocusPolicy(focus_policy)
 
 
+    @pyqtExceptionPrintingSlot()
     def on_active_window_start_time_editing_finished(self):
         """Editing of the time has finished """
         # Ensure the current text is interpreted and committed to the underlying value
@@ -739,6 +748,10 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
         self.ui.doubleSpinBox_ActiveWindowEndTime.interpretText()
         start_t_seconds: float = float(self.ui.doubleSpinBox_ActiveWindowStartTime.value())
         end_t_seconds: float = float(self.ui.doubleSpinBox_ActiveWindowEndTime.value())
+        if (not np.isfinite(start_t_seconds)) or (not np.isfinite(end_t_seconds)):
+            return
+        if end_t_seconds <= start_t_seconds:
+            end_t_seconds = start_t_seconds + 0.01
         self.log_print(f'start_t_seconds: {start_t_seconds}, end_t_seconds: {end_t_seconds}')
         
         self.ui.doubleSpinBox_ActiveWindowStartTime.clearFocus()
@@ -746,6 +759,7 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
         self.jump_specific_time_window.emit(start_t_seconds, end_t_seconds)
 
 
+    @pyqtExceptionPrintingSlot()
     def on_active_window_end_time_editing_finished(self):
         """Editing of the time has finished """
         # Ensure the current text is interpreted and committed to the underlying value
@@ -753,6 +767,10 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
         self.ui.doubleSpinBox_ActiveWindowEndTime.interpretText()
         start_t_seconds: float = float(self.ui.doubleSpinBox_ActiveWindowStartTime.value())
         end_t_seconds: float = float(self.ui.doubleSpinBox_ActiveWindowEndTime.value())
+        if (not np.isfinite(start_t_seconds)) or (not np.isfinite(end_t_seconds)):
+            return
+        if end_t_seconds <= start_t_seconds:
+            end_t_seconds = start_t_seconds + 0.01
         self.log_print(f'start_t_seconds: {start_t_seconds}, end_t_seconds: {end_t_seconds}')
         
         self.ui.doubleSpinBox_ActiveWindowEndTime.clearFocus()
@@ -1042,7 +1060,8 @@ class SpikeRasterBottomFrameControlsMixin(LoggingBaseClassLoggerOwningMixin):
         
         """
         # Called the Implementor's update_window(...) function
-        print(f'SpikeRasterBottomFrameControlsMixin_on_window_update(new_start: {new_start}, new_end: {new_end}')
+        if getattr(self, 'enable_debug_print', False):
+            print(f'SpikeRasterBottomFrameControlsMixin_on_window_update(new_start: {new_start}, new_end: {new_end}')
         #TODO 2023-11-21 18:49: - [ ] Doesn't work :[
         # need to block signals:
         

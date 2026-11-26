@@ -272,9 +272,13 @@ class CustomLinearRegionItem(DraggableGraphicsWidgetMixin, LinearRegionItem):
             return
             
         self.lines[0].blockSignals(True)  # only want to update once
+        self.lines[1].blockSignals(True)
         for i, l in enumerate(self.lines):
             l.setPos(self.cursorOffsets[i] + ev.pos())
+        ## END for i, l in enumerate(self.lines)....
+
         self.lines[0].blockSignals(False)
+        self.lines[1].blockSignals(False)
         self.prepareGeometryChange()
         
         if ev.isFinish():

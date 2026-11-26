@@ -519,13 +519,15 @@ class Spike3DRaster(PyQtGraphSpecificTimeCurvesMixin, RenderTimeEpoch3DMeshesMix
         # y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode='zero_centered', bin_position_mode='bin_center', side_bin_margins = self.params.side_bin_margins)
         # self.y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode=self.params.bin_position_mode, side_bin_margins = self.params.side_bin_margins)
         
+        # Slice active_windowed_df once outside the per-neuron loop (avoids N_cells full-session DataFrame scans):
+        curr_windowed_df = self.active_windowed_df
+        time_col_name = curr_windowed_df.spikes.time_variable_name
+        windowed_neuron_idxs = curr_windowed_df['fragile_linear_neuron_IDX'].to_numpy()
+        windowed_spike_times = curr_windowed_df[time_col_name].to_numpy()
+
         # Plot each unit one at a time:
         for i, a_fragile_linear_neuron_IDX in enumerate(self.fragile_linear_neuron_IDXs):    
-            # Filter the dataframe using that column and value from the list
-            curr_cell_df = self.active_windowed_df[self.active_windowed_df['fragile_linear_neuron_IDX']==a_fragile_linear_neuron_IDX]
-            curr_spike_t = curr_cell_df[curr_cell_df.spikes.time_variable_name].to_numpy() # this will map
-            # efficiently get curr_spike_t by filtering for unit and column at the same time
-            # curr_spike_t = self.active_windowed_df.loc[self.active_windowed_df.spikes.time_variable_name, (self.active_windowed_df['fragile_linear_neuron_IDX']==cell_id)].values # .to_numpy()
+            curr_spike_t = windowed_spike_times[windowed_neuron_idxs == a_fragile_linear_neuron_IDX]
             
             curr_unit_n_spikes = len(curr_spike_t)
             

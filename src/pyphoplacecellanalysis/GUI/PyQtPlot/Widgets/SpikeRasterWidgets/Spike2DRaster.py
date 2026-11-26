@@ -287,18 +287,18 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
             axes_planes_floor_fixed_y_spacing (default 10.0): the spacing of grid lines along the y-axis that subdivide the floor axes plane (blue z-plane)
         
         """
-        self.params.setdefault('useOpenGL', True)
-        self.params.setdefault('enableExperimental', True)
+        self.params.setdefault('useOpenGL', False)
+        self.params.setdefault('enableExperimental', False)
 
-        # Configure pyqtgraph config:
-        try:
-            import OpenGL
-            # pg.setConfigOption('useOpenGL', True)
-            pg.setConfigOption('useOpenGL', self.params.useOpenGL)
-            pg.setConfigOption('enableExperimental', self.params.enableExperimental)
-        except Exception as e:
-            self.logger.error(f"Enabling OpenGL failed with {e}. Will result in slow rendering. Try installing PyOpenGL.")
-            print(f"Enabling OpenGL failed with {e}. Will result in slow rendering. Try installing PyOpenGL.")
+        # Configure pyqtgraph config only when explicitly requested (2D multi-dock QOpenGLWidget + experimental paintGL can crash Qt5/OpenGL on Windows):
+        if bool(self.params.get('useOpenGL', False)) or bool(self.params.get('enableExperimental', False)):
+            try:
+                import OpenGL
+                pg.setConfigOption('useOpenGL', bool(self.params.useOpenGL))
+                pg.setConfigOption('enableExperimental', bool(self.params.enableExperimental))
+            except Exception as e:
+                self.logger.error(f"Enabling OpenGL failed with {e}. Will result in slow rendering. Try installing PyOpenGL.")
+                print(f"Enabling OpenGL failed with {e}. Will result in slow rendering. Try installing PyOpenGL.")
             
         pg.setConfigOptions(antialias = True)
         pg.setConfigOption('background', "#1B1B1B")
@@ -449,7 +449,7 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
         ##### Main Raster Plot Content Top ##########
         self.ui.main_graphics_layout_widget = CustomGraphicsLayoutWidget()
         self.ui.main_graphics_layout_widget.setObjectName('main_graphics_layout_widget')
-        self.ui.main_graphics_layout_widget.useOpenGL(True)
+        self.ui.main_graphics_layout_widget.useOpenGL(bool(self.params.get('useOpenGL', False)))
         self.ui.main_graphics_layout_widget.resize(1000,600)
         
         # add the GLViewWidget to the splitter
@@ -497,8 +497,9 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
             # self.plots.main_plot_widget.disableAutoRange()
             self._update_plot_ranges()
             
-            ## This scatter plot is the dynamic raster that "zooms" on adjustment of the lienar slider region. It is NOT static background raster that's rendered at the bottom of the window!
-            self.plots.scatter_plot = pg.ScatterPlotItem(name='spikeRasterScatterPlotItem', pxMode=True, symbol=vtick, size=10, pen={'color': 'w', 'width': 2})
+            ## This scatter plot is the dynamic raster that "zooms" on adjustment of the linear slider region. It is NOT static background raster that's rendered at the bottom of the window!
+            from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsObjects.FastCullableSpikeRasterItem import FastCullableSpikeRasterItem
+            self.plots.scatter_plot = FastCullableSpikeRasterItem(name='spikeRasterScatterPlotItem', pxMode=True, symbol=vtick, size=10, pen={'color': 'w', 'width': 2})
             self.plots.scatter_plot.setObjectName('scatter_plot')
             self.plots.scatter_plot.opts['useCache'] = True
             self.plots.main_plot_widget.addItem(self.plots.scatter_plot)
@@ -513,9 +514,8 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
         self.plots.background_static_scroll_window_plot = self.ui.main_graphics_layout_widget.addPlot(row=2, col=0, rowspan=1, colspan=1) # rowspan=self.params.main_graphics_plot_widget_rowspan
         self.plots.background_static_scroll_window_plot = self.ScrollRasterPreviewWindow_on_BuildUI(self.plots.background_static_scroll_window_plot)
 
-        # self.ScrollRasterPreviewWindow_on_BuildUI()
-        if self.Includes2DActiveWindowScatter:
-            self.plots.scatter_plot.addPoints(self.plots_data.all_spots)
+        if self.Includes2DActiveWindowScatter and (self.plots.scatter_plot is not None):
+            self.update_rasters()
     
         self.params.custom_interval_rendering_plots.append(self.plots.background_static_scroll_window_plot)
 
@@ -564,7 +564,7 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
             self.params.custom_interval_rendering_plots.append(intervals_plot_item)
 
             # Rasters ____________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
-            _raster_overview_tracks_out_dict = self.prepare_pyqtgraph_rasterPlot_track(name_modifier_suffix='raster_overview', should_link_to_main_plot_widget=False, sync_mode=SynchronizedPlotMode.NO_SYNC, downsampling_rate=5)
+            _raster_overview_tracks_out_dict = self.prepare_pyqtgraph_rasterPlot_track(name_modifier_suffix='raster_overview', should_link_to_main_plot_widget=False, sync_mode=SynchronizedPlotMode.NO_SYNC, downsampling_rate=1, create_scatter_plot=False)
             raster_overview_dock_config, raster_overview_time_sync_pyqtgraph_widget, raster_overview_root_graphics_layout_widget, raster_overview_plot_item, raster_overview_display_outputs_tuple = _raster_overview_tracks_out_dict['rasters[raster_overview]']
             self.plots.background_static_scroll_window_plot = raster_overview_plot_item
             self.plots.background_static_scroll_window_plot = self.ScrollRasterPreviewWindow_on_BuildUI(self.plots.background_static_scroll_window_plot)
@@ -578,12 +578,9 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
                 raster_window_app, raster_window_win, raster_window_plots, raster_window_plots_data = raster_window_display_outputs_tuple                
                 self.plots.main_plot_widget = raster_window_plot_item
                 self.plots.scatter_plot = raster_window_plots.scatter_plot
-                # self.params.custom_interval_rendering_plots.append(self.plots.main_plot_widget)
-                # _all_outputs_dict['_raster_tracks_out_dict'] = _raster_tracks_out_dict
-                if self.plots.scatter_plot is not None:
-                    if self.plots_data.all_spots is not None:
-                        self.plots.scatter_plot.addPoints(self.plots_data.all_spots)
-
+                # Upgrade early-created PyQtGraph tracks onto main_plot_widget XLink now that main_plot_widget exists:
+                self.sync_matplotlib_render_plot_widget('rasters[raster_window]', sync_mode=SynchronizedPlotMode.TO_WINDOW)
+                self.sync_matplotlib_render_plot_widget('intervals', sync_mode=SynchronizedPlotMode.TO_WINDOW)
             # END if self.Includes2DActiveWindowScatter...
 
 
@@ -693,9 +690,13 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
         # From Render2DScrollWindowPlotMixin:
         # self.EpochRenderingMixin_on_buildUI()
         
-        # self.Render2DScrollWindowPlot_on_window_update # register with the animation time window for updates for the scroller.
-        # Connect the signals for the zoom region and the LinearRegionItem        
-        self.rate_limited_signal_scrolled_proxy = pg.SignalProxy(self.window_scrolled, rateLimit=30, slot=self.update_zoomed_plot_rate_limited) # Limit updates to 30 Signals/Second
+        # Connect the signals for the zoom region and the LinearRegionItem using a 60 Hz leading+trailing coalescer (0 ms latency on single step, 60 FPS cap during continuous drag)
+        self._last_zoomed_plot_update_perf = 0.0
+        self._pending_zoomed_plot_range = None
+        self._zoomed_plot_coalesce_timer = QtCore.QTimer(self)
+        self._zoomed_plot_coalesce_timer.setSingleShot(True)
+        self._zoomed_plot_coalesce_timer.timeout.connect(self._flush_coalesced_window_scroll)
+        self.rate_limited_signal_scrolled_proxy = self.window_scrolled.connect(self._on_window_scrolled_coalesced)
 
         # Required for dynamic matplotlib figures (2022-12-23 added, not sure how it relates to above):
         self._setupUI_matplotlib_render_plots()
@@ -796,16 +797,39 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
         if self.enable_debug_print:
             print(f'Spike2DRaster._update_plots()')
         # assert (len(self.ui.plots) == self.n_cells), f"after all operations the length of the plots array should be the same as the n_cells, but len(self.ui.plots): {len(self.ui.plots)} and self.n_cells: {self.n_cells}!"
-        # build the position range for each unit along the y-axis:
-        # self._series_identity_y_values = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode=self.params.bin_position_mode, side_bin_margins = self.params.side_bin_margins)
-        self.update_series_identity_y_values()
+        # build the position range for each unit along the y-axis only if not yet initialized (neuron identities do not change on time scroll):
+        if getattr(self, '_series_identity_y_values', None) is None:
+            self.update_series_identity_y_values()
 
-        # update the current scroll region:
-        # self.ui.scroll_window_region.setRegion(updated_time_window)
-        
-        # Update 3D Curves if we have them: TODO: figure out where this goes!
-        self.TimeCurvesViewMixin_on_window_update() # Don't think this does much here
-        
+        # Update 3D Curves if we have them:
+        self.TimeCurvesViewMixin_on_window_update()
+
+
+    @pyqtExceptionPrintingSlot(float, float)
+    def _on_window_scrolled_coalesced(self, min_t: float, max_t: float):
+        """Leading+trailing 60 Hz frame coalescer: immediate update on first event, 16 ms coalescing during bursts."""
+        import time
+        now = time.perf_counter()
+        elapsed = now - getattr(self, '_last_zoomed_plot_update_perf', 0.0)
+        if (not self._zoomed_plot_coalesce_timer.isActive()) and (elapsed >= 0.016):
+            self._last_zoomed_plot_update_perf = now
+            self.update_zoomed_plot(min_t, max_t)
+        else:
+            self._pending_zoomed_plot_range = (float(min_t), float(max_t))
+            if not self._zoomed_plot_coalesce_timer.isActive():
+                remaining_ms = max(1, int((0.016 - elapsed) * 1000.0))
+                self._zoomed_plot_coalesce_timer.start(remaining_ms)
+
+
+    @pyqtExceptionPrintingSlot()
+    def _flush_coalesced_window_scroll(self):
+        import time
+        pending = getattr(self, '_pending_zoomed_plot_range', None)
+        self._pending_zoomed_plot_range = None
+        if pending is not None:
+            self._last_zoomed_plot_update_perf = time.perf_counter()
+            self.update_zoomed_plot(pending[0], pending[1])
+
 
     @pyqtExceptionPrintingSlot(object)
     def update_zoomed_plot_rate_limited(self, evt):
@@ -931,9 +955,7 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
             ## update window start only:            
             self.spikes_window.update_window_start(min_t)
 
-
-        # Update 3D Curves if we have them: TODO: figure out where this goes!
-        self.TimeCurvesViewMixin_on_window_update()
+        # Note: spikes_window.update_window_* already triggers _update_plots() -> TimeCurvesViewMixin_on_window_update() once
         self._apply_decoded_posterior_x_grid(min_t, max_t)
 
 
@@ -978,9 +1000,10 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
         if colors_changed:
             ## Rebuild Raster Plot Points:
             self._build_cell_configs()
-            # ALL Spikes in the preview window:
-            self.plots_data.all_spots = self._build_all_spikes_all_spots()
-            # Update preview_overview_scatter_plot
+            from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsObjects.FastCullableSpikeRasterItem import FastCullableSpikeRasterItem
+            if not isinstance(getattr(self.plots, 'scatter_plot', None), FastCullableSpikeRasterItem):
+                self.plots_data.all_spots = self._build_all_spikes_all_spots()
+            # Update preview_overview_scatter_plot and active window scatter_plot
             self.update_rasters()
         
 
@@ -1283,11 +1306,13 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
     
     #####################################################
     def clear_all_3D_time_curves(self):
+        self._static_2d_time_curves_signature = None
         for (aUID, plt) in self.plots.time_curves.items():
             self.ui.main_time_curves_view_widget.removeItem(plt) # this should automatically work for 2D curves as well
-            # plt.delete_later() #?
-            
-        self.ui.main_time_curves_view_legend.clear() # remove all items from the legend
+        ## END for (aUID, plt) in self.plots.time_curves.items()....
+
+        if self.ui.main_time_curves_view_legend is not None:
+            self.ui.main_time_curves_view_legend.clear() # remove all items from the legend
         # Clear the dict
         self.plots.time_curves.clear()
         ## This part might be 3D only, but we do have a working 2D version so maybe just bring that in?
@@ -1295,27 +1320,31 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
         
 
     def update_3D_time_curves(self):
-        """ initialize the graphics objects if needed, or update them if they already exist. """
-        if self.params.time_curves_datasource is None:
+        """ initialize the graphics objects if needed, or update them if they already exist.
+        For 2D plots, full-session curves are uploaded once with clipToView=True + setXLink so scrolling is O(1) with zero DataFrame slicing.
+        """
+        ds = self.params.time_curves_datasource
+        if ds is None:
             return
         elif self.params.time_curves_no_update:
             # don't update because we're in no_update mode
-            print(f'')
             return
         else:
-            # Common to both:
-            # Get current plot items:
-            curr_plot3D_active_window_data = self.params.time_curves_datasource.get_updated_data_window(self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time) # get updated data for the active window from the datasource # if we want the data from the whole time, we aren't getting that here unfortunately
-            
-            is_data_series_mode = self.params.time_curves_datasource.has_data_series_specs # True for SpikeRaster2D
+            is_data_series_mode = ds.has_data_series_specs # True for SpikeRaster2D
+            full_df = ds.df
+            expected_uids = tuple(ds.datasource_UIDs) if is_data_series_mode else ()
+            curr_sig = (id(full_df), len(full_df), expected_uids)
+            if (len(self.plots.time_curves) > 0) and (getattr(self, '_static_2d_time_curves_signature', None) == curr_sig) and all((uid in self.plots.time_curves) for uid in expected_uids):
+                # Already uploaded full-session curves; XLink + clipToView handles viewport scrolling automatically
+                return
+
             if is_data_series_mode:
-                data_series_spaital_values_list = self.params.time_curves_datasource.data_series_specs.get_data_series_spatial_values(curr_plot3D_active_window_data)
+                data_series_spaital_values_list = ds.data_series_specs.get_data_series_spatial_values(full_df)
                 num_data_series = len(data_series_spaital_values_list)
             else:
                 # old compatibility mode:
                 num_data_series = 1
 
-            # curr_data_series_index = 0
             # Loop through the active data series:                
             for curr_data_series_index in np.arange(num_data_series):
                 # Data series mode:
@@ -1324,8 +1353,8 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
                     curr_data_series_dict = data_series_spaital_values_list[curr_data_series_index]
                     
                     curr_plot_column_name = curr_data_series_dict.get('name', f'series[{curr_data_series_index}]') # get either the specified name or the generic 'series[i]' name otherwise
-                    curr_plot_name = self.params.time_curves_datasource.datasource_UIDs[curr_data_series_index]
-                    curr_plot_legend_name = self.params.time_curves_datasource.data_column_names[curr_data_series_index] # ['lin_pos', 'x', 'y']
+                    curr_plot_name = ds.datasource_UIDs[curr_data_series_index]
+                    curr_plot_legend_name = ds.data_column_names[curr_data_series_index] # ['lin_pos', 'x', 'y']
                     
                     # points for the current plot:
                     pts = np.column_stack([curr_data_series_dict['x'], curr_data_series_dict['y'], curr_data_series_dict['z']])
@@ -1344,8 +1373,9 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
                 
                 # outputs of either mode are curr_plot_name, pts
                 curr_plt = self._build_or_update_time_curves_plot(curr_plot_name, pts, **extra_plot_options_dict)
-                # end for curr_data_series_index in np.arange(num_data_series)
+            ## END for curr_data_series_index in np.arange(num_data_series)....
 
+            self._static_2d_time_curves_signature = curr_sig
             self.add_3D_time_curves_baseline_grid_mesh() # from Render3DTimeCurvesBaseGridMixin
 
 
@@ -1403,14 +1433,18 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
             points = points[:, [0, 2]]
         assert np.shape(points)[1] == 2, f"points must be (N, 2) but it instead {np.shape(points)}"
 
+        x_vals = np.ascontiguousarray(points[:, 0], dtype=float)
+        y_vals = np.ascontiguousarray(points[:, 1], dtype=float)
+
         if plot_name in self.plots.time_curves:
             # Plot already exists, update it instead.
             plt = self.plots.time_curves[plot_name]
-            plt.setData(points)
+            plt.setData(x=x_vals, y=y_vals)
             if curr_plot_legend_name is not None:
                 # Update the legend entry:
                 curr_label = self.ui.main_time_curves_view_legend.getLabel(plt)
-                curr_label.setText(curr_plot_legend_name) # update the legend name if needed
+                if curr_label is not None:
+                    curr_label.setText(curr_plot_legend_name) # update the legend name if needed
                 
         else:
             # plot doesn't exist, built it fresh.
@@ -1421,18 +1455,14 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
                 line_color = pg.mkColor(plot_args.setdefault('color_name', 'white'))
                 line_color.setAlphaF(0.8)
 
-            # Note .plot(...) seems to allow more options than .addLine(...)
-            # curr_plt = self.ui.main_time_curves_view_widget.addLine(x=curr_data_series_dict['x'], y=curr_data_series_dict['y'])
-            plt = self.ui.main_time_curves_view_widget.plot(points, pen=line_color, name=plot_name) # TODO: is this the slow version of name =?
-            # end for curr_data_series_index in np.arange(num_data_series)
+            line_width = float(plot_args.get('line_width', 1.0) or 1.0)
+            pen = pg.mkPen(color=line_color, width=line_width)
+            plt = self.ui.main_time_curves_view_widget.plot(x=x_vals, y=y_vals, pen=pen, name=plot_name, clipToView=True, autoDownsample=True, downsampleMethod='subsample', connect='finite')
             self.plots.time_curves[plot_name] = plt # add it to the dictionary.
             
             if curr_plot_legend_name is not None:
                 # Create the legend entry
                 self.ui.main_time_curves_view_legend.addItem(plt, curr_plot_legend_name)
-            
-            # TODO: set line_width?
-            # TODO: scaling like the 3D version?
             
         return plt
     
@@ -1477,12 +1507,10 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
         use_docked_pyqtgraph_plots: bool = self.params.use_docked_pyqtgraph_plots
         if use_docked_pyqtgraph_plots:
             a_time_sync_pyqtgraph_widget, root_graphics_layout_widget, plot_item, dDisplayItem = self.add_new_embedded_pyqtgraph_render_plot_widget(name=name, dockSize=(500,50))
-            target_graphics_layout_widget = root_graphics_layout_widget
+            new_curves_separate_plot = plot_item # Reuse the root PlotItem created by PyqtgraphTimeSynchronizedWidget instead of adding a duplicate PlotItem
         else:
             target_graphics_layout_widget = self.ui.active_window_container_layout # GraphicsLayoutWidget
-            
-        # self.ui.active_window_container_layout.
-        new_curves_separate_plot = target_graphics_layout_widget.addPlot(row=row, col=col, rowspan=rowspan, colspan=colspan) # PlotItem
+            new_curves_separate_plot = target_graphics_layout_widget.addPlot(row=row, col=col, rowspan=rowspan, colspan=colspan) # PlotItem
         new_curves_separate_plot.setObjectName(name)
 
         # Setup axes bounds for the bottom windowed plot:
@@ -1493,14 +1521,16 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
         
         # Setup axes bounds for the bottom windowed plot:
         new_curves_separate_plot.setMouseEnabled(x=False, y=True) ## unusual
+        new_curves_separate_plot.disableAutoRange('x')
         
         # Setup range for plot:
-        earliest_t, latest_t = self.spikes_window.total_df_start_end_times
+        earliest_t, latest_t = self.spikes_window.active_time_window
         new_curves_separate_plot.setXRange(earliest_t, latest_t, padding=0)
                 
-        # # setup the new_curves_separate_plot to have a linked X-axis to the other scroll plot:
+        # setup the new_curves_separate_plot to have a linked X-axis to the main zoomed plot:
         main_plot_widget = self.plots.main_plot_widget # PlotItem
-        new_curves_separate_plot.setXLink(main_plot_widget) # works to synchronize the main zoomed plot (current window) with the epoch_rect_separate_plot (rectangles plotter)
+        if main_plot_widget is not None:
+            new_curves_separate_plot.setXLink(main_plot_widget)
         
         if not use_docked_pyqtgraph_plots:
             if self._menuContextAddRenderable is not None:
@@ -1782,72 +1812,79 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
 
     @function_attributes(short_name=None, tags=['matplotlib_render_widget', 'dynamic_ui', 'group_matplotlib_render_plot_widget'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-10-17 13:27', related_items=[])
     def remove_matplotlib_render_plot_widget(self, identifier):
-        """ removes the subplot - does not work yet """
-        ## TODO: need to remove the display item from self.ui.dynamic_docked_widget_container?
+        """ removes a dynamically added matplotlib or pyqtgraph docked track widget """
         active_matplotlib_view_widget = self.ui.matplotlib_view_widgets.get(identifier, None)
         if active_matplotlib_view_widget is not None:
-            ## TODO: remove the connection from self.ui.connections[identifier]?
             self.sync_matplotlib_render_plot_widget(identifier, sync_mode=SynchronizedPlotMode.NO_SYNC)
-            ## Remove the widget itself:
-            # self.ui.dynamic_docked_widget_container
-            self.ui.layout.removeWidget(active_matplotlib_view_widget) # Remove the matplotlib widget
+            try:
+                self.ui.layout.removeWidget(active_matplotlib_view_widget)
+            except Exception:
+                pass
+            try:
+                if getattr(self.ui, 'dynamic_docked_widget_container', None) is not None:
+                    d_item = self.ui.dynamic_docked_widget_container.find_display_dock(identifier=identifier)
+                    if d_item is not None:
+                        self.ui.dynamic_docked_widget_container.remove_display_dock(identifer=identifier)
+            except Exception:
+                pass
             active_matplotlib_view_widget.deleteLater()
-            active_matplotlib_view_widget = None # Set the matplotlib_view_widget to None ## TODO: this doesn't actually remove it from the UI container does it?
-            ## remove from the dictionary
             del self.ui.matplotlib_view_widgets[identifier]
-            self.sigEmbeddedMatplotlibDockWidgetRemoved.emit(self, identifier) ## get the widget before it fails
-            self.sigDockClosed(self, identifier) ## sigDockClosed signal
-            
+            self.sigEmbeddedMatplotlibDockWidgetRemoved.emit(self, identifier)
+            self.sigDockClosed.emit(self, identifier)
         else:
             print(f'WARNING: active_matplotlib_view_widget with identifier "{identifier}" was not found!')
 
     @function_attributes(short_name=None, tags=['matplotlib_render_widget', 'dynamic_ui', 'group_matplotlib_render_plot_widget', 'sync'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-10-17 13:27', related_items=[])
     def sync_matplotlib_render_plot_widget(self, identifier, sync_mode=SynchronizedPlotMode.TO_WINDOW):
-        """ syncs a matplotlib render plot widget with a specified identifier with either the global window, the active time window, or disables sync with the Spike2DRaster. """
-        # Requires specifying the identifier
+        """ syncs a matplotlib or pyqtgraph render plot widget with a specified identifier with either the global window, the active time window, or disables sync with the Spike2DRaster. """
         active_matplotlib_view_widget = self.ui.matplotlib_view_widgets.get(identifier, None)
         if active_matplotlib_view_widget is not None:
-            if sync_mode.name == SynchronizedPlotMode.NO_SYNC.name:
-                # disable syncing
-                sync_connection = self.ui.connections.get(identifier, None)
-                if sync_connection is not None:
-                    # have an existing sync connection, need to disconnect it.
-                    print(f'disconnecting window_scrolled for "{identifier}"')
+            # Safely disconnect any prior window_scrolled connection first:
+            sync_connection = self.ui.connections.pop(identifier, None)
+            if sync_connection is not None:
+                try:
                     self.window_scrolled.disconnect(sync_connection)
-                    # print(f'WARNING: connection exists!')
-                    self.ui.connections[identifier] = None
-                    del self.ui.connections[identifier] # remove the connection after disconnecting it.
+                except (TypeError, RuntimeError):
+                    pass
 
-                return None
-            elif sync_mode.name == SynchronizedPlotMode.TO_GLOBAL_DATA.name:
-                ## Synchronize just once to the global data:
-                # disable active window syncing if it's enabled:
-                sync_connection = self.ui.connections.get(identifier, None)
-                if sync_connection is not None:
-                    # have an existing sync connection, need to disconnect it.
-                    print(f'\tdisconnecting window_scrolled for "{identifier}"')
-                    self.window_scrolled.disconnect(sync_connection)
-                    # print(f'WARNING: connection exists!')
-                    self.ui.connections[identifier] = None
-                    del self.ui.connections[identifier] # remove the connection after disconnecting it.
+            is_pg_widget = hasattr(active_matplotlib_view_widget, 'is_pyqtgraph_based') and active_matplotlib_view_widget.is_pyqtgraph_based()
+            target_plot_item = active_matplotlib_view_widget.getRootPlotItem() if (is_pg_widget and hasattr(active_matplotlib_view_widget, 'getRootPlotItem')) else None
+            main_plot_widget = getattr(self.plots, 'main_plot_widget', None)
 
-                # Perform Initial (one-time) update from source -> controlled:
-                active_matplotlib_view_widget.on_window_changed(self.spikes_window.total_df_start_end_times[0], self.spikes_window.total_df_start_end_times[1])
+            if sync_mode.value == SynchronizedPlotMode.NO_SYNC.value:
+                if (target_plot_item is not None) and (target_plot_item is not main_plot_widget):
+                    target_plot_item.setXLink(None)
                 return None
 
-            elif sync_mode.name == SynchronizedPlotMode.TO_WINDOW.name:
-                # disable any existing sync connection before re-linking
-                sync_connection = self.ui.connections.get(identifier, None)
-                if sync_connection is not None:
-                    print(f'\tdisconnecting window_scrolled for "{identifier}"')
-                    self.window_scrolled.disconnect(sync_connection)
-                    self.ui.connections[identifier] = None
-                    del self.ui.connections[identifier]
+            elif sync_mode.value == SynchronizedPlotMode.TO_GLOBAL_DATA.value:
+                if (target_plot_item is not None) and (target_plot_item is not main_plot_widget):
+                    target_plot_item.setXLink(None)
                 # Perform Initial (one-time) update from source -> controlled:
-                active_matplotlib_view_widget.on_window_changed(self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time)
+                global_t0, global_t1 = self.spikes_window.total_df_start_end_times
+                active_matplotlib_view_widget.on_window_changed(global_t0, global_t1)
+                return None
+
+            elif sync_mode.value == SynchronizedPlotMode.TO_WINDOW.value:
+                win_t0 = self.spikes_window.active_window_start_time
+                win_t1 = self.spikes_window.active_window_end_time
+                if is_pg_widget and (main_plot_widget is not None) and (target_plot_item is not None):
+                    if target_plot_item is main_plot_widget:
+                        # main_plot_widget is updated directly by perform_update_zoomed_plot; avoid self-XLink and duplicate setXRange slot
+                        target_plot_item.setXRange(win_t0, win_t1, padding=0)
+                        return None
+                    # Link PyQtGraph track directly via ViewBox C++/Qt XLink for 0 ms scroll synchronization
+                    target_plot_item.disableAutoRange('x')
+                    target_plot_item.setXLink(main_plot_widget)
+                    target_plot_item.setXRange(win_t0, win_t1, padding=0)
+                    if getattr(active_matplotlib_view_widget, 'wants_window_changed_callback', False):
+                        sync_connection = self.window_scrolled.connect(active_matplotlib_view_widget.on_window_changed)
+                        self.ui.connections[identifier] = sync_connection
+                        return sync_connection
+                    return None
+
+                # Perform Initial (one-time) update from source -> controlled:
+                active_matplotlib_view_widget.on_window_changed(win_t0, win_t1)
                 sync_connection = self.window_scrolled.connect(active_matplotlib_view_widget.on_window_changed)
-                # Use on_window_changed_rate_limited for SignalProxy since it wraps signals and emits sigDelayed[object]
-                # sync_connection = pg.SignalProxy(self.window_scrolled, delay=0.01, rateLimit=120, slot=active_matplotlib_view_widget.on_window_changed_rate_limited)
                 self.ui.connections[identifier] = sync_connection # add the connection to the connections array
                 return sync_connection # return the connection
             else:
@@ -1917,8 +1954,9 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
     def reset_spike_emphasis(self, defer_render=False):
         """ resets the emphasis state of all spikes to the default (SpikeEmphasisState.Default) and then rebuilds the all_spots """
         self.spikes_df['visualization_raster_emphasis_state'] = SpikeEmphasisState.Default
-        # TODO: PERFORMANCE: Rebuild the all_spots for all spikes after the update: (FUTURE) if more efficient, could just modify those that changed
-        self.plots_data.all_spots = self._build_all_spikes_all_spots()
+        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsObjects.FastCullableSpikeRasterItem import FastCullableSpikeRasterItem
+        if not isinstance(getattr(self.plots, 'scatter_plot', None), FastCullableSpikeRasterItem):
+            self.plots_data.all_spots = self._build_all_spikes_all_spots()
             
         # Once the dataframe is updated, rebuild the all_spots and update the plotters
         if not defer_render:
@@ -1957,8 +1995,9 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
         
         # Set the non-included spikes as SpikeEmphasisState.Deemphasized
         self.spikes_df.loc[spike_indicies, 'visualization_raster_emphasis_state'] = new_emphasis_state
-        # TODO: PERFORMANCE: Rebuild the all_spots for all spikes after the update: (FUTURE) if more efficient, could just modify those that changed
-        self.plots_data.all_spots = self._build_all_spikes_all_spots()
+        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsObjects.FastCullableSpikeRasterItem import FastCullableSpikeRasterItem
+        if not isinstance(getattr(self.plots, 'scatter_plot', None), FastCullableSpikeRasterItem):
+            self.plots_data.all_spots = self._build_all_spikes_all_spots()
             
         # Once the dataframe is updated, rebuild the all_spots and update the plotters
         if not defer_render:
@@ -2248,7 +2287,7 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
             from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import block_until_render_complete
 
             # For PlotWidget
-            pg.setConfigOptions(useOpenGL=True)
+            pg.setConfigOptions(useOpenGL=bool(self.params.get('useOpenGL', False)))
             pg.setConfigOption('antialias', False)
 
             def _perform_output_figure_delayed():

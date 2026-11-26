@@ -401,12 +401,15 @@ class IntervalRectsItem(ReprPrintableItemMixin, pg.GraphicsObject):
 
 
     def _refresh_visible_labels_from_viewbox(self):
-        view_box = self._resolve_label_viewbox()
-        if view_box is None:
-            self._clear_active_label_items()
-            return
-        view_range = view_box.viewRange()
-        self.refresh_visible_labels(canvas_width_px=max(1, int(view_box.width())), canvas_height_px=max(1, int(view_box.height())), x_range=view_range[0], y_range=view_range[1], immediate=True)
+        try:
+            view_box = self._resolve_label_viewbox()
+            if view_box is None:
+                self._clear_active_label_items()
+                return
+            view_range = view_box.viewRange()
+            self.refresh_visible_labels(canvas_width_px=max(1, int(view_box.width())), canvas_height_px=max(1, int(view_box.height())), x_range=view_range[0], y_range=view_range[1], immediate=True)
+        except Exception as err:
+            print(f'WARN: IntervalRectsItem._refresh_visible_labels_from_viewbox exception: {err}')
 
 
     def _schedule_label_refresh(self):

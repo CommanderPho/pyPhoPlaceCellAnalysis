@@ -242,10 +242,12 @@ def _setup_spike_raster_window_for_debugging(spike_raster_window, wants_docked_r
         if debug_print:
             print(f'_subfn_add_additional_plots():')
             
-        _interval_tracks_out_dict = active_2d_plot.prepare_pyqtgraph_intervalPlot_tracks(enable_interval_overview_track=enable_interval_overview_track, should_link_to_main_plot_widget=has_main_raster_plot)
-        _all_outputs_dict['_interval_tracks_out_dict'] = _interval_tracks_out_dict
+        existing_widgets = getattr(active_2d_plot.ui, 'matplotlib_view_widgets', {})
+        if ('intervals' not in existing_widgets) or (enable_interval_overview_track and ('interval_overview' not in existing_widgets)):
+            _interval_tracks_out_dict = active_2d_plot.prepare_pyqtgraph_intervalPlot_tracks(enable_interval_overview_track=enable_interval_overview_track, should_link_to_main_plot_widget=has_main_raster_plot)
+            _all_outputs_dict['_interval_tracks_out_dict'] = _interval_tracks_out_dict
 
-        if wants_docked_raster_window_track:
+        if wants_docked_raster_window_track and ('rasters[raster_window]' not in existing_widgets):
             _raster_tracks_out_dict = active_2d_plot.prepare_pyqtgraph_rasterPlot_track(name_modifier_suffix='raster_window', should_link_to_main_plot_widget=has_main_raster_plot)
             _all_outputs_dict['_raster_tracks_out_dict'] = _raster_tracks_out_dict
 

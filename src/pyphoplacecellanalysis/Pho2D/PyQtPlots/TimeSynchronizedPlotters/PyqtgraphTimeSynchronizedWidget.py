@@ -19,6 +19,7 @@ from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.TimeSynchro
 from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import pyqtplot_build_image_bounds_extent
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
+from pyphocorehelpers.gui.Qt.ExceptionPrintingSlot import pyqtExceptionPrintingSlot
 from pyphocorehelpers.plotting.mixins.plotting_backend_mixin import PlottingBackendSpecifyingMixin, PlottingBackendType, PlotImageExportableMixin
 from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.Mixins.CrosshairsTracingMixin import CrosshairsTracingMixin
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsWidgets.CustomGraphicsLayoutWidget import CustomViewBox, CustomGraphicsLayoutWidget
@@ -40,7 +41,7 @@ class PyqtgraphTimeSynchronizedWidget(CrosshairsTracingMixin, PlotImageExportabl
     applicationName = 'PyqtgraphTimeSynchronizedWidgetApp'
     windowName = 'PyqtgraphTimeSynchronizedWidgetWindow'
     
-    enable_debug_print = True
+    enable_debug_print = False
     
     sigCrosshairsUpdated = QtCore.Signal(object, str, str) # (self, name, trace_value) - CrosshairsTracingMixin Conformance
 
@@ -224,12 +225,16 @@ class PyqtgraphTimeSynchronizedWidget(CrosshairsTracingMixin, PlotImageExportabl
         if self.enable_debug_print:
             print(f'PyqtgraphTimeSynchronizedWidget.update(t: {t})')
     
-        # # Finds the nearest previous decoded position for the time t:
-        # self.last_window_index = np.searchsorted(self.time_window_centers, t, side='left') # side='left' ensures that no future values (later than 't') are ever returned
-        # self.last_window_time = self.time_window_centers[self.last_window_index] # If there is no suitable index, return either 0 or N (where N is the length of `a`).
         # Update the plots:
         if not defer_render:
             self._update_plots()
+
+
+    def draw(self):
+        """Compatibility helper matching `CustomMatplotlibWidget.draw()`."""
+        root_gfx = getattr(self.ui, 'root_graphics_layout_widget', None)
+        if root_gfx is not None and root_gfx.viewport() is not None:
+            root_gfx.viewport().update()
 
 
     def _update_plots(self):
@@ -262,28 +267,23 @@ class PyqtgraphTimeSynchronizedWidget(CrosshairsTracingMixin, PlotImageExportabl
     # QT Slots                                                                                                             #
     # ==================================================================================================================== #
     
-    @QtCore.Slot(float, float)
+    @pyqtExceptionPrintingSlot(float, float)
     def on_window_changed(self, start_t, end_t):
         # called when the window is updated
         if self.enable_debug_print:
             print(f'PyqtgraphTimeSynchronizedWidget.on_window_changed(start_t: {start_t}, end_t: {end_t})')
-        # if self.enable_debug_print:
-        #     profiler = pg.debug.Profiler(disabled=True, delayed=True)
 
-        if (start_t is not None) and (end_t is not None):
-            # Preserve the current Y range to prevent auto-fitting
-            vb = self.getRootPlotItem().getViewBox()
+        if (start_t is not None) and (end_t is not None) and np.isfinite(start_t) and np.isfinite(end_t):
+            root_plot = self.getRootPlotItem()
+            vb = root_plot.getViewBox()
             current_y_range = vb.viewRange()[1]  # Get current Y range [min, max]
-
-            self.getRootPlotItem().setXRange(start_t, end_t, padding=0) ## global frame
-
-            # Explicitly restore Y range in case it was changed
-            self.getRootPlotItem().setYRange(current_y_range[0], current_y_range[1], padding=0)
-
+            root_plot.setXRange(float(start_t), float(end_t), padding=0) ## global frame
+            after_y_range = vb.viewRange()[1]
+            if (abs(after_y_range[0] - current_y_range[0]) > 1e-9) or (abs(after_y_range[1] - current_y_range[1]) > 1e-9):
+                # Explicitly restore Y range only if auto-range mutated it
+                root_plot.setYRange(current_y_range[0], current_y_range[1], padding=0)
 
         self.update(end_t, defer_render=False)
-        # if self.enable_debug_print:
-        #     profiler('Finished calling _update_plots()')
             
 
 

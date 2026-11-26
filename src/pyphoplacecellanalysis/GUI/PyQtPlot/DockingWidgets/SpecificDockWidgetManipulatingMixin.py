@@ -112,21 +112,21 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
                 print(f'\tWARNING: Failed to inspect root graphics layout for "{identifier_name}". Error: {e}')
 
             if target_plot_item is not None:
-                if sync_mode.name == SynchronizedPlotMode.TO_GLOBAL_DATA.name:
+                if sync_mode.value == SynchronizedPlotMode.TO_GLOBAL_DATA.value:
                     # For TO_GLOBAL_DATA: unlink from main plot widget and set to global range
-                    if main_plot_widget is not None:
+                    if (main_plot_widget is not None) and (target_plot_item is not main_plot_widget):
                         target_plot_item.setXLink(None)  # Unlink from main plot widget
                     # Set to global data range
                     target_plot_item.setXRange(self.spikes_window.total_df_start_end_times[0], self.spikes_window.total_df_start_end_times[1], padding=0)
-                elif sync_mode.name == SynchronizedPlotMode.TO_WINDOW.name:
+                elif sync_mode.value == SynchronizedPlotMode.TO_WINDOW.value:
                     # For TO_WINDOW: link to main plot widget so it tracks the active window
-                    if main_plot_widget is not None:
+                    if (main_plot_widget is not None) and (target_plot_item is not main_plot_widget):
                         target_plot_item.setXLink(main_plot_widget)
                     # One-time jump to the current active timeline window (re-link alone may not update immediately)
                     target_plot_item.setXRange(self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time, padding=0)
-                elif sync_mode.name == SynchronizedPlotMode.NO_SYNC.name:
+                elif sync_mode.value == SynchronizedPlotMode.NO_SYNC.value:
                     # For NO_SYNC: unlink from main plot widget and leave the current range as-is
-                    if main_plot_widget is not None:
+                    if (main_plot_widget is not None) and (target_plot_item is not main_plot_widget):
                         target_plot_item.setXLink(None)
         
         # Sync works for both matplotlib and PyQtGraph widgets since they're both stored in
@@ -172,27 +172,91 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
         pass
 
 
-    @function_attributes(short_name=None, tags=['IMPORTANT', 'FINAL', 'track', 'posterior', '1D'], input_requires=[], output_provides=[], uses=['plot_1D_most_likely_position_comparsions', 'add_new_matplotlib_render_plot_widget', 'PlottingHelpers.helper_matplotlib_add_pseudo2D_marginal_labels'], used_by=['add_docked_decoded_posterior_track_from_result'], creation_date='2025-03-21 08:32', related_items=[])
-    def add_docked_decoded_posterior_track(self, name: str, time_window_centers: NDArray, a_1D_posterior: NDArray, xbin: Optional[NDArray]=None, measured_position_df: Optional[pd.DataFrame]=None, a_variable_name: Optional[str]=None, a_dock_config: Optional[CustomDockDisplayConfig]=None, extended_dock_title_info: Optional[str]=None, should_defer_render:bool=False, **kwargs):
-        """ adds a decoded 1D posterior 
+    def _build_pyqtgraph_decoded_posterior_track_internal(self, identifier_name: str, variable_name: str, a_dock_config: CustomDockDisplayConfig, dockSize: Tuple[int, int], time_window_centers: Optional[NDArray] = None, a_1D_posterior: Optional[NDArray] = None, slices_time_window_centers: Optional[List[NDArray]] = None, slices_posteriors: Optional[List[NDArray]] = None, xbin: Optional[NDArray] = None, measured_position_df: Optional[pd.DataFrame] = None, measured_position_col_name: str = 'lin_pos', cmap: Any = 'viridis', vmin: float = 0.0, vmax: float = 1.0, y_bin_labels: Optional[List[str]] = None, extended_dock_title_info: Optional[str] = None, sync_mode=None):
+        """Builds a native PyQtGraph `TiledPosteriorHeatmapItem` (+ optional static red `lin_pos` curve & pinned `y_bin_labels`) docked track."""
+        import pyphoplacecellanalysis.External.pyqtgraph as pg
+        from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtGui
+        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster import SynchronizedPlotMode
+        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsObjects.TiledPosteriorHeatmapItem import TiledPosteriorHeatmapItem
 
-        Aims to replace `AddNewDecodedPosteriors_MatplotlibPlotCommand._perform_add_new_decoded_posterior_row`
-        
-        
-        Usage 0:
-            time_bin_size = epochs_decoding_time_bin_size
-            info_string: str = f" - t_bin_size: {time_bin_size}"
-            identifier_name, widget, matplotlib_fig, matplotlib_fig_axes, dock_item = active_2d_plot.add_docked_decoded_posterior_track(name='non-PBE_marginal_over_track_ID',
-                                                                                                    time_window_centers=time_window_centers, a_1D_posterior=non_PBE_marginal_over_track_ID,
-                                                                                                    xbin = deepcopy(a_position_decoder.xbin), measured_position_df=deepcopy(curr_active_pipeline.sess.position.to_dataframe()),
-                                                                                                    extended_dock_title_info=info_string)
-                                                                                                    
-        Usage 1:
-            _out_tuple = active_2d_plot.add_docked_decoded_posterior_track(name=f'DirectionalDecodersDecoded[{a_decoder_name}]', a_dock_config=a_dock_config,
-                                                                                            time_window_centers=a_1D_continuous_decoded_result.time_bin_container.centers, a_1D_posterior=a_1D_continuous_decoded_result.p_x_given_n,
-                                                                                            xbin = deepcopy(a_1D_decoder.xbin), measured_position_df=deepcopy(curr_active_pipeline.sess.position.to_dataframe()),
-                                                                                            extended_dock_title_info=info_string)
-        """
+        if sync_mode is None:
+            sync_mode = SynchronizedPlotMode.TO_WINDOW
+
+        widget, root_graphics_layout_widget, plot_item, dock_item = self.add_new_embedded_pyqtgraph_render_plot_widget(name=identifier_name, dockSize=dockSize, display_config=a_dock_config)
+        plot_item.setObjectName(identifier_name)
+        plot_item.hideButtons()
+        plot_item.showAxes(False)
+        plot_item.setMouseEnabled(x=False, y=False)
+        plot_item.disableAutoRange('xy')
+
+        # Remove any previous heatmap/measured curve if re-populating an existing dock
+        for old_attr in ('im_posterior_x', 'line_measured_position'):
+            if widget.plots.has_attr(old_attr) and (getattr(widget.plots, old_attr, None) is not None):
+                try:
+                    plot_item.removeItem(getattr(widget.plots, old_attr))
+                except Exception:
+                    pass
+        ## END for old_attr in ('im_posterior_x', 'line_measured_position')....
+
+        heatmap_item = TiledPosteriorHeatmapItem(y_bin_labels=y_bin_labels)
+        if slices_posteriors is not None and slices_time_window_centers is not None:
+            heatmap_item.setPosteriorSlices(slices_posteriors=slices_posteriors, slices_time_window_centers=slices_time_window_centers, xbin=xbin, cmap=cmap, vmin=vmin, vmax=vmax, use_original_bounds=True, y_bin_labels=y_bin_labels)
+        elif a_1D_posterior is not None and time_window_centers is not None:
+            heatmap_item.setPosteriorData(posterior=a_1D_posterior, time_window_centers=time_window_centers, xbin=xbin, cmap=cmap, vmin=vmin, vmax=vmax, use_original_bounds=False, y_bin_labels=y_bin_labels)
+        heatmap_item.setZValue(0)
+        plot_item.addItem(heatmap_item)
+        widget.plots.im_posterior_x = heatmap_item
+        widget.plots.heatmap_item = heatmap_item
+
+        y_bounds = heatmap_item.dataBounds(1)
+        if y_bounds[0] is not None and y_bounds[1] is not None:
+            plot_item.setYRange(float(y_bounds[0]), float(y_bounds[1]), padding=0)
+
+        # Static full-session red measured position curve (`clipToView=True` + `setXLink` = 0 ms scroll)
+        widget.plots_data.measured_position_df = None
+        widget.plots.measured_position_artists = None
+        widget.plots.line_measured_position = None
+        if measured_position_df is not None:
+            pos_col = measured_position_col_name if (measured_position_col_name in measured_position_df.columns) else (variable_name if (variable_name in measured_position_df.columns) else ('lin_pos' if 'lin_pos' in measured_position_df.columns else None))
+            t_col = 't' if 't' in measured_position_df.columns else (measured_position_df.position.time_variable_name if hasattr(measured_position_df, 'position') else None)
+            if (pos_col is not None) and (t_col is not None):
+                widget.plots_data.measured_position_df = measured_position_df
+                pos_t = np.ascontiguousarray(measured_position_df[t_col].to_numpy(), dtype=np.float64)
+                pos_y = np.ascontiguousarray(measured_position_df[pos_col].to_numpy(), dtype=np.float64)
+                red_pen = pg.mkPen(color=QtGui.QColor(255, 30, 30, 140), width=1.4)
+                pos_curve = plot_item.plot(x=pos_t, y=pos_y, pen=red_pen, clipToView=True, autoDownsample=True, downsampleMethod='subsample', connect='finite')
+                pos_curve.setZValue(15)
+                widget.plots.line_measured_position = pos_curve
+                widget.plots.measured_position_artists = {plot_item: [pos_curve]}
+
+        # Populate params & plots_data for crosshairs / inspection without deep-copying huge matrices
+        widget.params.variable_name = variable_name
+        widget.params.enable_flat_line_drawing = False
+        if y_bin_labels is not None:
+            widget.params.y_bin_labels = list(y_bin_labels)
+        if extended_dock_title_info is not None:
+            widget.params.extended_dock_title_info = extended_dock_title_info
+
+        if time_window_centers is not None:
+            widget.plots_data.time_window_centers = np.asarray(time_window_centers)
+        if slices_time_window_centers is not None:
+            widget.plots_data.slices_time_window_centers = slices_time_window_centers
+        if xbin is not None:
+            widget.plots_data.xbin = np.asarray(xbin)
+        widget.plots_data.variable_name = variable_name
+        if a_1D_posterior is not None:
+            widget.plots_data.matrix = np.asarray(a_1D_posterior)
+        if slices_posteriors is not None:
+            widget.plots_data.slices_posteriors = slices_posteriors
+
+        self.sync_matplotlib_render_plot_widget(identifier_name, sync_mode=sync_mode)
+        self._connect_dock_timeline_sync_mode_button(dock_item, identifier_name)
+        return identifier_name, widget, root_graphics_layout_widget, [plot_item], dock_item
+
+
+    @function_attributes(short_name=None, tags=['IMPORTANT', 'FINAL', 'track', 'posterior', '1D'], input_requires=[], output_provides=[], uses=['plot_1D_most_likely_position_comparsions', 'add_new_matplotlib_render_plot_widget', 'PlottingHelpers.helper_matplotlib_add_pseudo2D_marginal_labels'], used_by=['add_docked_decoded_posterior_track_from_result'], creation_date='2025-03-21 08:32', related_items=[])
+    def add_docked_decoded_posterior_track(self, name: str, time_window_centers: NDArray, a_1D_posterior: NDArray, xbin: Optional[NDArray]=None, measured_position_df: Optional[pd.DataFrame]=None, a_variable_name: Optional[str]=None, a_dock_config: Optional[CustomDockDisplayConfig]=None, extended_dock_title_info: Optional[str]=None, should_defer_render:bool=False, plotting_backend: Optional[str]=None, **kwargs):
+        """ adds a decoded 1D posterior (defaults to native PyQtGraph `TiledPosteriorHeatmapItem` for 0 ms scrolling; pass `plotting_backend='matplotlib'` for legacy fallback) """
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_1D_most_likely_position_comparsions
         from neuropy.utils.matplotlib_helpers import get_heatmap_cmap
         if a_variable_name is None:
@@ -202,7 +266,6 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
             override_dock_group_name: str = None ## this feature doesn't work
             a_dock_config = CustomCyclicColorsDockDisplayConfig(showCloseButton=True, named_color_scheme=NamedColorScheme.grey)
             a_dock_config.dock_group_names = [override_dock_group_name] # , 'non-PBE Continuous Decoding'
-
 
         n_xbins, n_t_bins = np.shape(a_1D_posterior)
 
@@ -215,23 +278,46 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
         
         dockSize = kwargs.pop('dockSize', (65, 200)) 
         
-        ## ✅ Add a new row for each of the four 1D directional decoders:
         identifier_name: str = name
         if extended_dock_title_info is not None:
             identifier_name += extended_dock_title_info ## add extra info like the time_bin_size in ms
-        # print(f'identifier_name: {identifier_name}')
+
+        if plotting_backend is None:
+            plotting_backend = self.params.get('decoded_tracks_plotting_backend', 'pyqtgraph') if hasattr(self, 'params') else 'pyqtgraph'
+
+        posterior_heatmap_imshow_kwargs = kwargs.pop('posterior_heatmap_imshow_kwargs', dict(
+            cmap = get_heatmap_cmap(cmap='viridis', bad_color='black', under_color='white', over_color='red'),
+        ))
+
+        if str(plotting_backend).lower() != 'matplotlib':
+            cmap_val = posterior_heatmap_imshow_kwargs.get('cmap', 'viridis')
+            vmin_val = float(posterior_heatmap_imshow_kwargs.get('vmin', 0.0))
+            vmax_val = float(posterior_heatmap_imshow_kwargs.get('vmax', 1.0))
+            y_lbls = list(reversed(xbin_labels)) if xbin_labels is not None else kwargs.pop('y_bin_labels', None)
+            sync_mode = kwargs.pop('sync_mode', None)
+            return self._build_pyqtgraph_decoded_posterior_track_internal(
+                identifier_name=identifier_name,
+                variable_name=a_variable_name,
+                a_dock_config=a_dock_config,
+                dockSize=dockSize,
+                time_window_centers=time_window_centers,
+                a_1D_posterior=a_1D_posterior,
+                xbin=xbin,
+                measured_position_df=measured_position_df,
+                cmap=cmap_val,
+                vmin=vmin_val,
+                vmax=vmax_val,
+                y_bin_labels=y_lbls,
+                extended_dock_title_info=extended_dock_title_info,
+                sync_mode=sync_mode,
+            )
+
         widget, matplotlib_fig, matplotlib_fig_axes, dock_item = self.add_new_matplotlib_render_plot_widget(name=identifier_name, dockSize=dockSize, display_config=a_dock_config)
         an_ax = matplotlib_fig_axes[0]
 
         variable_name: str = a_variable_name
-        
-        # active_most_likely_positions = active_marginals.most_likely_positions_1D # Raw decoded positions
         active_most_likely_positions = None
         active_posterior = deepcopy(a_1D_posterior)
-        
-        posterior_heatmap_imshow_kwargs = kwargs.pop('posterior_heatmap_imshow_kwargs', dict(
-            cmap = get_heatmap_cmap(cmap='viridis', bad_color='black', under_color='white', over_color='red'),
-        ))
 
         # most_likely_positions_mode: 'standard'|'corrected'
         ## Actual plotting portion:
@@ -482,14 +568,8 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
 
 
     @function_attributes(short_name=None, tags=['IMPORTANT', 'track', 'posterior', 'marginal'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-03-21 08:10', related_items=[])
-    def add_docked_marginal_track(self, name: str, time_window_centers: NDArray, a_1D_posterior: NDArray, xbin: Optional[NDArray]=None, a_variable_name: Optional[str]=None, a_dock_config: Optional[CustomDockDisplayConfig]=None, extended_dock_title_info: Optional[str]=None, **kwargs):
-        """ adds a marginal (such as Long v. Short, or Long_LR v. Long_RL v. Short_LR v. Short_RL) 
-        
-        time_bin_size = epochs_decoding_time_bin_size
-        info_string: str = f" - t_bin_size: {time_bin_size}"
-        identifier_name, widget, matplotlib_fig, matplotlib_fig_axes, dock_item = active_2d_plot.add_docked_marginal_track(name='non-PBE_marginal_over_track_ID',
-                                                                                                time_window_centers=time_window_centers, a_1D_posterior=non_PBE_marginal_over_track_ID, extended_dock_title_info=info_string)
-        """
+    def add_docked_marginal_track(self, name: str, time_window_centers: NDArray, a_1D_posterior: NDArray, xbin: Optional[NDArray]=None, a_variable_name: Optional[str]=None, a_dock_config: Optional[CustomDockDisplayConfig]=None, extended_dock_title_info: Optional[str]=None, plotting_backend: Optional[str]=None, **kwargs):
+        """ adds a marginal (such as Long v. Short, or Long_LR v. Long_RL v. Short_LR v. Short_RL) """
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_1D_most_likely_position_comparsions
         from neuropy.utils.matplotlib_helpers import get_heatmap_cmap
         from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import PlottingHelpers
@@ -508,14 +588,40 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
         if xbin is None:
             xbin = np.arange(n_xbins)
 
-        ## ✅ Add a new row for each of the four 1D directional decoders:
         identifier_name: str = name
         if extended_dock_title_info is not None:
             identifier_name += extended_dock_title_info ## add extra info like the time_bin_size in ms
-        print(f'identifier_name: {identifier_name}')
         
         posterior_heatmap_imshow_kwargs = kwargs.pop('posterior_heatmap_imshow_kwargs', dict()) # 'posterior_heatmap_imshow_kwargs' must be removed from kwargs before call to `self.add_new_matplotlib_render_plot_widget(..., **kwargs)`
-        
+        y_bin_labels = kwargs.pop('y_bin_labels', None)
+
+        if plotting_backend is None:
+            plotting_backend = self.params.get('decoded_tracks_plotting_backend', 'pyqtgraph') if hasattr(self, 'params') else 'pyqtgraph'
+
+        if str(plotting_backend).lower() != 'matplotlib':
+            cmap_val = posterior_heatmap_imshow_kwargs.get('cmap', 'Oranges')
+            vmin_val = float(posterior_heatmap_imshow_kwargs.get('vmin', 0.0))
+            vmax_val = float(posterior_heatmap_imshow_kwargs.get('vmax', 1.0))
+            dockSize = kwargs.pop('dockSize', (25, 200))
+            sync_mode = kwargs.pop('sync_mode', None)
+            return self._build_pyqtgraph_decoded_posterior_track_internal(
+                identifier_name=identifier_name,
+                variable_name=a_variable_name,
+                a_dock_config=a_dock_config,
+                dockSize=dockSize,
+                time_window_centers=time_window_centers,
+                a_1D_posterior=a_1D_posterior,
+                xbin=xbin,
+                measured_position_df=None,
+                cmap=cmap_val,
+                vmin=vmin_val,
+                vmax=vmax_val,
+                y_bin_labels=y_bin_labels,
+                extended_dock_title_info=extended_dock_title_info,
+                sync_mode=sync_mode,
+            )
+
+        print(f'identifier_name: {identifier_name}')
         widget, matplotlib_fig, matplotlib_fig_axes, dock_item = self.add_new_matplotlib_render_plot_widget(name=identifier_name, dockSize=(25, 200), display_config=a_dock_config, **kwargs)
         an_ax = matplotlib_fig_axes[0]
 
@@ -1131,7 +1237,7 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
 
 
     @function_attributes(short_name=None, tags=['raster', 'tracks', 'pyqtgraph', 'specific', 'dynamic_ui', 'group_matplotlib_render_plot_widget'], input_requires=[], output_provides=[], uses=['self.add_new_embedded_pyqtgraph_render_plot_widget', 'new_plot_raster_plot'], used_by=[], creation_date='2025-01-09 10:50', related_items=[])
-    def prepare_pyqtgraph_rasterPlot_track(self, name_modifier_suffix: str='', should_link_to_main_plot_widget:bool=True, sync_mode:SynchronizedPlotMode=None, downsampling_rate: Optional[int]=None, debug_print=False):
+    def prepare_pyqtgraph_rasterPlot_track(self, name_modifier_suffix: str='', should_link_to_main_plot_widget:bool=True, sync_mode:SynchronizedPlotMode=None, downsampling_rate: Optional[int]=None, create_scatter_plot: bool=True, debug_print=False):
         """ adds to separate pyqtgraph-backed tracks to the SpikeRaster2D plotter for rendering a 2D raster `active_2d_plot.params.custom_interval_rendering_plots` so the intervals are rendered on these new tracks in addition to any normal ones
         
         enable_interval_overview_track: bool: if True, renders a track to show all the intervals during the sessions (overview) in addition to the track for the intervals within the current active window
@@ -1206,29 +1312,28 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
         curr_spike_emphasis_state: SpikeEmphasisState = SpikeEmphasisState.Default
         unsorted_unit_colors_map: Dict[types.aclu_index, pg.QColor] = {aclu:v[2][curr_spike_emphasis_state].color() for aclu, v in self.params.config_items.items()} # [2] is hardcoded and the only element of the tuple used, something legacy I guess
 
-        # Get only the spikes for the shared_aclus:
-        a_spikes_df = deepcopy(spikes_df).spikes.sliced_by_neuron_id(an_included_unsorted_neuron_ids)
-        a_spikes_df, neuron_id_to_new_IDX_map = a_spikes_df.spikes.rebuild_fragile_linear_neuron_IDXs() # rebuild the fragile indicies afterwards
-
         time_sync_pyqtgraph_widget.plots.root_plot = raster_plot_item # name the plotItem "root_plot" so `new_plot_raster_plot` can reuse it
-        rasters_display_outputs_tuple = new_plot_raster_plot(a_spikes_df, an_included_unsorted_neuron_ids, unit_sort_order=unit_sort_order, unit_colors_list=deepcopy(unsorted_unit_colors_map),
-                                                        scatter_app_name=identifier_name, defer_show=True, active_context=None,
-                                                        win=raster_root_graphics_layout_widget, plots_data=time_sync_pyqtgraph_widget.plots_data, plots=time_sync_pyqtgraph_widget.plots,
-                                                        add_debug_header_label=False,
-                                                        scatter_plot_kwargs=dict(size=5, hoverable=False, tick_width=0.0, tick_height=1.0),
-                                                        downsampling_rate=downsampling_rate,
-                                                        ) # defer_show=True so we can add it manually to the track view
+        if create_scatter_plot:
+            # Get only the spikes for the shared_aclus:
+            a_spikes_df = deepcopy(spikes_df).spikes.sliced_by_neuron_id(an_included_unsorted_neuron_ids)
+            a_spikes_df, neuron_id_to_new_IDX_map = a_spikes_df.spikes.rebuild_fragile_linear_neuron_IDXs() # rebuild the fragile indicies afterwards
 
-        # an_app, a_win, a_plots, a_plots_data = rasters_display_outputs_tuple = rasters_display_outputs_tuple
-        # raster_root_graphics_layout_widget.addWidget(a_win, row=1, col=1)
-        
+            rasters_display_outputs_tuple = new_plot_raster_plot(a_spikes_df, an_included_unsorted_neuron_ids, unit_sort_order=unit_sort_order, unit_colors_list=deepcopy(unsorted_unit_colors_map),
+                                                            scatter_app_name=identifier_name, defer_show=True, active_context=None,
+                                                            win=raster_root_graphics_layout_widget, plots_data=time_sync_pyqtgraph_widget.plots_data, plots=time_sync_pyqtgraph_widget.plots,
+                                                            add_debug_header_label=False,
+                                                            scatter_plot_kwargs=dict(size=5, hoverable=False, tick_width=0.0, tick_height=1.0),
+                                                            downsampling_rate=downsampling_rate,
+                                                            ) # defer_show=True so we can add it manually to the track view
+            earliest_t, latest_t = self.spikes_window.active_time_window # current
+            raster_plot_item.setXRange(earliest_t, latest_t, padding=0)
+            neuron_y_pos = np.array(list(deepcopy(time_sync_pyqtgraph_widget.plots_data.new_sorted_raster.neuron_y_pos).values()))
+            raster_plot_item.setYRange(np.nanmin(neuron_y_pos) - 0.5, np.nanmax(neuron_y_pos) + 0.5, padding=0)
+        else:
+            from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.SpikeRasters import RasterPlotSetupTuple
+            rasters_display_outputs_tuple = RasterPlotSetupTuple(None, raster_root_graphics_layout_widget, time_sync_pyqtgraph_widget.plots, time_sync_pyqtgraph_widget.plots_data)
+
         _raster_tracks_out_dict[identifier_name] = (dock_config, time_sync_pyqtgraph_widget, raster_root_graphics_layout_widget, raster_plot_item, rasters_display_outputs_tuple)
-        # Setup range for plot:
-        # earliest_t, latest_t = active_2d_plot.spikes_window.total_df_start_end_times # global
-        earliest_t, latest_t = self.spikes_window.active_time_window # current
-        raster_plot_item.setXRange(earliest_t, latest_t, padding=0)
-        neuron_y_pos = np.array(list(deepcopy(time_sync_pyqtgraph_widget.plots_data.new_sorted_raster.neuron_y_pos).values()))
-        raster_plot_item.setYRange(np.nanmin(neuron_y_pos), np.nanmax(neuron_y_pos), padding=0)
 
         if should_link_to_main_plot_widget:
             main_plot_widget = self.plots.main_plot_widget # PlotItem

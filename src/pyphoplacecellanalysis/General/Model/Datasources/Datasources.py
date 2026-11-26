@@ -121,15 +121,32 @@ class DataframeDatasource(BaseDatasource):
     @property
     def total_df_start_end_times(self):
         """[earliest_df_time, latest_df_time]: The earliest and latest times in the total df """
-        earliest_df_time = np.nanmin(self.df[self.time_column_name])
-        latest_df_time = np.nanmax(self.df[self.time_column_name])
-        df_timestamps = self.df[self.time_column_name].to_numpy()
-        earliest_df_time = df_timestamps[0]
-        latest_df_time = df_timestamps[-1]
-        return (earliest_df_time, latest_df_time)
+        t_vals = self._ensure_time_cache()
+        if len(t_vals) == 0:
+            return (0.0, 0.0)
+        if self._is_time_monotonic:
+            return (float(t_vals[0]), float(t_vals[-1]))
+        return (float(np.nanmin(t_vals)), float(np.nanmax(t_vals)))
     
     
     ##### Get/Set Properties ####:
+    def _invalidate_time_cache(self):
+        self._cached_time_values = None
+        self._is_time_monotonic = False
+
+
+    def _ensure_time_cache(self):
+        if getattr(self, '_cached_time_values', None) is None:
+            t_vals = np.asarray(self._df[self.time_column_name].to_numpy(), dtype=float)
+            self._cached_time_values = t_vals
+            if len(t_vals) <= 1:
+                self._is_time_monotonic = True
+            else:
+                diffs = np.diff(t_vals)
+                self._is_time_monotonic = bool(np.all(np.isfinite(t_vals)) and np.all(diffs >= 0.0))
+        return self._cached_time_values
+
+
     @property
     def df(self):
         """The df property."""
@@ -137,6 +154,7 @@ class DataframeDatasource(BaseDatasource):
     @df.setter
     def df(self, value):
         self._df = value
+        self._invalidate_time_cache()
         self.source_data_changed_signal.emit(self)
         
 
@@ -144,6 +162,7 @@ class DataframeDatasource(BaseDatasource):
         # Initialize the datasource as a BaseDatasource
         BaseDatasource.__init__(self, datasource_name=datasource_name)
         self._df = df
+        self._invalidate_time_cache()
         assert self.time_column_name in df.columns, f"dataframe must have a time column with name '{self.time_column_name}'.\n\tdf.columns: {list(df.columns)}"
         
         
@@ -157,6 +176,11 @@ class DataframeDatasource(BaseDatasource):
     @QtCore.pyqtSlot(float, float)
     def get_updated_data_window(self, new_start, new_end):
         """ called to get the data that should be displayed for the window starting at new_start and ending at new_end """
+        t_vals = self._ensure_time_cache()
+        if self._is_time_monotonic:
+            i0 = int(np.searchsorted(t_vals, float(new_start), side='left'))
+            i1 = int(np.searchsorted(t_vals, float(new_end), side='right'))
+            return self.df.iloc[i0:i1]
         return self.df[self.df[self.time_column_name].between(new_start, new_end)]
     
 

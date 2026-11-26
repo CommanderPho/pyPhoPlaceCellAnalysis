@@ -118,6 +118,7 @@ class Spike3DRasterLeftSidebarControlBar(QWidget):
         
         # Connect Signals:
         # self.ui.verticalSliderZoom.valueChanged.connect(self.temporal_zoom_slider_valueChanged)
+        self.ui.spinRenderWindowDuration.setOpts(bounds=[0.005, 100000.0], dec=False, step=1.0, minStep=0.05)
         self.ui.spinAnimationTimeStep.sigValueChanged.connect(self.animation_time_step_valueChanged)
         self.ui.spinTemporalZoomFactor.sigValueChanged.connect(self.temporal_zoom_factor_valueChanged)
         self.ui.spinRenderWindowDuration.sigValueChanged.connect(self.render_window_duration_valueChanged)
@@ -286,10 +287,12 @@ class SpikeRasterLeftSidebarControlsMixin:
         left_side_bar_controls.ui.spinTemporalZoomFactor.blockSignals(True)
         left_side_bar_controls.ui.spinRenderWindowDuration.blockSignals(True)
         
+        max_allowed_dur = max(1.0, float(self.total_data_duration) * 1.05) if np.isfinite(self.total_data_duration) and (self.total_data_duration > 0) else 100000.0
+        left_side_bar_controls.ui.spinRenderWindowDuration.setOpts(bounds=[0.005, max_allowed_dur], dec=False, step=1.0, minStep=0.05)
         left_side_bar_controls.ui.verticalSliderZoom.setValue(round(self.temporal_zoom_factor))
         left_side_bar_controls.ui.spinAnimationTimeStep.setValue(self.animation_time_step)
         left_side_bar_controls.ui.spinTemporalZoomFactor.setValue(round(self.temporal_zoom_factor))
-        left_side_bar_controls.ui.spinRenderWindowDuration.setValue(self.render_window_duration)
+        left_side_bar_controls.ui.spinRenderWindowDuration.setValue(min(float(self.render_window_duration), max_allowed_dur))
 
         left_side_bar_controls.ui.verticalSliderZoom.blockSignals(False)
         left_side_bar_controls.ui.spinAnimationTimeStep.blockSignals(False)
