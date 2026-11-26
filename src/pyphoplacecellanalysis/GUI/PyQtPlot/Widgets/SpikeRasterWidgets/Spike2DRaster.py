@@ -1435,11 +1435,13 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
 
         x_vals = np.ascontiguousarray(points[:, 0], dtype=float)
         y_vals = np.ascontiguousarray(points[:, 1], dtype=float)
+        all_curve_finite = bool(np.isfinite(x_vals).all() and np.isfinite(y_vals).all())
+        curve_connect = 'all' if all_curve_finite else 'finite'
 
         if plot_name in self.plots.time_curves:
             # Plot already exists, update it instead.
             plt = self.plots.time_curves[plot_name]
-            plt.setData(x=x_vals, y=y_vals)
+            plt.setData(x=x_vals, y=y_vals, connect=curve_connect, skipFiniteCheck=all_curve_finite)
             if curr_plot_legend_name is not None:
                 # Update the legend entry:
                 curr_label = self.ui.main_time_curves_view_legend.getLabel(plt)
@@ -1457,7 +1459,9 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
 
             line_width = float(plot_args.get('line_width', 1.0) or 1.0)
             pen = pg.mkPen(color=line_color, width=line_width)
-            plt = self.ui.main_time_curves_view_widget.plot(x=x_vals, y=y_vals, pen=pen, name=plot_name, clipToView=True, autoDownsample=True, downsampleMethod='subsample', connect='finite')
+            plt = self.ui.main_time_curves_view_widget.plot(x=x_vals, y=y_vals, pen=pen, name=plot_name, connect=curve_connect, skipFiniteCheck=all_curve_finite, dynamicRangeLimit=None)
+            plt.setClipToView(True)
+            plt.setDownsampling(auto=True, method='subsample')
             self.plots.time_curves[plot_name] = plt # add it to the dictionary.
             
             if curr_plot_legend_name is not None:

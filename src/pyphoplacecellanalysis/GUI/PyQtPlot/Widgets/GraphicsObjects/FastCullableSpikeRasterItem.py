@@ -75,8 +75,19 @@ class FastCullableSpikeRasterItem(GraphicsObject):
 
         # Lazy LOD cache: dt -> list of (QRectF, QImage, backing_uint8_ndarray)
         self._lod_tiles_by_dt: Dict[float, List[Tuple[QtCore.QRectF, QtGui.QImage, np.ndarray]]] = {}
+        self._paint_count: int = 0
 
-        if (len(args) > 0) or ('spots' in kwargs) or ('x' in kwargs) or ('pos' in kwargs):
+        if ('spike_times' in kwargs) and ('spike_y' in kwargs):
+            st = kwargs.pop('spike_times')
+            sy = kwargs.pop('spike_y')
+            sp_rgba = kwargs.pop('palette_rgba', None)
+            sp_idx = kwargs.pop('spike_palette_idx', None)
+            if sp_rgba is None:
+                sp_rgba = np.array([[255, 255, 255, 255]], dtype=np.uint8)
+            if sp_idx is None:
+                sp_idx = np.zeros(len(st), dtype=np.int32)
+            self.setSpikeArrays(st, sy, sp_rgba, sp_idx)
+        elif (len(args) > 0) or ('spots' in kwargs) or ('x' in kwargs) or ('pos' in kwargs):
             self.setData(*args, **kwargs)
 
 
@@ -271,6 +282,7 @@ class FastCullableSpikeRasterItem(GraphicsObject):
     # ==================================================================================================================== #
 
     def paint(self, p: QtGui.QPainter, option, widget=None):
+        self._paint_count += 1
         n_total = len(self._t_sorted)
         if n_total == 0 or self._x_bounds is None:
             return
@@ -361,7 +373,7 @@ class FastCullableSpikeRasterItem(GraphicsObject):
         y_vis = self._y_sorted[i0:i1]
         pal_vis = self._pal_idx_sorted[i0:i1]
 
-        if (not tr.isRotating()) and (not tr.isProjecting()):
+        if tr.type() <= QtGui.QTransform.TxScale:
             px_x = tr.m11() * t_vis + tr.dx()
             px_y = tr.m22() * y_vis + tr.dy()
         else:
@@ -388,11 +400,13 @@ class FastCullableSpikeRasterItem(GraphicsObject):
         if m == 0:
             return
 
+        prev_cap = self._pixmap_fragments.arr.shape[0]
         frags = self._pixmap_fragments.array(m)
+        if self._pixmap_fragments.arr.shape[0] != prev_cap:
+            self._pixmap_fragments.arr[:, 6:10] = [1.0, 1.0, 0.0, 1.0]
         frags[:, 0] = px_x
         frags[:, 1] = px_y
         frags[:, 2:6] = self._atlas_source_rects[pal_vis]
-        frags[:, 6:10] = [1.0, 1.0, 0.0, 1.0]
 
         p.save()
         try:
@@ -452,7 +466,7 @@ class FastCullableSpikeRasterItem(GraphicsObject):
             col_end = min(n_tbins, col_start + self.MAX_TILE_WIDTH)
             w = col_end - col_start
             tile_arr = np.ascontiguousarray(rgba_img[:, col_start:col_end, :])
-            qimg = QtGui.QImage(tile_arr.data, w, self._n_rows, w * 4, QtGui.QImage.Format_RGBA8888)
+            qimg = QtGui.QImage(tile_arr.data, w, self._n_rows, w * 4, QtGui.QImage.Format_RGBA8888).copy()
             tile_rect = QtCore.QRectF(t0 + col_start * dt, self._row_origin, w * dt, y_height)
             tiles.append((tile_rect, qimg, tile_arr))
         ## END for col_start in range(0, n_tbins, self.MAX_TILE_WIDTH)....

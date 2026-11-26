@@ -982,7 +982,7 @@ class PlotDataItem(GraphicsObject):
                     ## downsampling is expensive; delay until after clipping.
 
         if self.opts['clipToView']:
-            if view is None or view.autoRangeEnabled()[0]:
+            if view is None or (not hasattr(view, 'autoRangeEnabled')) or view.autoRangeEnabled()[0]:
                 pass # no ViewBox to clip to, or view will autoscale to data range.
             else:
                 # clip-to-view always presumes that x-values are in increasing order

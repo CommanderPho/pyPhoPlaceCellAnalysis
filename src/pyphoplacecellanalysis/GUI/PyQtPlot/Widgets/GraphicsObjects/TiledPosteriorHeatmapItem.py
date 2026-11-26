@@ -38,6 +38,7 @@ class TiledPosteriorHeatmapItem(GraphicsObject):
         self._label_font.setBold(True)
         self._label_text_pen: QtGui.QPen = QtGui.QPen(QtGui.QColor(245, 245, 245, 235))
         self._label_bg_brush: QtGui.QBrush = QtGui.QBrush(QtGui.QColor(0, 0, 0, 145))
+        self._paint_count: int = 0
 
         if (posterior is not None) and (time_window_centers is not None):
             self.setPosteriorData(
@@ -163,7 +164,7 @@ class TiledPosteriorHeatmapItem(GraphicsObject):
             c1 = min(w, c0 + cls.MAX_TILE_WIDTH)
             tw = c1 - c0
             tile_arr = np.ascontiguousarray(rgba[:, c0:c1, :])
-            qimg = QtGui.QImage(tile_arr.data, tw, h, tw * 4, QtGui.QImage.Format_RGBA8888)
+            qimg = QtGui.QImage(tile_arr.data, tw, h, tw * 4, QtGui.QImage.Format_RGBA8888).copy()
             rect = QtCore.QRectF(xmin + c0 * col_w, ymin, tw * col_w, y_height)
             tiles.append((rect, qimg, tile_arr))
         ## END for c0 in range(0, w, cls.MAX_TILE_WIDTH)....
@@ -280,6 +281,7 @@ class TiledPosteriorHeatmapItem(GraphicsObject):
 
 
     def paint(self, p: QtGui.QPainter, option, widget=None):
+        self._paint_count += 1
         if not self._levels_tiles or self._x_bounds is None or self._y_bounds is None:
             return
 

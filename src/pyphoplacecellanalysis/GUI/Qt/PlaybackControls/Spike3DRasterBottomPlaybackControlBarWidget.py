@@ -237,7 +237,7 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
 
         ## Setup Extra Button:
         # self.ui.btnCurrentIntervals_Extra.pressed.connect(self.on_series_customize_button_pressed)
-        self.ui._series_extra_menu = QtWidgets.QMenu()
+        self.ui._series_extra_menu = QtWidgets.QMenu(self)
         self.ui._series_extra_menu.addAction('Clear all', self.on_action_clear_all_pressed)
         self.ui._series_extra_menu.addAction('Remove current', self.on_series_remove_button_pressed)
         self.ui._series_extra_menu.addAction('Add Intervals...', self.on_action_request_add_intervals_pressed)
@@ -249,9 +249,10 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
             if hasattr(a_ctrl, 'hide'):
                 a_ctrl.hide()
             else:
+                # Collapse spacer size to (0, 0) in-place; do NOT call `self.ui.layout().removeItem(a_ctrl)` because PyQt5's `/TransferBack/`
+                # steals ownership even when `a_ctrl` belongs to a nested child layout, causing a C++ double-free (`0xC0000374`) on GC.
                 a_ctrl.changeSize(0, 0, QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
-                self.ui.layout().removeItem(a_ctrl)
-                # self.ui.layout().invalidate()
+        ## END for a_ctrl in controls_to_hide...
 
         # Force the layout to recalc: assume ui is the parent widget holding the layout
         self.ui.layout().invalidate()  # invalidates the layout cache

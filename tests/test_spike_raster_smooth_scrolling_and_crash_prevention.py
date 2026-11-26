@@ -140,7 +140,8 @@ class TestCrashAndOOMPrevention(unittest.TestCase):
         # Programmatic setter must block signals so feedback loops never fire
         self.assertEqual(len(emitted_timestamps), 0)
         self.assertEqual(len(time_edit_signals), 0)
-        bar.deleteLater()
+        bar.close()
+        QtWidgets.QApplication.processEvents()
 
 
     def test_generic_plotter_layer_zero_copy_chunked_aggregation_and_binary_search(self):
@@ -181,16 +182,17 @@ class TestCrashAndOOMPrevention(unittest.TestCase):
             def setImage(self, img, rect=None, axisOrder=None):
                 captured['image'] = img
 
-        dummy_layer = object.__new__(TimeSynchronizedGenericPlotterLayer)
-        dummy_layer._params = VisualizationParameters(name='test_layer', debug_print=False, drop_below_threshold=None, image_bounds_extent=QtCore.QRectF(0, 0, 10, 10), shared_axis_order=None)
-        dummy_layer.data = {'main': posterior_3d, 'time_window_centers': t_centers}
-        dummy_layer.contents = {'main': _DummyImageItem()}
-        dummy_layer.parent = SimpleNamespace(last_included_posterior_bin_indices=sub_idx, time_window_centers=t_centers)
-        dummy_layer.last_window_index = int(sub_idx[0])
-        dummy_layer.last_window_time = float(t_centers[int(sub_idx[0])])
+        dummy_layer = SimpleNamespace(
+            params=VisualizationParameters(name='test_layer', debug_print=False, drop_below_threshold=None, image_bounds_extent=QtCore.QRectF(0, 0, 10, 10), shared_axis_order=None),
+            data={'main': posterior_3d, 'time_window_centers': t_centers},
+            contents={'main': _DummyImageItem()},
+            parent=SimpleNamespace(last_included_posterior_bin_indices=sub_idx, time_window_centers=t_centers),
+            last_window_index=int(sub_idx[0]),
+            last_window_time=float(t_centers[int(sub_idx[0])]),
+        )
 
         t_agg_0 = time.perf_counter()
-        dummy_layer._update_plots()
+        TimeSynchronizedGenericPlotterLayer._update_plots(dummy_layer)
         dt_agg_ms = (time.perf_counter() - t_agg_0) * 1000.0
         self.assertIn('image', captured)
         self.assertLess(dt_agg_ms, 50.0)
@@ -286,15 +288,15 @@ class TestFastGraphicsItemsAndBenchmark(unittest.TestCase):
         palette[:, 3] = 230
 
         pw = pg.PlotWidget()
+        pw.setBackground('k')
+        pw.getPlotItem().hideAxis('left')
+        pw.getPlotItem().hideAxis('bottom')
         pw.resize(1000, 300)
         raster_item = FastCullableSpikeRasterItem(
             spike_times=t_arr,
             spike_y=y_arr,
             spike_palette_idx=pal_idx,
             palette_rgba=palette,
-            y_min=0.0,
-            y_max=float(n_neurons),
-            n_rows=n_neurons,
         )
         pw.addItem(raster_item)
         pw.setYRange(0.0, float(n_neurons), padding=0.0)
@@ -468,13 +470,14 @@ class TestFastGraphicsItemsAndBenchmark(unittest.TestCase):
         decoder_names = ['long_LR', 'long_RL', 'short_LR', 'short_RL']
         created_posterior_widgets = []
         for dec_name in decoder_names:
-            track_id, widget, root_gfx, plot_item, dock_item = spike_raster_plt_2d.add_docked_decoded_posterior_track(
+            track_id, widget, root_gfx, plot_items, dock_item = spike_raster_plt_2d.add_docked_decoded_posterior_track(
                 name=f'ContinuousDecode_{dec_name} - 0.025',
                 a_1D_posterior=base_posterior,
                 time_window_centers=decode_t_centers,
                 xbin=xbin_centers,
                 measured_position_df=pos_df,
             )
+            plot_item = plot_items[0]
             created_posterior_widgets.append((track_id, widget, root_gfx, plot_item))
             # Verify TO_WINDOW tracks are X-linked directly to main_plot_widget
             self.assertIs(plot_item.vb.linkedView(plot_item.vb.XAxis), spike_raster_plt_2d.plots.main_plot_widget.vb)
@@ -484,7 +487,7 @@ class TestFastGraphicsItemsAndBenchmark(unittest.TestCase):
             0.5 + 0.45 * np.sin(col_idx * 0.002),
             0.5 - 0.45 * np.sin(col_idx * 0.002),
         ]).astype(np.float32)
-        marg_id, marg_widget, marg_gfx, marg_plot_item, _ = spike_raster_plt_2d.add_docked_marginal_track(
+        marg_id, marg_widget, marg_gfx, marg_plot_items, _ = spike_raster_plt_2d.add_docked_marginal_track(
             name='ContinuousDecode_marginal_over_track_ID - 0.025',
             a_1D_posterior=marginal_posterior,
             time_window_centers=decode_t_centers,
@@ -492,39 +495,56 @@ class TestFastGraphicsItemsAndBenchmark(unittest.TestCase):
             xbin_labels=['long', 'short'],
             measured_position_df=None,
         )
+        marg_plot_item = marg_plot_items[0]
         self.assertIs(marg_plot_item.vb.linkedView(marg_plot_item.vb.XAxis), spike_raster_plt_2d.plots.main_plot_widget.vb)
         raster_win.update_scrolling_event_filters()
         QtWidgets.QApplication.processEvents()
 
-        # Collect all QGraphicsViews across the raster window + overview + 4 posterior tracks + 1 marginal track
+        # Collect all QGraphicsViews across the raster window + overview + 2D curves + 4 posterior tracks + 1 marginal track
         all_views: List[QtWidgets.QGraphicsView] = []
         for _, _, rgfx, _ in created_posterior_widgets:
             all_views.append(rgfx)
         ## END for _, _, rgfx, _ in created_posterior_widgets...
 
         all_views.append(marg_gfx)
-        if 'rasters[raster_window]' in spike_raster_plt_2d.plots.matplotlib_view_widgets:
-            rw_gfx = getattr(spike_raster_plt_2d.plots.matplotlib_view_widgets['rasters[raster_window]'].ui, 'root_graphics_layout_widget', None)
+        if 'rasters[raster_window]' in spike_raster_plt_2d.ui.matplotlib_view_widgets:
+            rw_gfx = getattr(spike_raster_plt_2d.ui.matplotlib_view_widgets['rasters[raster_window]'].ui, 'root_graphics_layout_widget', None)
             if rw_gfx is not None:
                 all_views.append(rw_gfx)
-        if 'rasters[raster_overview]' in spike_raster_plt_2d.plots.matplotlib_view_widgets:
-            ro_gfx = getattr(spike_raster_plt_2d.plots.matplotlib_view_widgets['rasters[raster_overview]'].ui, 'root_graphics_layout_widget', None)
+        if 'rasters[raster_overview]' in spike_raster_plt_2d.ui.matplotlib_view_widgets:
+            ro_gfx = getattr(spike_raster_plt_2d.ui.matplotlib_view_widgets['rasters[raster_overview]'].ui, 'root_graphics_layout_widget', None)
             if ro_gfx is not None:
                 all_views.append(ro_gfx)
+        tc_container = getattr(spike_raster_plt_2d.ui, 'main_time_curves_view_container_widget', None)
+        if tc_container is not None:
+            tc_gfx = getattr(tc_container.ui, 'root_graphics_layout_widget', None)
+            if (tc_gfx is not None) and (tc_gfx not in all_views):
+                all_views.append(tc_gfx)
 
         # 5. Benchmark scroll + scene paint frame time across 15s, 235s, and 2000s window durations!
         benchmark_durations = [15.0, 235.0, 2000.0]
+        main_scatter = spike_raster_plt_2d.plots.scatter_plot
+        strip_h = 90
+        composite_img = QtGui.QImage(960, strip_h * len(all_views), QtGui.QImage.Format_ARGB32_Premultiplied)
+        target_rects = [QtCore.QRectF(0.0, float(idx * strip_h), 960.0, float(strip_h)) for idx in range(len(all_views))]
+
+        def _render_all_tracks_single_pass():
+            qp = QtGui.QPainter(composite_img)
+            try:
+                for v_idx, v in enumerate(all_views):
+                    v.render(qp, target_rects[v_idx])
+                ## END for v_idx, v in enumerate(all_views)...
+            finally:
+                qp.end()
 
         for dur in benchmark_durations:
-            raster_win.update_duration_Controls(dur)
+            raster_win.on_render_window_duration_valueChanged(dur)
             spike_raster_plt_2d._flush_coalesced_window_scroll()
             # Warmup 2 frames at this duration (builds LOD level once lazily on first wide zoom)
             for warm_i in range(2):
-                spike_raster_plt_2d.shift_animation_frame_val(1)
+                raster_win.shift_animation_frame_val(1)
                 spike_raster_plt_2d._flush_coalesced_window_scroll()
-                for v in all_views:
-                    _render_graphics_view_to_qimage(v, 900, 90)
-                ## END for v in all_views...
+                _render_all_tracks_single_pass()
             ## END for warm_i in range(2)...
 
             step_signal_times_ms: List[float] = []
@@ -532,31 +552,33 @@ class TestFastGraphicsItemsAndBenchmark(unittest.TestCase):
             n_bench_steps = 20
             max_start = max(35.0, 2080.0 - dur)
             step_starts = np.linspace(20.0, max_start, n_bench_steps)
+            start_paint_count = main_scatter._paint_count
 
             for s_val in step_starts:
                 t0 = time.perf_counter()
                 spike_raster_plt_2d.animation_active_time_window.update_window_start(float(s_val))
                 spike_raster_plt_2d._flush_coalesced_window_scroll()
                 t1 = time.perf_counter()
-                for v in all_views:
-                    v.viewport().repaint()
-                ## END for v in all_views...
+                # Render all 8 QGraphicsViews into a single backing-store QImage via QGraphicsView.render()
+                _render_all_tracks_single_pass()
                 t2 = time.perf_counter()
                 step_signal_times_ms.append((t1 - t0) * 1000.0)
                 step_full_paint_times_ms.append((t2 - t0) * 1000.0)
             ## END for s_val in step_starts...
 
+            actual_paints = main_scatter._paint_count - start_paint_count
             med_sig_ms = float(np.median(step_signal_times_ms))
             med_total_ms = float(np.median(step_full_paint_times_ms))
-            print(f"\n[BENCHMARK] window_duration={dur:6.1f}s | median_scroll_update={med_sig_ms:.3f} ms | median_scroll_plus_7_track_repaint={med_total_ms:.3f} ms")
-            self.assertLess(med_total_ms, 5.0, f"Scroll + repaint exceeded 5.0ms budget at {dur}s window: {med_total_ms:.3f}ms")
+            print(f"\n[BENCHMARK] window_duration={dur:6.1f}s | tracks={len(all_views)} | paints={actual_paints}/{n_bench_steps} | median_scroll_update={med_sig_ms:.3f} ms | median_all_tracks_render={med_total_ms:.3f} ms")
+            self.assertEqual(actual_paints, n_bench_steps, f"Expected real QPainter paint on every scroll step at {dur}s")
+            self.assertLess(med_total_ms, 5.0, f"Scroll + {len(all_views)}-track render exceeded 5.0ms budget at {dur}s window: {med_total_ms:.3f}ms")
         ## END for dur in benchmark_durations...
 
         # 6. Stress-test rapid window duration sweep (0.001s -> 5000s -> negative -> NaN -> rapid scroll)
         sweep_durations = [0.001, 0.05, 1.0, 15.0, 75.0, 235.0, 800.0, 2000.0, 5000.0, 0.0001, -10.0, float('nan'), float('inf'), 30.0]
         for sweep_dur in sweep_durations:
             raster_win.on_render_window_duration_valueChanged(sweep_dur)
-            spike_raster_plt_2d.shift_animation_frame_val(2)
+            raster_win.shift_animation_frame_val(2)
             spike_raster_plt_2d._flush_coalesced_window_scroll()
         ## END for sweep_dur in sweep_durations...
 

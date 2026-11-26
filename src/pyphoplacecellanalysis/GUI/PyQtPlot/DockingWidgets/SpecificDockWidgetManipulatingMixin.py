@@ -223,8 +223,11 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
                 widget.plots_data.measured_position_df = measured_position_df
                 pos_t = np.ascontiguousarray(measured_position_df[t_col].to_numpy(), dtype=np.float64)
                 pos_y = np.ascontiguousarray(measured_position_df[pos_col].to_numpy(), dtype=np.float64)
-                red_pen = pg.mkPen(color=QtGui.QColor(255, 30, 30, 140), width=1.4)
-                pos_curve = plot_item.plot(x=pos_t, y=pos_y, pen=red_pen, clipToView=True, autoDownsample=True, downsampleMethod='subsample', connect='finite')
+                all_pos_finite = bool(np.isfinite(pos_t).all() and np.isfinite(pos_y).all())
+                red_pen = pg.mkPen(color=QtGui.QColor(255, 35, 35, 175), width=1.0)
+                pos_curve = plot_item.plot(x=pos_t, y=pos_y, pen=red_pen, connect=('all' if all_pos_finite else 'finite'), skipFiniteCheck=all_pos_finite, dynamicRangeLimit=None)
+                pos_curve.setClipToView(True)
+                pos_curve.setDownsampling(auto=True, method='subsample')
                 pos_curve.setZValue(15)
                 widget.plots.line_measured_position = pos_curve
                 widget.plots.measured_position_artists = {plot_item: [pos_curve]}
