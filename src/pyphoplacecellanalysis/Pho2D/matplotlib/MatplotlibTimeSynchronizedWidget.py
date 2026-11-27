@@ -41,8 +41,11 @@ class MatplotlibTimeSynchronizedWidget(CustomMatplotlibWidget):
 
 
     @pyqtExceptionPrintingSlot(float, float)
-    def on_window_changed(self, start_t, end_t):
+    def on_window_changed(self, start_t, end_t=None):
         # called when the window is updated
+        # SignalProxy packs (start_t, end_t) into a single tuple arg — unpack if needed:
+        if end_t is None and isinstance(start_t, (tuple, list)) and len(start_t) == 2:
+            start_t, end_t = start_t
         if (start_t is None) or (end_t is None) or (not np.isfinite(start_t)) or (not np.isfinite(end_t)):
             return
         if end_t <= start_t:
@@ -61,7 +64,7 @@ class MatplotlibTimeSynchronizedWidget(CustomMatplotlibWidget):
         elif not self._draw_coalesce_timer.isActive():
             remaining_ms = max(1, int((0.033 - elapsed) * 1000.0))
             self._draw_coalesce_timer.start(remaining_ms)
-        
+
 
     ############### Rate-Limited SLots ###############:
     ##################################################

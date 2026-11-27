@@ -268,8 +268,11 @@ class PyqtgraphTimeSynchronizedWidget(CrosshairsTracingMixin, PlotImageExportabl
     # ==================================================================================================================== #
     
     @pyqtExceptionPrintingSlot(float, float)
-    def on_window_changed(self, start_t, end_t):
+    def on_window_changed(self, start_t, end_t=None):
         # called when the window is updated
+        # SignalProxy packs (start_t, end_t) into a single tuple arg — unpack if needed:
+        if end_t is None and isinstance(start_t, (tuple, list)) and len(start_t) == 2:
+            start_t, end_t = start_t
         if self.enable_debug_print:
             print(f'PyqtgraphTimeSynchronizedWidget.on_window_changed(start_t: {start_t}, end_t: {end_t})')
 
@@ -284,7 +287,15 @@ class PyqtgraphTimeSynchronizedWidget(CrosshairsTracingMixin, PlotImageExportabl
                 root_plot.setYRange(current_y_range[0], current_y_range[1], padding=0)
 
         self.update(end_t, defer_render=False)
-            
+
+
+    ############### Rate-Limited SLots ###############:
+    ##################################################
+    ## For use with pg.SignalProxy
+    # using signal proxy turns original arguments into a tuple
+    @pyqtExceptionPrintingSlot(object)
+    def on_window_changed_rate_limited(self, evt):
+        self.on_window_changed(*evt)
 
 
     # def mouse_clicked(self, event):

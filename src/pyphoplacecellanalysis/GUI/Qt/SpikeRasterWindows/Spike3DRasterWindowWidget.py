@@ -585,8 +585,11 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
     
 
     @pyqtExceptionPrintingSlot(float, float)
-    def _on_drive_spikes_window_time_changed(self, start_t: float, end_t: float):
+    def _on_drive_spikes_window_time_changed(self, start_t: float, end_t: float = None):
         """Refresh bottom and left playback controls when the 2D driver spikes_window TimeWindow changes (region drag, wheel via window_scrolled, jumps, duration edits)."""
+        # SignalProxy packs (start_t, end_t) into a single tuple arg — unpack if needed:
+        if end_t is None and isinstance(start_t, (tuple, list)) and len(start_t) == 2:
+            start_t, end_t = start_t
         self.SpikeRasterBottomFrameControlsMixin_on_window_update(start_t, end_t)
         self.SpikeRasterLeftSidebarControlsMixin_on_window_update(start_t, end_t)
 

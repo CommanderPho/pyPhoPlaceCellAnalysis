@@ -1004,42 +1004,53 @@ class FigureToImageHelpers:
 
             captures: active_2d_plot, 
             """
-            if hasattr(active_2d_plot, 'perform_update_zoomed_plot'):
-                active_2d_plot.perform_update_zoomed_plot(min_t=start, max_t=end)
-            if hasattr(active_2d_plot, 'update_scroll_window_region'):
-                active_2d_plot.update_scroll_window_region(start, end, block_signals=True)
+            # Block TimeWindow signals during export sync so bottom-bar / paired-widget slots
+            # (and any SignalProxy-packed deliveries) do not spam missing-end_t errors mid-export.
+            time_window = getattr(getattr(active_2d_plot, 'spikes_window', None), 'timeWindow', None)
+            if time_window is not None:
+                time_window.blockSignals(True)
+            try:
+                if hasattr(active_2d_plot, 'perform_update_zoomed_plot'):
+                    active_2d_plot.perform_update_zoomed_plot(min_t=start, max_t=end)
+                if hasattr(active_2d_plot, 'update_scroll_window_region'):
+                    active_2d_plot.update_scroll_window_region(start, end, block_signals=True)
 
-            ui_connections = getattr(getattr(active_2d_plot, 'ui', None), 'connections', {}) or {}
+                ui_connections = getattr(getattr(active_2d_plot, 'ui', None), 'connections', {}) or {}
 
-            for dock_id, widget in zip(included_track_dock_identifiers, found_track_widgets):
-                if widget is None:
-                    continue
-                is_to_window_matplotlib = (dock_id in ui_connections and dock_id != 'tracks')
-                if is_to_window_matplotlib and hasattr(widget, 'on_window_changed'):
-                    if debug_print:
-                        print(f'_subfn_sync_export_chunk_window: TO_WINDOW matplotlib track "{dock_id}"')
-                    widget.on_window_changed(start, end)
-                elif isinstance(widget, PyqtgraphTimeSynchronizedWidget) or (hasattr(widget, 'getRootPlotItem') and callable(getattr(widget, 'getRootPlotItem', None))):
-                    if hasattr(widget, 'on_window_changed'):
+                for dock_id, widget in zip(included_track_dock_identifiers, found_track_widgets):
+                    if widget is None:
+                        continue
+                    is_to_window_matplotlib = (dock_id in ui_connections and dock_id != 'tracks')
+                    if is_to_window_matplotlib and hasattr(widget, 'on_window_changed'):
                         if debug_print:
-                            print(f'_subfn_sync_export_chunk_window: pyqtgraph track "{dock_id}"')
+                            print(f'_subfn_sync_export_chunk_window: TO_WINDOW matplotlib track "{dock_id}"')
                         widget.on_window_changed(start, end)
-                elif hasattr(widget, 'on_window_changed'):
-                    try:
-                        sig = inspect.signature(widget.on_window_changed)
-                        if 'defer_render' in sig.parameters:
+                    elif isinstance(widget, PyqtgraphTimeSynchronizedWidget) or (hasattr(widget, 'getRootPlotItem') and callable(getattr(widget, 'getRootPlotItem', None))):
+                        if hasattr(widget, 'on_window_changed'):
                             if debug_print:
-                                print(f'_subfn_sync_export_chunk_window: defer_render track "{dock_id}"')
-                            widget.on_window_changed(start, end, defer_render=False)
-                        else:
+                                print(f'_subfn_sync_export_chunk_window: pyqtgraph track "{dock_id}"')
                             widget.on_window_changed(start, end)
-                    except (TypeError, ValueError):
-                        widget.on_window_changed(start, end)
+                    elif hasattr(widget, 'on_window_changed'):
+                        try:
+                            sig = inspect.signature(widget.on_window_changed)
+                            if 'defer_render' in sig.parameters:
+                                if debug_print:
+                                    print(f'_subfn_sync_export_chunk_window: defer_render track "{dock_id}"')
+                                widget.on_window_changed(start, end, defer_render=False)
+                            else:
+                                widget.on_window_changed(start, end)
+                        except (TypeError, ValueError):
+                            widget.on_window_changed(start, end)
+                    ## END if/elif on_window_changed branches...
+                ## END for dock_id, widget in zip(included_track_dock_identifiers, found_track_widgets)...
 
-            QtWidgets.QApplication.processEvents()
-            if hasattr(active_2d_plot, 'repaint'):
-                active_2d_plot.repaint()
-            QtWidgets.QApplication.processEvents()
+                QtWidgets.QApplication.processEvents()
+                if hasattr(active_2d_plot, 'repaint'):
+                    active_2d_plot.repaint()
+                QtWidgets.QApplication.processEvents()
+            finally:
+                if time_window is not None:
+                    time_window.blockSignals(False)
 
 
 
@@ -1066,6 +1077,9 @@ class FigureToImageHelpers:
         debug_print = kwargs.pop('debug_print', False)
         min_track_height_px = kwargs.pop('min_track_height_px', 1)
         min_track_height_inches = kwargs.pop('min_track_height_inches', 0.05)
+        # Optional cooperative cancel: callable returning True, or a threading.Event (.is_set()).
+        # Notebook Interrupt still only surfaces between Python iterations (Qt C++ work is uninterruptible).
+        should_cancel = kwargs.pop('should_cancel', None)
 
         normalized_track_heights = _subfn_compute_normalized_track_heights(found_track_widgets, min_track_height_px=min_track_height_px, debug_print=debug_print)
 
@@ -1153,10 +1167,32 @@ class FigureToImageHelpers:
         ui_connections = getattr(getattr(active_2d_plot, 'ui', None), 'connections', {}) or {}
         max_export_width_px = int(figsize[0] * dpi)
 
+        import time as _time
+
+        def _subfn_raise_if_cancelled(page_idx: Optional[int] = None):
+            """Surface notebook Interrupt / cooperative cancel between pages/chunks (Qt C++ work itself cannot be interrupted)."""
+            try:
+                _time.sleep(0)  # let pending KeyboardInterrupt surface once control returns to Python
+            except KeyboardInterrupt:
+                where = f' after page {page_idx}/{len(pages)}' if page_idx is not None else ''
+                print(f'Export interrupted by KeyboardInterrupt{where}. Partial PDF kept at: {output_pdf_path}')
+                raise
+            cancelled = False
+            if should_cancel is not None:
+                if callable(should_cancel):
+                    cancelled = bool(should_cancel())
+                elif hasattr(should_cancel, 'is_set'):
+                    cancelled = bool(should_cancel.is_set())
+            if cancelled:
+                where = f' after page {page_idx}/{len(pages)}' if page_idx is not None else ''
+                print(f'Export cancelled via should_cancel{where}. Partial PDF kept at: {output_pdf_path}')
+                raise KeyboardInterrupt('export_wrapped_tracks_to_paged_df cancelled')
+
         with plt.ioff():
             ## Disables showing the figure by default; Agg canvas avoids Qt GUI windows under QtAgg backends.
             with backend_pdf.PdfPages(output_pdf_path) as pdf:
-                for page_chunks in pages:
+                for page_idx, page_chunks in enumerate(pages, start=1):
+                    _subfn_raise_if_cancelled(page_idx=page_idx - 1)
                     fig = Figure(figsize=figsize, dpi=dpi, layout='constrained')
                     FigureCanvasAgg(fig)
                     axes = fig.subplots(nrows=len(page_chunks))
@@ -1165,6 +1201,7 @@ class FigureToImageHelpers:
 
                     first_chunk = True
                     for ax, (start, end) in zip(axes, page_chunks):
+                        _subfn_raise_if_cancelled(page_idx=page_idx - 1)
                         ## one temp axes to draw into:
                         # active_2d_plot.Render2DScrollWindowPlot_on_window_update(start, end)
                         # active_2d_plot.TimeCurvesViewMixin_on_window_update(new_start=start, new_end=end) ## the passed times don't actually do anything, but it does trigger the curve updates
@@ -1227,8 +1264,8 @@ class FigureToImageHelpers:
                     except Exception as e:
                         print(f'ERROR: unhandled exception {e} while trying to close temp fig.')
                         raise
-                    
-                ## END for page_chunks in pages...
+                    print(f'exported page {page_idx}/{len(pages)}')
+                ## END for page_idx, page_chunks in enumerate(pages, start=1)...
             ## END with backend_pdf.PdfPages(output_pdf_path) as pdf:...
         ## END with plt.ioff():...
         
