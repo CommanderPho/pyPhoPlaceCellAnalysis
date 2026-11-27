@@ -4580,7 +4580,7 @@ def figures_export_laps_correct_decoder_side_by_side_completion_function(self, g
 
 
 @function_attributes(short_name=None, tags=['figure', 'batch', 'continuous', 'posterior', 'raster', 'four-decoder', 'groundtruth', 'context', 'Agg', 'headless'], input_requires=['DirectionalLaps', 'DirectionalMergedDecoders', 'TrainTestSplit'], output_provides=['figures_export_continuous_4decoder_rasters_and_context_completion_function'],
-                      uses=['_subfn_build_laps_gt_df', '_subfn_extract_time_bin_edges', '_subfn_prepare_decoder_sorted_spikes', '_subfn_compute_low_firing_mask_rgba', '_subfn_draw_lap_gt_boxes_and_non_gt_dimming', '_subfn_render_time_chunk_figure'], used_by=[], creation_date='2026-11-27 10:25', related_items=['figures_export_laps_correct_decoder_side_by_side_completion_function'])
+                      uses=['_subfn_format_publication_decoder_label', '_subfn_build_laps_gt_df', '_subfn_extract_time_bin_edges', '_subfn_prepare_decoder_sorted_spikes', '_subfn_compute_low_firing_mask_rgba', '_subfn_draw_lap_gt_boxes_and_non_gt_dimming', '_subfn_render_time_chunk_figure'], used_by=[], creation_date='2026-11-27 10:25', related_items=['figures_export_laps_correct_decoder_side_by_side_completion_function'])
 def figures_export_continuous_4decoder_rasters_and_context_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict,
                                                                                active_laps_decoding_time_bin_size: float = 0.025, context_decoding_time_bin_size: float = 0.075, posterior_masking_value: float = 0.0,
                                                                                should_dim_low_firing_bins: bool = True, min_num_spikes_per_bin_to_be_considered_active: int = 1, min_num_unique_active_neurons_per_time_bin: Optional[int] = 1,
@@ -4608,8 +4608,11 @@ def figures_export_continuous_4decoder_rasters_and_context_completion_function(s
     import matplotlib
     matplotlib.use('Agg', force=False)
     import matplotlib.pyplot as plt
+    import matplotlib.patheffects as pe
     from matplotlib.collections import LineCollection
+    from matplotlib.colors import LinearSegmentedColormap
     from matplotlib.gridspec import GridSpec
+    from matplotlib.lines import Line2D
     from matplotlib.patches import Rectangle
     from matplotlib.ticker import MultipleLocator
     plt.ioff()
@@ -4620,6 +4623,26 @@ def figures_export_continuous_4decoder_rasters_and_context_completion_function(s
     from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder, DecodedFilterEpochsResult, is_clusterless_position_decoder
     from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import PlottingHelpers
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import TrackTemplates, TrainTestLapsSplitting, DirectionalPseudo2DDecodersResult, add_laps_groundtruth_information_to_dataframe, get_proper_global_spikes_df, decoding_continuous_cache_key
+
+    def _subfn_format_publication_decoder_label(raw_name: str) -> str:
+        """Map internal decoder names (`long_LR`, `long_RL`, `short_LR`, `short_RL`) to publication labels with Unicode arrows (`Long →`, `Long ←`, `Short →`, `Short ←`)."""
+        pub_map = {
+            'long_LR': 'Long \u2192',
+            'long_RL': 'Long \u2190',
+            'short_LR': 'Short \u2192',
+            'short_RL': 'Short \u2190',
+            'long': 'Long',
+            'short': 'Short',
+        }
+        key_str: str = str(raw_name)
+        if key_str in pub_map:
+            return pub_map[key_str]
+        out_str: str = key_str.replace('_LR', ' \u2192').replace('_RL', ' \u2190')
+        if out_str.startswith('long'):
+            out_str = 'Long' + out_str[4:]
+        elif out_str.startswith('short'):
+            out_str = 'Short' + out_str[5:]
+        return out_str
 
     def _subfn_build_laps_gt_df(pipeline_obj, global_epoch_name_str: str, decoder_names_list: List[str]) -> pd.DataFrame:
         """Build session laps DataFrame with ground-truth `lap_id` and `truth_decoder_name` columns."""
@@ -4812,8 +4835,12 @@ def figures_export_continuous_4decoder_rasters_and_context_completion_function(s
             2.2, 1.5, 0.35,
             1.1,
         ]
+        gs_left_frac: float = left_pad_in / fig_w_in
+        gs_right_frac: float = (fig_w_in - right_pad_in) / fig_w_in
+        gs_top_frac: float = 0.956
+        gs_bottom_frac: float = 0.048
         gs = GridSpec(nrows=len(gs_height_ratios), ncols=1, figure=fig, height_ratios=gs_height_ratios, hspace=0.03,
-                      left=(left_pad_in / fig_w_in), right=((fig_w_in - right_pad_in) / fig_w_in), top=0.965, bottom=0.045)
+                      left=gs_left_frac, right=gs_right_frac, top=gs_top_frac, bottom=gs_bottom_frac)
 
         ## Slice measured position once for `[c_t0, c_t1]` (with 1-sample overhang so lines reach exact chunk edges):
         p_i0: int = max(0, int(np.searchsorted(pos_t_all, c_t0, side='left')) - 1)
@@ -4884,19 +4911,16 @@ def figures_export_continuous_4decoder_rasters_and_context_completion_function(s
             ## GT green boxes + non-GT lap dimming on both posterior and paired raster:
             _subfn_draw_lap_gt_boxes_and_non_gt_dimming(ax_post=ax_post, ax_rast=ax_rast, laps_gt_df=laps_gt_df, decoder_name_str=a_name, chunk_t0=c_t0, chunk_t1=c_t1, post_ylim=post_ylim, rast_ylim=rast_ylim, non_gt_dim_alpha=non_gt_lap_dim_alpha)
 
-            if (t_delta is not None) and np.isfinite(float(t_delta)) and (c_t0 <= float(t_delta) <= c_t1):
-                ax_post.axvline(float(t_delta), color='white', linestyle='--', linewidth=1.2, alpha=0.85, zorder=22.0)
-                ax_rast.axvline(float(t_delta), color='white', linestyle='--', linewidth=1.2, alpha=0.85, zorder=22.0)
-
             ax_post.xaxis.set_major_locator(MultipleLocator(major_tick_step))
             ax_rast.xaxis.set_major_locator(MultipleLocator(major_tick_step))
             ax_post.tick_params(axis='x', which='both', bottom=False, labelbottom=False)
             ax_rast.tick_params(axis='x', which='both', bottom=False, labelbottom=False)
 
             if is_first_chunk:
-                ax_post.set_ylabel(f'{a_name}\npos (cm)', fontsize=8.5, fontweight='bold')
+                pub_dec_label: str = _subfn_format_publication_decoder_label(a_name)
+                ax_post.set_ylabel(f'{pub_dec_label}\nPos. (cm)', fontsize=8.5, fontweight='bold')
                 ax_post.tick_params(axis='y', labelsize=7)
-                ax_rast.set_ylabel(f'{a_name}\naclus ({n_cells_d})', fontsize=7.5)
+                ax_rast.set_ylabel(f'{pub_dec_label}\nUnits ({n_cells_d})', fontsize=7.5)
                 ax_rast.tick_params(axis='y', labelsize=6.5)
             else:
                 ax_post.tick_params(axis='y', left=False, labelleft=False)
@@ -4908,23 +4932,49 @@ def figures_export_continuous_4decoder_rasters_and_context_completion_function(s
                 ax_rast.spines['right'].set_visible(False)
         ## END for dec_i, a_name in enumerate(decoder_names)...
 
-        ## Bottom row (slot 12): 75ms continuous `track_ID` marginal (`long` vs `short`):
+        ## Bottom row (slot 12): 75ms continuous `track_ID` marginal (`Long` vs `Short`, orange cmap):
         ax_ctx = fig.add_subplot(gs[12, 0])
-        ax_ctx.set_facecolor('black')
+        ax_ctx.set_facecolor('white')
         n_ctx_bins: int = int(track_id_marginal_2d.shape[1])
         if (n_ctx_bins > 0) and (len(ctx_t_edges) == (n_ctx_bins + 1)):
             cb0: int = max(0, int(np.searchsorted(ctx_t_edges, c_t0, side='right')) - 1)
             cb1: int = min(n_ctx_bins, int(np.searchsorted(ctx_t_edges, c_t1, side='left')) + 1)
             if cb1 > cb0:
                 ax_ctx.imshow(track_id_marginal_2d[:, cb0:cb1], origin='lower', aspect='auto', interpolation='nearest', cmap=context_cmap, vmin=0.0, vmax=1.0, extent=(float(ctx_t_edges[cb0]), float(ctx_t_edges[cb1]), 0.0, 2.0), animated=False, zorder=2.0)
-        ax_ctx.axhline(1.0, color='white', linewidth=0.8, alpha=0.65, zorder=10.0)
-        if (t_delta is not None) and np.isfinite(float(t_delta)) and (c_t0 <= float(t_delta) <= c_t1):
-            ax_ctx.axvline(float(t_delta), color='white', linestyle='--', linewidth=1.4, alpha=0.9, zorder=22.0)
+        ax_ctx.axhline(1.0, color='black', linewidth=0.9, alpha=0.65, zorder=10.0)
         ax_ctx.set_xlim(c_t0, c_t1)
         ax_ctx.set_ylim(0.0, 2.0)
         ax_ctx.xaxis.set_major_locator(MultipleLocator(major_tick_step))
         ax_ctx.xaxis.set_minor_locator(MultipleLocator(minor_tick_step))
         ax_ctx.tick_params(axis='x', which='major', labelsize=7.5)
+
+        ## Prominent full-height vertical bar at `delta_t` (`plot_t_delta == 0.0` on `delta_relative_t` axis):
+        if (plot_t_delta is not None) and (c_t0 <= float(plot_t_delta) <= c_t1):
+            delta_x_fig: float = gs_left_frac + ((float(plot_t_delta) - c_t0) / max(c_t1 - c_t0, 1e-9)) * (gs_right_frac - gs_left_frac)
+            delta_bar_line = Line2D(
+                [delta_x_fig, delta_x_fig],
+                [gs_bottom_frac, gs_top_frac],
+                transform=fig.transFigure,
+                color='#000000',
+                linewidth=4.5,
+                solid_capstyle='butt',
+                zorder=100.0,
+            )
+            delta_bar_line.set_path_effects([pe.withStroke(linewidth=7.5, foreground='white')])
+            fig.add_artist(delta_bar_line)
+            if (c_t0 < float(plot_t_delta) < c_t1) or (total_chunks == 1):
+                fig.text(
+                    delta_x_fig,
+                    gs_top_frac + 0.004,
+                    '\u0394t',
+                    ha='center',
+                    va='bottom',
+                    fontsize=8.5,
+                    fontweight='bold',
+                    color='white',
+                    bbox=dict(boxstyle='round,pad=0.20', facecolor='#000000', edgecolor='white', linewidth=0.9),
+                    zorder=110.0,
+                )
 
         ## Suppress major x-tick labels right on interior chunk seams so text never clips at pixel 0 / W-1:
         if total_chunks > 1:
@@ -4937,16 +4987,13 @@ def figures_export_continuous_4decoder_rasters_and_context_completion_function(s
 
         if is_first_chunk:
             ctx_ms_label: int = int(round(eff_ctx_tbin * 1000.0))
-            ax_ctx.set_ylabel(f'Context\n({ctx_ms_label}ms)', fontsize=8.0, fontweight='bold')
+            ax_ctx.set_ylabel(f'Track ID\n({ctx_ms_label}ms)', fontsize=8.0, fontweight='bold')
             ax_ctx.set_yticks([0.5, 1.5])
-            ax_ctx.set_yticklabels(['long', 'short'], fontsize=7.5, fontweight='bold')
-            try:
-                PlottingHelpers.helper_matplotlib_add_pseudo2D_marginal_labels(ax_ctx, y_bin_labels=['long', 'short'], enable_draw_decoder_colored_lines=False, enable_draw_separator_lines=False, additional_label_kwargs=dict(color='white', fontsize=8.5, fontweight='bold', bbox=dict(boxstyle='round,pad=0.15', facecolor=(0.0, 0.0, 0.0, 0.55), edgecolor='none')))
-            except Exception:
-                pass
-            ax_ctx.set_xlabel('Session Time (s)', fontsize=8.5, loc='left')
+            ax_ctx.set_yticklabels(['Long', 'Short'], fontsize=8.0, fontweight='bold')
+            x_axis_label_str: str = 'Time Relative to \u0394t (s)' if has_t_delta else 'Session Time (s)'
+            ax_ctx.set_xlabel(x_axis_label_str, fontsize=8.5, fontweight='bold', loc='left')
             pos_ms_label: int = int(round(eff_pos_tbin * 1000.0))
-            fig.text(left_pad_in / fig_w_in, 0.978, f"{animal_exper_session} | Continuous 4-Decoder ({pos_ms_label}ms, {'held-out TrainTestSplit' if used_heldout_train_decoders else 'TrackTemplates'}) + Sorted Rasters + {ctx_ms_label}ms Context (long/short)", ha='left', va='bottom', fontsize=10.0, fontweight='bold')
+            fig.text(gs_left_frac, 0.981, f"{animal_exper_session} | Continuous 4-Decoder ({pos_ms_label}ms, {'held-out TrainTestSplit' if used_heldout_train_decoders else 'TrackTemplates'}) + Sorted Rasters + {ctx_ms_label}ms Track ID Marginal", ha='left', va='bottom', fontsize=10.0, fontweight='bold')
         else:
             ax_ctx.tick_params(axis='y', left=False, labelleft=False)
             ax_ctx.spines['left'].set_visible(False)
@@ -4975,7 +5022,7 @@ def figures_export_continuous_4decoder_rasters_and_context_completion_function(s
     non_gt_lap_dim_alpha: float = float(kwargs.pop('non_gt_lap_dim_alpha', 0.25))
     raster_bg_color: str = str(kwargs.pop('raster_bg_color', '#111318'))
     posterior_cmap_name: str = str(kwargs.pop('cmap', 'viridis'))
-    context_cmap_name: str = str(kwargs.pop('context_cmap', 'viridis'))
+    context_cmap_name: str = str(kwargs.pop('context_cmap', 'Oranges'))
 
     print(f'figures_export_continuous_4decoder_rasters_and_context_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, active_laps_decoding_time_bin_size={active_laps_decoding_time_bin_size}, context_decoding_time_bin_size={context_decoding_time_bin_size}, ...)', flush=True)
     callback_outputs: Dict[str, Any] = {
@@ -5120,16 +5167,51 @@ def figures_export_continuous_4decoder_rasters_and_context_completion_function(s
         pos_t_all = pos_t_all[pos_sort_idx]
         pos_y_all = pos_y_all[pos_sort_idx]
 
+        ## Shift all plotted time coordinates to `delta_relative_t = t - t_delta` when `t_delta` is finite (so `delta_t` sits at `0.0` s):
+        has_t_delta: bool = (t_delta is not None) and np.isfinite(float(t_delta))
+        t_offset: float = float(t_delta) if has_t_delta else 0.0
+        plot_t_start: float = float(t_start) - t_offset
+        plot_t_end: float = float(t_end) - t_offset
+        plot_t_delta: Optional[float] = 0.0 if has_t_delta else None
+        if t_offset != 0.0:
+            for a_name in decoder_names:
+                continuous_4dec_data[a_name]['t_edges'] = continuous_4dec_data[a_name]['t_edges'] - t_offset
+                if len(sorted_rasters_data[a_name]['spk_t']) > 0:
+                    sorted_rasters_data[a_name]['spk_t'] = sorted_rasters_data[a_name]['spk_t'] - t_offset
+            ## END for a_name in decoder_names...
+
+            if len(laps_gt_df) > 0:
+                laps_gt_df = laps_gt_df.copy()
+                laps_gt_df['start'] = laps_gt_df['start'].to_numpy(dtype=float) - t_offset
+                laps_gt_df['stop'] = laps_gt_df['stop'].to_numpy(dtype=float) - t_offset
+            ctx_t_edges = ctx_t_edges - t_offset
+            pos_t_all = pos_t_all - t_offset
+
         posterior_cmap = get_heatmap_cmap(cmap=posterior_cmap_name, bad_color='black', under_color='black', over_color='white')
-        context_cmap = get_heatmap_cmap(cmap=context_cmap_name, bad_color='black', under_color='black', over_color='white')
+        if context_cmap_name == 'Oranges':
+            ## Trim only the muddy dark-brown tip (>0.82) of Matplotlib `Oranges` so `P=1.0` renders as vivid saturated orange:
+            _vivid_oranges_base = LinearSegmentedColormap.from_list('Oranges_vivid', plt.get_cmap('Oranges')(np.linspace(0.0, 0.82, 256)))
+            context_cmap = get_heatmap_cmap(cmap=_vivid_oranges_base, bad_color='black', under_color='white', over_color='#d94801')
+        else:
+            context_cmap = get_heatmap_cmap(cmap=context_cmap_name, bad_color='black', under_color='white', over_color='white')
 
         ## Compute horizontal chunking so no single Matplotlib Agg canvas exceeds `max_chunk_width_px` (and always stays < 65,535 px):
-        session_duration_sec: float = float(t_end - t_start)
+        session_duration_sec: float = float(plot_t_end - plot_t_start)
         eff_inches_per_sec: float = max(float(inches_per_second), 0.005)
         total_data_width_px: float = session_duration_sec * eff_inches_per_sec * float(dpi)
         eff_max_chunk_px: int = max(2000, min(int(max_chunk_width_px), 60000))
         n_chunks: int = max(1, int(math.ceil(total_data_width_px / float(eff_max_chunk_px))))
-        chunk_edges_sec: NDArray = np.linspace(t_start, t_end, n_chunks + 1, dtype=float)
+        chunk_edges_sec: NDArray = np.linspace(plot_t_start, plot_t_end, n_chunks + 1, dtype=float)
+        if (n_chunks > 1) and (plot_t_delta is not None):
+            seam_guard_for_delta: float = max(4.0, 2.5 * (0.35 / eff_inches_per_sec))
+            for seam_k in range(1, n_chunks):
+                if abs(float(chunk_edges_sec[seam_k]) - float(plot_t_delta)) < seam_guard_for_delta:
+                    shifted_edge: float = float(plot_t_delta) + max(6.0, 3.0 * (0.35 / eff_inches_per_sec))
+                    lo_clamp: float = float(chunk_edges_sec[seam_k - 1]) + 2.0
+                    hi_clamp: float = float(chunk_edges_sec[seam_k + 1]) - 2.0
+                    if lo_clamp < hi_clamp:
+                        chunk_edges_sec[seam_k] = float(np.clip(shifted_edge, lo_clamp, hi_clamp))
+            ## END for seam_k in range(1, n_chunks)...
 
         ## Global major/minor x-tick steps so ticks align uniformly across chunk seams:
         approx_sec_per_major_tick: float = 1.25 / eff_inches_per_sec
