@@ -4579,15 +4579,15 @@ def figures_export_laps_correct_decoder_side_by_side_completion_function(self, g
     return across_session_results_extended_dict
 
 
-@function_attributes(short_name=None, tags=['figure', 'batch', 'continuous', 'posterior', 'raster', 'four-decoder', 'groundtruth', 'context', 'Agg', 'headless'], input_requires=['DirectionalLaps', 'DirectionalMergedDecoders', 'TrainTestSplit'], output_provides=['figures_export_continuous_4decoder_rasters_and_context_completion_function'],
-                      uses=['_subfn_format_publication_decoder_label', '_subfn_build_laps_gt_df', '_subfn_extract_time_bin_edges', '_subfn_prepare_decoder_sorted_spikes', '_subfn_compute_low_firing_mask_rgba', '_subfn_draw_lap_gt_boxes_and_non_gt_dimming', '_subfn_render_time_chunk_figure'], used_by=[], creation_date='2026-11-27 10:25', related_items=['figures_export_laps_correct_decoder_side_by_side_completion_function'])
+@function_attributes(short_name=None, tags=['figure', 'batch', 'continuous', 'posterior', 'raster', 'four-decoder', 'groundtruth', 'pbe', 'context', 'Agg', 'headless'], input_requires=['DirectionalLaps', 'DirectionalMergedDecoders', 'TrainTestSplit'], output_provides=['figures_export_continuous_4decoder_rasters_and_context_completion_function'],
+                      uses=['_subfn_format_publication_decoder_label', '_subfn_build_laps_gt_df', '_subfn_build_pbe_epochs_df', '_subfn_extract_time_bin_edges', '_subfn_prepare_decoder_sorted_spikes', '_subfn_compute_low_firing_mask_rgba', '_subfn_draw_lap_gt_boxes_and_non_gt_dimming', '_subfn_draw_pbe_indicators_on_decoder_pair', '_subfn_draw_pbe_barcode_strip', '_subfn_render_time_chunk_figure'], used_by=[], creation_date='2026-11-27 10:25', related_items=['figures_export_laps_correct_decoder_side_by_side_completion_function'])
 def figures_export_continuous_4decoder_rasters_and_context_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict,
                                                                                active_laps_decoding_time_bin_size: float = 0.025, context_decoding_time_bin_size: float = 0.075, posterior_masking_value: float = 0.0,
                                                                                should_dim_low_firing_bins: bool = True, min_num_spikes_per_bin_to_be_considered_active: int = 1, min_num_unique_active_neurons_per_time_bin: Optional[int] = 1,
-                                                                               should_filter_inactive_bins_before_split: bool = False, train_test_full_lap: Optional[bool] = None,
+                                                                               should_filter_inactive_bins_before_split: bool = False, train_test_full_lap: Optional[bool] = None, should_show_pbes: bool = True,
                                                                                inches_per_second: float = 0.15, figsize_height: float = 16.0, dpi: int = 150, max_chunk_width_px: int = 30000,
                                                                                fail_on_exception_for_debugging: bool = False, debug_print: bool = False, **kwargs) -> dict:
-    """Batch/SLURM headless Agg export: full-session continuous 4-decoder posteriors + decoder-sorted spike rasters + low-firing dimming + green GT lap boxes + bottom 75ms continuous track_ID (long vs short) marginal.
+    """Batch/SLURM headless Agg export: full-session continuous 4-decoder posteriors + decoder-sorted spike rasters + low-firing dimming + green GT lap boxes + non-occluding PBE indicators + bottom 75ms continuous track_ID (long vs short) marginal.
 
     Self-contained for `inspect.getsource` embedding on Great Lakes SLURM jobs (all imports local; all single-use helpers nested as `_subfn_*`).
     Automatically splits ultra-wide full-session timelines into fixed-geometry horizontal chunks when pixel width exceeds `max_chunk_width_px` (capped below Agg's 65,535 px limit) and stitches them seamlessly via PIL `horizontal_image_stack`.
@@ -4609,7 +4609,7 @@ def figures_export_continuous_4decoder_rasters_and_context_completion_function(s
     matplotlib.use('Agg', force=False)
     import matplotlib.pyplot as plt
     import matplotlib.patheffects as pe
-    from matplotlib.collections import LineCollection
+    from matplotlib.collections import LineCollection, PolyCollection
     from matplotlib.colors import LinearSegmentedColormap
     from matplotlib.gridspec import GridSpec
     from matplotlib.lines import Line2D
@@ -4670,6 +4670,66 @@ def figures_export_continuous_4decoder_rasters_and_context_completion_function(s
             print(f'WARN: _subfn_build_laps_gt_df could not resolve lap ground-truth labels ({gt_err}); skipping GT lap boxes.', flush=True)
             return pd.DataFrame(columns=['start', 'stop', 'lap_id', 'truth_decoder_name'])
         return laps_df
+
+    def _subfn_build_pbe_epochs_df(pipeline_obj, global_epoch_name_str: str, t_bound_start: float, t_bound_end: float, preferred_source: str = 'pbe', merged_decoders_res=None) -> Tuple[pd.DataFrame, str]:
+        """Resolve detected session PBE epochs (`sess.pbe`, falling back to `sess.replay`) clipped to `[t_bound_start, t_bound_end]`."""
+        empty_df = pd.DataFrame(columns=['start', 'stop', 'mid', 'duration'])
+        candidates: List[Tuple[str, Any]] = []
+        filt_sess = pipeline_obj.filtered_sessions.get(global_epoch_name_str, None) if hasattr(pipeline_obj, 'filtered_sessions') else None
+        base_sess = getattr(pipeline_obj, 'sess', None)
+        pref_norm: str = str(preferred_source).strip().lower()
+        attr_order: List[str] = ['replay', 'pbe'] if (pref_norm == 'replay') else ['pbe', 'replay']
+        for attr_name in attr_order:
+            if filt_sess is not None:
+                candidates.append((f'filtered_sessions[{global_epoch_name_str}].{attr_name}', getattr(filt_sess, attr_name, None)))
+            if base_sess is not None:
+                candidates.append((f'sess.{attr_name}', getattr(base_sess, attr_name, None)))
+        ## END for attr_name in attr_order...
+
+        if merged_decoders_res is not None:
+            rip_res = getattr(merged_decoders_res, 'all_directional_ripple_filter_epochs_decoder_result', None)
+            if rip_res is not None:
+                candidates.append(('DirectionalMergedDecoders.filter_epochs', getattr(rip_res, 'filter_epochs', None)))
+
+        for src_label, cand_obj in candidates:
+            if cand_obj is None:
+                continue
+            try:
+                cand_df = ensure_dataframe(deepcopy(cand_obj))
+            except Exception:
+                continue
+            if (cand_df is None) or (len(cand_df) == 0):
+                continue
+            if ('stop' not in cand_df.columns) and ('end' in cand_df.columns):
+                cand_df = cand_df.copy()
+                cand_df['stop'] = cand_df['end']
+            if ('start' not in cand_df.columns) or ('stop' not in cand_df.columns):
+                continue
+            st_arr = pd.to_numeric(cand_df['start'], errors='coerce').to_numpy(dtype=float)
+            en_arr = pd.to_numeric(cand_df['stop'], errors='coerce').to_numpy(dtype=float)
+            valid_mask = np.isfinite(st_arr) & np.isfinite(en_arr) & (en_arr > st_arr) & (en_arr > float(t_bound_start)) & (st_arr < float(t_bound_end))
+            if not np.any(valid_mask):
+                continue
+            st_valid = np.maximum(st_arr[valid_mask], float(t_bound_start))
+            en_valid = np.minimum(en_arr[valid_mask], float(t_bound_end))
+            keep_pos = en_valid > st_valid
+            st_valid = st_valid[keep_pos]
+            en_valid = en_valid[keep_pos]
+            if len(st_valid) == 0:
+                continue
+            order_idx = np.argsort(st_valid, kind='mergesort')
+            st_valid = st_valid[order_idx]
+            en_valid = en_valid[order_idx]
+            out_df = pd.DataFrame({
+                'start': st_valid,
+                'stop': en_valid,
+                'mid': 0.5 * (st_valid + en_valid),
+                'duration': en_valid - st_valid,
+            })
+            return out_df, src_label
+        ## END for src_label, cand_obj in candidates...
+
+        return empty_df, 'none'
 
     def _subfn_extract_time_bin_edges(time_bin_container, time_window_centers: NDArray) -> NDArray:
         """Return `(n_bins + 1,)` time-bin edges from `time_bin_container.edges` or reconstructed from `time_window_centers`."""
@@ -4810,14 +4870,117 @@ def figures_export_continuous_4decoder_rasters_and_context_completion_function(s
                 ax_rast.add_patch(Rectangle((lap_st, rast_y0 + rast_ypad), lap_dur, max(rast_yspan - (2.0 * rast_ypad), 1e-6), fill=False, edgecolor='limegreen', linewidth=1.8, zorder=25.0, clip_on=True))
                 lap_mid: float = 0.5 * (lap_st + lap_en)
                 if (lap_mid >= float(chunk_t0)) and (lap_mid < float(chunk_t1)):
-                    ax_post.text(lap_mid, post_y1 + (0.015 * post_yspan), f'Lap {lap_ids_arr[idx_l]}', ha='center', va='bottom', fontsize=6.5, fontweight='bold', color='#15803d', clip_on=False, zorder=30.0)
+                    ax_post.text(lap_mid, post_y1 + (0.048 * post_yspan), f'Lap {lap_ids_arr[idx_l]}', ha='center', va='bottom', fontsize=6.5, fontweight='bold', color='#15803d', clip_on=False, zorder=30.0)
             elif non_gt_dim_alpha > 0.0:
                 ax_post.add_patch(Rectangle((lap_st, post_y0), lap_dur, post_yspan, facecolor=(0.12, 0.05, 0.18, float(non_gt_dim_alpha)), edgecolor='none', zorder=12.0, clip_on=True))
                 ax_rast.add_patch(Rectangle((lap_st, rast_y0), lap_dur, rast_yspan, facecolor=(0.08, 0.05, 0.12, float(0.65 * non_gt_dim_alpha)), edgecolor='none', zorder=12.0, clip_on=True))
         ## END for idx_l in overlap_idxs...
 
+    def _subfn_draw_pbe_indicators_on_decoder_pair(ax_post, ax_rast, pbe_df: pd.DataFrame, chunk_t0: float, chunk_t1: float, post_ylim: Tuple[float, float], rast_ylim: Tuple[float, float]) -> None:
+        """Draw non-occluding outward top vernier ticks + micro-carets above `ax_post` and under-spike magenta glow ribbons on `ax_rast`."""
+        if (pbe_df is None) or (len(pbe_df) == 0):
+            return
+        st_all = pbe_df['start'].to_numpy(dtype=float)
+        en_all = pbe_df['stop'].to_numpy(dtype=float)
+        mid_all = pbe_df['mid'].to_numpy(dtype=float)
+        ov_mask = (en_all > float(chunk_t0)) & (st_all < float(chunk_t1))
+        if not np.any(ov_mask):
+            return
+        st_ov = np.clip(st_all[ov_mask], float(chunk_t0), float(chunk_t1))
+        en_ov = np.clip(en_all[ov_mask], float(chunk_t0), float(chunk_t1))
+        mid_ov = mid_all[ov_mask]
+
+        ## 1) Under-spike vertical glow ribbons on dark `ax_rast` (`zorder < 5.0` so unit spikes render crisply on top):
+        rast_y0, rast_y1 = float(rast_ylim[0]), float(rast_ylim[1])
+        quads = np.empty((len(st_ov), 4, 2), dtype=float)
+        quads[:, 0, 0] = st_ov
+        quads[:, 0, 1] = rast_y0
+        quads[:, 1, 0] = en_ov
+        quads[:, 1, 1] = rast_y0
+        quads[:, 2, 0] = en_ov
+        quads[:, 2, 1] = rast_y1
+        quads[:, 3, 0] = st_ov
+        quads[:, 3, 1] = rast_y1
+        ax_rast.add_collection(PolyCollection(quads, facecolors=(1.0, 0.18, 0.68, 0.24), edgecolors='none', zorder=3.2))
+
+        in_chunk_mid = (mid_ov >= float(chunk_t0)) & (mid_ov <= float(chunk_t1))
+        if np.any(in_chunk_mid):
+            mids_in = mid_ov[in_chunk_mid]
+            rast_hairlines = np.empty((len(mids_in), 2, 2), dtype=float)
+            rast_hairlines[:, 0, 0] = mids_in
+            rast_hairlines[:, 1, 0] = mids_in
+            rast_hairlines[:, 0, 1] = rast_y0
+            rast_hairlines[:, 1, 1] = rast_y1
+            ax_rast.add_collection(LineCollection(rast_hairlines, colors=[(1.0, 0.24, 0.72, 0.40)], linewidths=1.0, zorder=3.4))
+
+            ## 2) Outward top vernier ticks + downward micro-carets above `ax_post` (zero occlusion of posterior spatial bins):
+            post_y0, post_y1 = float(post_ylim[0]), float(post_ylim[1])
+            post_yspan: float = post_y1 - post_y0
+            tick_y0: float = post_y1 + (0.005 * post_yspan)
+            tick_y1: float = post_y1 + (0.038 * post_yspan)
+            caret_y: float = post_y1 + (0.042 * post_yspan)
+            post_ticks = np.empty((len(mids_in), 2, 2), dtype=float)
+            post_ticks[:, 0, 0] = mids_in
+            post_ticks[:, 1, 0] = mids_in
+            post_ticks[:, 0, 1] = tick_y0
+            post_ticks[:, 1, 1] = tick_y1
+            lc_ticks = LineCollection(post_ticks, colors=pbe_accent_color, linewidths=1.0, clip_on=False, zorder=28.0)
+            ax_post.add_collection(lc_ticks)
+            ax_post.scatter(mids_in, np.full_like(mids_in, caret_y), marker='v', s=5.8, c=pbe_accent_color, edgecolors='none', clip_on=False, zorder=29.0)
+
+    def _subfn_draw_pbe_barcode_strip(ax_pbe, ax_ctx, pbe_df: pd.DataFrame, chunk_t0: float, chunk_t1: float) -> None:
+        """Render dedicated dark oscilloscope-style PBE stem-and-pin barcode strip + top vernier ticks on `ax_ctx`."""
+        ax_pbe.set_facecolor('#14161f')
+        ax_pbe.axhline(0.50, color='#2d3246', linewidth=0.5, linestyle=':', zorder=1.0)
+        if (pbe_df is None) or (len(pbe_df) == 0):
+            return
+        st_all = pbe_df['start'].to_numpy(dtype=float)
+        en_all = pbe_df['stop'].to_numpy(dtype=float)
+        mid_all = pbe_df['mid'].to_numpy(dtype=float)
+        dur_all = pbe_df['duration'].to_numpy(dtype=float)
+        ov_mask = (en_all > float(chunk_t0)) & (st_all < float(chunk_t1))
+        if not np.any(ov_mask):
+            return
+        st_ov = np.clip(st_all[ov_mask], float(chunk_t0), float(chunk_t1))
+        en_ov = np.clip(en_all[ov_mask], float(chunk_t0), float(chunk_t1))
+        mid_ov = mid_all[ov_mask]
+        dur_ov = dur_all[ov_mask]
+        ## Gentle duration-scaled stem heights (`[0.42, 0.90]` across `40..300ms`) so bursty PBE pinheads stagger cleanly:
+        h_ov = 0.42 + (0.48 * np.clip((dur_ov - 0.040) / 0.260, 0.0, 1.0))
+
+        quads = np.empty((len(st_ov), 4, 2), dtype=float)
+        quads[:, 0, 0] = st_ov
+        quads[:, 0, 1] = 0.0
+        quads[:, 1, 0] = en_ov
+        quads[:, 1, 1] = 0.0
+        quads[:, 2, 0] = en_ov
+        quads[:, 2, 1] = h_ov
+        quads[:, 3, 0] = st_ov
+        quads[:, 3, 1] = h_ov
+        ax_pbe.add_collection(PolyCollection(quads, facecolors=(1.0, 0.18, 0.68, 0.45), edgecolors='none', zorder=4.0))
+
+        in_chunk_mid = (mid_ov >= float(chunk_t0)) & (mid_ov <= float(chunk_t1))
+        if np.any(in_chunk_mid):
+            mids_in = mid_ov[in_chunk_mid]
+            h_in = h_ov[in_chunk_mid]
+            stems = np.empty((len(mids_in), 2, 2), dtype=float)
+            stems[:, 0, 0] = mids_in
+            stems[:, 1, 0] = mids_in
+            stems[:, 0, 1] = 0.0
+            stems[:, 1, 1] = h_in
+            ax_pbe.add_collection(LineCollection(stems, colors=pbe_bar_color, linewidths=1.25, zorder=6.0))
+            ax_pbe.scatter(mids_in, h_in, s=8.5, c='#ff9ef0', edgecolors=pbe_bar_color, linewidths=0.55, zorder=8.0)
+
+            ## Outward top vernier ticks on `ax_ctx` linking each PBE stem into the 75ms Track ID marginal:
+            ctx_ticks = np.empty((len(mids_in), 2, 2), dtype=float)
+            ctx_ticks[:, 0, 0] = mids_in
+            ctx_ticks[:, 1, 0] = mids_in
+            ctx_ticks[:, 0, 1] = 2.01
+            ctx_ticks[:, 1, 1] = 2.13
+            ax_ctx.add_collection(LineCollection(ctx_ticks, colors=pbe_accent_color, linewidths=1.0, clip_on=False, zorder=25.0))
+
     def _subfn_render_time_chunk_figure(chunk_idx: int, total_chunks: int, c_t0: float, c_t1: float) -> Image.Image:
-        """Render one contiguous `[c_t0, c_t1]` horizontal slice across all 9 tracks with exact fixed vertical geometry."""
+        """Render one contiguous `[c_t0, c_t1]` horizontal slice across all tracks with exact fixed vertical geometry."""
         is_first_chunk: bool = (chunk_idx == 0)
         is_last_chunk: bool = (chunk_idx == (total_chunks - 1))
         data_w_in: float = max((c_t1 - c_t0) * eff_inches_per_sec, 1.5)
@@ -4827,17 +4990,32 @@ def figures_export_continuous_4decoder_rasters_and_context_completion_function(s
         fig_h_in: float = float(figsize_height)
 
         fig = plt.figure(figsize=(fig_w_in, fig_h_in), dpi=int(dpi), facecolor='white')
-        ## 13-slot GridSpec: 4x (posterior=2.2, raster=1.5) separated by 0.28 spacers + 0.35 spacer + bottom 75ms context=1.1:
-        gs_height_ratios = [
-            2.2, 1.5, 0.28,
-            2.2, 1.5, 0.28,
-            2.2, 1.5, 0.28,
-            2.2, 1.5, 0.35,
-            1.1,
-        ]
+        if eff_show_pbes:
+            ## 15-slot GridSpec: 4x (posterior=2.2, raster=1.5) separated by 0.32 spacers + 0.28 spacer + PBE barcode=0.60 + 0.14 spacer + 75ms context=1.1:
+            gs_height_ratios = [
+                2.2, 1.5, 0.32,
+                2.2, 1.5, 0.32,
+                2.2, 1.5, 0.32,
+                2.2, 1.5, 0.28,
+                0.60, 0.14,
+                1.1,
+            ]
+            slot_pbe: Optional[int] = 12
+            slot_ctx: int = 14
+        else:
+            ## 13-slot GridSpec: 4x (posterior=2.2, raster=1.5) separated by 0.30 spacers + 0.35 spacer + bottom 75ms context=1.1:
+            gs_height_ratios = [
+                2.2, 1.5, 0.30,
+                2.2, 1.5, 0.30,
+                2.2, 1.5, 0.30,
+                2.2, 1.5, 0.35,
+                1.1,
+            ]
+            slot_pbe = None
+            slot_ctx = 12
         gs_left_frac: float = left_pad_in / fig_w_in
         gs_right_frac: float = (fig_w_in - right_pad_in) / fig_w_in
-        gs_top_frac: float = 0.956
+        gs_top_frac: float = 0.952
         gs_bottom_frac: float = 0.048
         gs = GridSpec(nrows=len(gs_height_ratios), ncols=1, figure=fig, height_ratios=gs_height_ratios, hspace=0.03,
                       left=gs_left_frac, right=gs_right_frac, top=gs_top_frac, bottom=gs_bottom_frac)
@@ -4910,6 +5088,8 @@ def figures_export_continuous_4decoder_rasters_and_context_completion_function(s
 
             ## GT green boxes + non-GT lap dimming on both posterior and paired raster:
             _subfn_draw_lap_gt_boxes_and_non_gt_dimming(ax_post=ax_post, ax_rast=ax_rast, laps_gt_df=laps_gt_df, decoder_name_str=a_name, chunk_t0=c_t0, chunk_t1=c_t1, post_ylim=post_ylim, rast_ylim=rast_ylim, non_gt_dim_alpha=non_gt_lap_dim_alpha)
+            if eff_show_pbes:
+                _subfn_draw_pbe_indicators_on_decoder_pair(ax_post=ax_post, ax_rast=ax_rast, pbe_df=pbe_epochs_df, chunk_t0=c_t0, chunk_t1=c_t1, post_ylim=post_ylim, rast_ylim=rast_ylim)
 
             ax_post.xaxis.set_major_locator(MultipleLocator(major_tick_step))
             ax_rast.xaxis.set_major_locator(MultipleLocator(major_tick_step))
@@ -4932,8 +5112,8 @@ def figures_export_continuous_4decoder_rasters_and_context_completion_function(s
                 ax_rast.spines['right'].set_visible(False)
         ## END for dec_i, a_name in enumerate(decoder_names)...
 
-        ## Bottom row (slot 12): 75ms continuous `track_ID` marginal (`Long` vs `Short`, orange cmap):
-        ax_ctx = fig.add_subplot(gs[12, 0])
+        ## Bottom row (`slot_ctx`): 75ms continuous `track_ID` marginal (`Long` vs `Short`, orange cmap), plus optional `PBEs` stem-and-pin barcode strip (`slot_pbe`):
+        ax_ctx = fig.add_subplot(gs[slot_ctx, 0])
         ax_ctx.set_facecolor('white')
         n_ctx_bins: int = int(track_id_marginal_2d.shape[1])
         if (n_ctx_bins > 0) and (len(ctx_t_edges) == (n_ctx_bins + 1)):
@@ -4947,6 +5127,21 @@ def figures_export_continuous_4decoder_rasters_and_context_completion_function(s
         ax_ctx.xaxis.set_major_locator(MultipleLocator(major_tick_step))
         ax_ctx.xaxis.set_minor_locator(MultipleLocator(minor_tick_step))
         ax_ctx.tick_params(axis='x', which='major', labelsize=7.5)
+
+        if (slot_pbe is not None) and eff_show_pbes:
+            ax_pbe = fig.add_subplot(gs[slot_pbe, 0])
+            _subfn_draw_pbe_barcode_strip(ax_pbe=ax_pbe, ax_ctx=ax_ctx, pbe_df=pbe_epochs_df, chunk_t0=c_t0, chunk_t1=c_t1)
+            ax_pbe.set_xlim(c_t0, c_t1)
+            ax_pbe.set_ylim(0.0, 1.05)
+            ax_pbe.xaxis.set_major_locator(MultipleLocator(major_tick_step))
+            ax_pbe.tick_params(axis='x', which='both', bottom=False, labelbottom=False)
+            ax_pbe.set_yticks([])
+            if is_first_chunk:
+                ax_pbe.set_ylabel(f'PBEs\n(n={n_total_pbes})', fontsize=7.8, fontweight='bold', color='#be185d')
+            else:
+                ax_pbe.spines['left'].set_visible(False)
+            if not is_last_chunk:
+                ax_pbe.spines['right'].set_visible(False)
 
         ## Prominent full-height vertical bar at `delta_t` (`plot_t_delta == 0.0` on `delta_relative_t` axis):
         if (plot_t_delta is not None) and (c_t0 <= float(plot_t_delta) <= c_t1):
@@ -4993,7 +5188,8 @@ def figures_export_continuous_4decoder_rasters_and_context_completion_function(s
             x_axis_label_str: str = 'Time Relative to \u0394t (s)' if has_t_delta else 'Session Time (s)'
             ax_ctx.set_xlabel(x_axis_label_str, fontsize=8.5, fontweight='bold', loc='left')
             pos_ms_label: int = int(round(eff_pos_tbin * 1000.0))
-            fig.text(gs_left_frac, 0.981, f"{animal_exper_session} | Continuous 4-Decoder ({pos_ms_label}ms, {'held-out TrainTestSplit' if used_heldout_train_decoders else 'TrackTemplates'}) + Sorted Rasters + {ctx_ms_label}ms Track ID Marginal", ha='left', va='bottom', fontsize=10.0, fontweight='bold')
+            pbe_title_tok: str = f' + PBEs (n={n_total_pbes})' if eff_show_pbes else ''
+            fig.text(gs_left_frac, 0.981, f"{animal_exper_session} | Continuous 4-Decoder ({pos_ms_label}ms, {'held-out TrainTestSplit' if used_heldout_train_decoders else 'TrackTemplates'}) + Sorted Rasters{pbe_title_tok} + {ctx_ms_label}ms Track ID Marginal", ha='left', va='bottom', fontsize=10.0, fontweight='bold')
         else:
             ax_ctx.tick_params(axis='y', left=False, labelleft=False)
             ax_ctx.spines['left'].set_visible(False)
@@ -5014,6 +5210,12 @@ def figures_export_continuous_4decoder_rasters_and_context_completion_function(s
         should_filter_inactive_bins_before_split = bool(kwargs.pop('should_filter_inactive_bins_before_split'))
     if 'train_test_full_lap' in kwargs:
         train_test_full_lap = kwargs.pop('train_test_full_lap')
+    if 'should_show_pbes' in kwargs:
+        should_show_pbes = bool(kwargs.pop('should_show_pbes'))
+    eff_show_pbes: bool = bool(should_show_pbes)
+    pbe_epochs_source: str = str(kwargs.pop('pbe_epochs_source', 'pbe'))
+    pbe_bar_color: str = str(kwargs.pop('pbe_color', '#ff2dac'))
+    pbe_accent_color: str = str(kwargs.pop('pbe_accent_color', '#e11d8f'))
     combined_image_basename: Optional[str] = kwargs.pop('combined_image_basename', None)
     export_filename_extra_suffix_parts: Optional[List[str]] = kwargs.pop('export_filename_extra_suffix_parts', None)
     measured_line_color: str = str(kwargs.pop('measured_line_color', '#ff0000'))
@@ -5026,7 +5228,7 @@ def figures_export_continuous_4decoder_rasters_and_context_completion_function(s
 
     print(f'figures_export_continuous_4decoder_rasters_and_context_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, active_laps_decoding_time_bin_size={active_laps_decoding_time_bin_size}, context_decoding_time_bin_size={context_decoding_time_bin_size}, ...)', flush=True)
     callback_outputs: Dict[str, Any] = {
-        'out_path': None, 'output_dir': None, 'n_chunks': None, 'n_laps': None, 'image_size_px': None,
+        'out_path': None, 'output_dir': None, 'n_chunks': None, 'n_laps': None, 'n_pbes': None, 'pbe_source': None, 'image_size_px': None,
         'session_time_bounds': None, 'active_laps_decoding_time_bin_size': float(active_laps_decoding_time_bin_size),
         'context_decoding_time_bin_size': float(context_decoding_time_bin_size), 'used_heldout_train_decoders': False, 'error': None,
     }
@@ -5160,6 +5362,14 @@ def figures_export_continuous_4decoder_rasters_and_context_completion_function(s
         ctx_t_edges = _subfn_extract_time_bin_edges(ctx_tbin_container, ctx_t_centers)
         track_id_marginal_2d: NDArray = np.asarray(DirectionalPseudo2DDecodersResult.build_custom_marginal_over_long_short(pseudo2D_cont_result)[0].p_x_given_n, dtype=float)
 
+        ## 4) Resolve detected session PBE epochs (`sess.pbe` / `sess.replay`):
+        if eff_show_pbes:
+            pbe_epochs_df, resolved_pbe_source = _subfn_build_pbe_epochs_df(curr_active_pipeline, global_epoch_name_str=global_epoch_name, t_bound_start=t_start, t_bound_end=t_end, preferred_source=pbe_epochs_source, merged_decoders_res=directional_merged_decoders_result)
+        else:
+            pbe_epochs_df = pd.DataFrame(columns=['start', 'stop', 'mid', 'duration'])
+            resolved_pbe_source = 'disabled'
+        n_total_pbes: int = int(len(pbe_epochs_df))
+
         ## Pre-slice measured position arrays sorted by `t` for fast per-chunk plotting:
         pos_t_all = global_pos_df['t'].to_numpy(dtype=float, copy=False)
         pos_y_all = global_pos_df[pos_var_name].to_numpy(dtype=float, copy=False)
@@ -5184,6 +5394,11 @@ def figures_export_continuous_4decoder_rasters_and_context_completion_function(s
                 laps_gt_df = laps_gt_df.copy()
                 laps_gt_df['start'] = laps_gt_df['start'].to_numpy(dtype=float) - t_offset
                 laps_gt_df['stop'] = laps_gt_df['stop'].to_numpy(dtype=float) - t_offset
+            if len(pbe_epochs_df) > 0:
+                pbe_epochs_df = pbe_epochs_df.copy()
+                pbe_epochs_df['start'] = pbe_epochs_df['start'].to_numpy(dtype=float) - t_offset
+                pbe_epochs_df['stop'] = pbe_epochs_df['stop'].to_numpy(dtype=float) - t_offset
+                pbe_epochs_df['mid'] = pbe_epochs_df['mid'].to_numpy(dtype=float) - t_offset
             ctx_t_edges = ctx_t_edges - t_offset
             pos_t_all = pos_t_all - t_offset
 
@@ -5252,11 +5467,13 @@ def figures_export_continuous_4decoder_rasters_and_context_completion_function(s
             output_dir=output_dir,
             n_chunks=int(n_chunks),
             n_laps=int(len(laps_gt_df)),
+            n_pbes=int(n_total_pbes),
+            pbe_source=str(resolved_pbe_source),
             image_size_px=(int(img_w_px), int(img_h_px)),
             session_time_bounds=(float(t_start), float(t_end)),
             used_heldout_train_decoders=bool(used_heldout_train_decoders),
         ))
-        print(f'\tsaved continuous 4-decoder figure ({img_w_px}x{img_h_px} px, {n_chunks} chunk(s), {len(laps_gt_df)} laps) -> {out_path.resolve().as_uri()}', flush=True)
+        print(f'\tsaved continuous 4-decoder figure ({img_w_px}x{img_h_px} px, {n_chunks} chunk(s), {len(laps_gt_df)} laps, {n_total_pbes} PBEs [{resolved_pbe_source}]) -> {out_path.resolve().as_uri()}', flush=True)
     except Exception as e:
         callback_outputs['error'] = str(e)
         print(f'WARN: figures_export_continuous_4decoder_rasters_and_context_completion_function failed: {e}', flush=True)
