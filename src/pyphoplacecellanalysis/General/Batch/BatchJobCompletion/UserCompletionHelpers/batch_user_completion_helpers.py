@@ -4579,6 +4579,614 @@ def figures_export_laps_correct_decoder_side_by_side_completion_function(self, g
     return across_session_results_extended_dict
 
 
+@function_attributes(short_name=None, tags=['figure', 'batch', 'continuous', 'posterior', 'raster', 'four-decoder', 'groundtruth', 'context', 'Agg', 'headless'], input_requires=['DirectionalLaps', 'DirectionalMergedDecoders', 'TrainTestSplit'], output_provides=['figures_export_continuous_4decoder_rasters_and_context_completion_function'],
+                      uses=['_subfn_build_laps_gt_df', '_subfn_extract_time_bin_edges', '_subfn_prepare_decoder_sorted_spikes', '_subfn_compute_low_firing_mask_rgba', '_subfn_draw_lap_gt_boxes_and_non_gt_dimming', '_subfn_render_time_chunk_figure'], used_by=[], creation_date='2026-11-27 10:25', related_items=['figures_export_laps_correct_decoder_side_by_side_completion_function'])
+def figures_export_continuous_4decoder_rasters_and_context_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict,
+                                                                               active_laps_decoding_time_bin_size: float = 0.025, context_decoding_time_bin_size: float = 0.075, posterior_masking_value: float = 0.0,
+                                                                               should_dim_low_firing_bins: bool = True, min_num_spikes_per_bin_to_be_considered_active: int = 1, min_num_unique_active_neurons_per_time_bin: Optional[int] = 1,
+                                                                               should_filter_inactive_bins_before_split: bool = False, train_test_full_lap: Optional[bool] = None,
+                                                                               inches_per_second: float = 0.15, figsize_height: float = 16.0, dpi: int = 150, max_chunk_width_px: int = 30000,
+                                                                               fail_on_exception_for_debugging: bool = False, debug_print: bool = False, **kwargs) -> dict:
+    """Batch/SLURM headless Agg export: full-session continuous 4-decoder posteriors + decoder-sorted spike rasters + low-firing dimming + green GT lap boxes + bottom 75ms continuous track_ID (long vs short) marginal.
+
+    Self-contained for `inspect.getsource` embedding on Great Lakes SLURM jobs (all imports local; all single-use helpers nested as `_subfn_*`).
+    Automatically splits ultra-wide full-session timelines into fixed-geometry horizontal chunks when pixel width exceeds `max_chunk_width_px` (capped below Agg's 65,535 px limit) and stitches them seamlessly via PIL `horizontal_image_stack`.
+    """
+    import io
+    import math
+    import os
+    import traceback
+    from copy import deepcopy
+    from pathlib import Path
+    from typing import Dict, List, Tuple, Optional, Any
+    os.environ.setdefault('MPLBACKEND', 'Agg')
+    os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
+    import numpy as np
+    import pandas as pd
+    from numpy.typing import NDArray
+    from PIL import Image
+    import matplotlib
+    matplotlib.use('Agg', force=False)
+    import matplotlib.pyplot as plt
+    from matplotlib.collections import LineCollection
+    from matplotlib.gridspec import GridSpec
+    from matplotlib.patches import Rectangle
+    from matplotlib.ticker import MultipleLocator
+    plt.ioff()
+
+    from neuropy.core.epoch import ensure_dataframe, ensure_Epoch
+    from neuropy.utils.matplotlib_helpers import get_heatmap_cmap
+    from pyphocorehelpers.plotting.media_output_helpers import horizontal_image_stack
+    from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder, DecodedFilterEpochsResult, is_clusterless_position_decoder
+    from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import PlottingHelpers
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import TrackTemplates, TrainTestLapsSplitting, DirectionalPseudo2DDecodersResult, add_laps_groundtruth_information_to_dataframe, get_proper_global_spikes_df, decoding_continuous_cache_key
+
+    def _subfn_build_laps_gt_df(pipeline_obj, global_epoch_name_str: str, decoder_names_list: List[str]) -> pd.DataFrame:
+        """Build session laps DataFrame with ground-truth `lap_id` and `truth_decoder_name` columns."""
+        laps_epochs_obj = None
+        if (global_epoch_name_str in pipeline_obj.computation_results) and (pipeline_obj.computation_results[global_epoch_name_str].computation_config is not None):
+            laps_epochs_obj = pipeline_obj.computation_results[global_epoch_name_str].computation_config.pf_params.computation_epochs
+        if laps_epochs_obj is None:
+            laps_epochs_obj = pipeline_obj.sess.laps
+        if laps_epochs_obj is None:
+            return pd.DataFrame(columns=['start', 'stop', 'lap_id', 'truth_decoder_name'])
+        laps_df = ensure_dataframe(deepcopy(laps_epochs_obj))
+        if len(laps_df) == 0:
+            return pd.DataFrame(columns=['start', 'stop', 'lap_id', 'truth_decoder_name'])
+        if ('stop' not in laps_df.columns) and ('end' in laps_df.columns):
+            laps_df['stop'] = laps_df['end']
+        if ('lap_id' not in laps_df.columns) and ('lap_idx' not in laps_df.columns):
+            if 'label' in laps_df.columns:
+                laps_df['lap_id'] = pd.to_numeric(laps_df['label'], errors='coerce').fillna(pd.Series(np.arange(len(laps_df)) + 1, index=laps_df.index)).astype(int)
+            else:
+                laps_df['lap_id'] = np.arange(len(laps_df), dtype=int) + 1
+        try:
+            laps_df = add_laps_groundtruth_information_to_dataframe(curr_active_pipeline=pipeline_obj, result_laps_epochs_df=laps_df)
+            laps_df['truth_decoder_name'] = np.asarray(decoder_names_list)[laps_df['true_decoder_index'].to_numpy().astype(int)]
+        except Exception as gt_err:
+            print(f'WARN: _subfn_build_laps_gt_df could not resolve lap ground-truth labels ({gt_err}); skipping GT lap boxes.', flush=True)
+            return pd.DataFrame(columns=['start', 'stop', 'lap_id', 'truth_decoder_name'])
+        return laps_df
+
+    def _subfn_extract_time_bin_edges(time_bin_container, time_window_centers: NDArray) -> NDArray:
+        """Return `(n_bins + 1,)` time-bin edges from `time_bin_container.edges` or reconstructed from `time_window_centers`."""
+        centers_arr = np.asarray(time_window_centers, dtype=float).reshape(-1)
+        n_bins: int = int(len(centers_arr))
+        if n_bins == 0:
+            return np.zeros((0,), dtype=float)
+        raw_edges = getattr(time_bin_container, 'edges', None)
+        if raw_edges is not None:
+            edges_arr = np.asarray(raw_edges, dtype=float).reshape(-1)
+            if len(edges_arr) == (n_bins + 1):
+                return edges_arr
+        dt: float = float(np.nanmedian(np.diff(centers_arr))) if (n_bins > 1) else 0.025
+        half_dt: float = 0.5 * dt
+        edges_arr = np.empty((n_bins + 1,), dtype=float)
+        edges_arr[:-1] = centers_arr - half_dt
+        edges_arr[-1] = centers_arr[-1] + half_dt
+        return edges_arr
+
+    def _subfn_prepare_decoder_sorted_spikes(decoders_map: Dict[str, BasePositionDecoder], decoder_names_list: List[str], spikes_df_in: pd.DataFrame) -> Dict[str, Dict[str, Any]]:
+        """Sort each decoder's `neuron_IDs` ascending by placefield CoM and precompute chronological spike `(t, y_idx, rgba)` arrays."""
+        neuron_ids_lists: List[NDArray] = []
+        for a_name in decoder_names_list:
+            a_dec = decoders_map.get(a_name, None)
+            if (a_dec is not None) and (not is_clusterless_position_decoder(a_dec)) and (getattr(a_dec, 'neuron_IDs', None) is not None):
+                neuron_ids_lists.append(np.asarray(a_dec.neuron_IDs, dtype=int))
+        ## END for a_name in decoder_names_list...
+
+        all_union_ids: NDArray = np.unique(np.concatenate(neuron_ids_lists)) if (len(neuron_ids_lists) > 0) else np.zeros((0,), dtype=int)
+        unit_rgba_map: Dict[int, NDArray] = {}
+        if len(all_union_ids) > 1:
+            try:
+                from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.SpikeRasters import build_shared_sorted_neuron_color_maps
+                _, _raw_color_map = build_shared_sorted_neuron_color_maps([all_union_ids], return_255_array=False)
+                for aclu_id, raw_rgba in _raw_color_map.items():
+                    rgba_arr = np.clip(np.asarray(raw_rgba, dtype=float).reshape(-1)[:4], 0.0, 1.0)
+                    if len(rgba_arr) < 4:
+                        rgba_arr = np.array([rgba_arr[0], rgba_arr[1], rgba_arr[2], 0.92], dtype=float)
+                    else:
+                        rgba_arr = np.array([rgba_arr[0], rgba_arr[1], rgba_arr[2], 0.92], dtype=float)
+                    unit_rgba_map[int(aclu_id)] = rgba_arr
+                ## END for aclu_id, raw_rgba in _raw_color_map.items()...
+
+            except Exception:
+                unit_rgba_map = {}
+        if (len(unit_rgba_map) == 0) and (len(all_union_ids) > 0):
+            fallback_cmap = plt.get_cmap('turbo')
+            denom: float = float(max(1, len(all_union_ids) - 1))
+            for idx_u, aclu_id in enumerate(all_union_ids):
+                c_rgba = fallback_cmap(float(idx_u) / denom if (len(all_union_ids) > 1) else 0.5)
+                unit_rgba_map[int(aclu_id)] = np.array([c_rgba[0], c_rgba[1], c_rgba[2], 0.92], dtype=float)
+            ## END for idx_u, aclu_id in enumerate(all_union_ids)...
+
+        spk_time_col: str = spikes_df_in.spikes.time_variable_name if ((spikes_df_in is not None) and (len(spikes_df_in) > 0)) else 't_rel_seconds'
+        if (spikes_df_in is not None) and (len(spikes_df_in) > 0) and (spk_time_col in spikes_df_in.columns) and ('aclu' in spikes_df_in.columns):
+            all_spk_t = spikes_df_in[spk_time_col].to_numpy(dtype=float, copy=False)
+            all_spk_aclu = spikes_df_in['aclu'].to_numpy(dtype=int, copy=False)
+            time_sort_idx = np.argsort(all_spk_t, kind='mergesort')
+            all_spk_t = all_spk_t[time_sort_idx]
+            all_spk_aclu = all_spk_aclu[time_sort_idx]
+        else:
+            all_spk_t = np.zeros((0,), dtype=float)
+            all_spk_aclu = np.zeros((0,), dtype=int)
+
+        prepared_dict: Dict[str, Dict[str, Any]] = {}
+        for a_name in decoder_names_list:
+            a_dec = decoders_map.get(a_name, None)
+            if (a_dec is None) or is_clusterless_position_decoder(a_dec) or (getattr(a_dec, 'neuron_IDs', None) is None):
+                prepared_dict[a_name] = dict(sorted_neuron_ids=np.zeros((0,), dtype=int), n_cells=0, spk_t=np.zeros((0,), dtype=float), spk_y=np.zeros((0,), dtype=float), spk_rgba=np.zeros((0, 4), dtype=float))
+                continue
+            dec_ids = np.asarray(a_dec.neuron_IDs, dtype=int)
+            peak_coms = np.asarray(a_dec.pf.ratemap.peak_tuning_curve_center_of_masses, dtype=float)
+            sort_idx = np.argsort(peak_coms, kind='mergesort')
+            sorted_ids = dec_ids[sort_idx]
+            n_cells: int = int(len(sorted_ids))
+            if (n_cells == 0) or (len(all_spk_t) == 0):
+                prepared_dict[a_name] = dict(sorted_neuron_ids=sorted_ids, n_cells=n_cells, spk_t=np.zeros((0,), dtype=float), spk_y=np.zeros((0,), dtype=float), spk_rgba=np.zeros((0, 4), dtype=float))
+                continue
+            in_dec_mask = np.isin(all_spk_aclu, sorted_ids)
+            dec_t = all_spk_t[in_dec_mask]
+            dec_aclu = all_spk_aclu[in_dec_mask]
+            aclu_to_y = {int(aclu_id): float(y_i) for y_i, aclu_id in enumerate(sorted_ids)}
+            dec_y = np.array([aclu_to_y[int(a)] for a in dec_aclu], dtype=float) if (len(dec_aclu) > 0) else np.zeros((0,), dtype=float)
+            default_rgba = np.array([0.85, 0.85, 0.85, 0.90], dtype=float)
+            dec_rgba = np.vstack([unit_rgba_map.get(int(a), default_rgba) for a in dec_aclu]) if (len(dec_aclu) > 0) else np.zeros((0, 4), dtype=float)
+            prepared_dict[a_name] = dict(sorted_neuron_ids=sorted_ids, n_cells=n_cells, spk_t=dec_t, spk_y=dec_y, spk_rgba=dec_rgba)
+        ## END for a_name in decoder_names_list...
+
+        return prepared_dict
+
+    def _subfn_compute_low_firing_mask_rgba(spikes_df_in: pd.DataFrame, time_bin_container, time_bin_edges: NDArray, min_spikes: int, min_unique_neurons: Optional[int], included_neuron_ids: Optional[NDArray] = None) -> NDArray:
+        """Compute `(1, n_bins, 4)` uint8 semi-transparent black RGBA mask for inactive time bins using the decoder's `neuron_IDs`."""
+        eff_min_unique: int = int(min_unique_neurons) if (min_unique_neurons is not None) else 1
+        sliding_iv = time_bin_container.get_sliding_window_intervals()
+        if sliding_iv is not None:
+            w_st, w_en = sliding_iv
+            n_bins: int = int(len(w_st))
+            if (spikes_df_in is None) or (len(spikes_df_in) == 0) or ((included_neuron_ids is not None) and (len(included_neuron_ids) == 0)):
+                mask_rgba = np.zeros((1, n_bins, 4), dtype=np.uint8)
+                if eff_min_unique > 0:
+                    mask_rgba[0, :, :] = [0, 0, 0, 200]
+            else:
+                _counts, _units, (_is_active, _inactive_mask, mask_rgba) = spikes_df_in.spikes.compute_unit_time_binned_spike_counts_and_mask_from_window_intervals(window_start_edges=w_st, window_stop_edges=w_en, included_neuron_ids=included_neuron_ids, min_num_spikes_per_bin_to_be_considered_active=min_spikes, min_num_unique_active_neurons_per_time_bin=eff_min_unique)
+        else:
+            n_bins = max(0, int(len(time_bin_edges)) - 1)
+            if (spikes_df_in is None) or (len(spikes_df_in) == 0) or ((included_neuron_ids is not None) and (len(included_neuron_ids) == 0)):
+                mask_rgba = np.zeros((1, n_bins, 4), dtype=np.uint8)
+                if eff_min_unique > 0:
+                    mask_rgba[0, :, :] = [0, 0, 0, 200]
+            else:
+                _counts, _units, (_is_active, _inactive_mask, mask_rgba) = spikes_df_in.spikes.compute_unit_time_binned_spike_counts_and_mask(time_bin_edges=time_bin_edges, included_neuron_ids=included_neuron_ids, min_num_spikes_per_bin_to_be_considered_active=min_spikes, min_num_unique_active_neurons_per_time_bin=eff_min_unique)
+        return mask_rgba
+
+    def _subfn_draw_lap_gt_boxes_and_non_gt_dimming(ax_post, ax_rast, laps_gt_df: pd.DataFrame, decoder_name_str: str, chunk_t0: float, chunk_t1: float, post_ylim: Tuple[float, float], rast_ylim: Tuple[float, float], non_gt_dim_alpha: float = 0.25) -> None:
+        """Draw `limegreen` GT rectangles on `[lap_start, lap_stop]` for matching `truth_decoder_name` laps and subtle dimming on non-GT laps."""
+        if (laps_gt_df is None) or (len(laps_gt_df) == 0):
+            return
+        starts_arr = laps_gt_df['start'].to_numpy(dtype=float)
+        stops_arr = laps_gt_df['stop'].to_numpy(dtype=float)
+        truth_arr = laps_gt_df['truth_decoder_name'].astype(str).to_numpy()
+        lap_ids_arr = laps_gt_df['lap_id'].to_numpy() if ('lap_id' in laps_gt_df.columns) else (np.arange(len(laps_gt_df), dtype=int) + 1)
+        overlap_idxs = np.flatnonzero((stops_arr > float(chunk_t0)) & (starts_arr < float(chunk_t1)))
+        post_y0, post_y1 = float(post_ylim[0]), float(post_ylim[1])
+        post_yspan: float = post_y1 - post_y0
+        post_ypad: float = 0.012 * post_yspan
+        rast_y0, rast_y1 = float(rast_ylim[0]), float(rast_ylim[1])
+        rast_yspan: float = rast_y1 - rast_y0
+        rast_ypad: float = 0.012 * rast_yspan
+        for idx_l in overlap_idxs:
+            lap_st: float = float(starts_arr[idx_l])
+            lap_en: float = float(stops_arr[idx_l])
+            lap_dur: float = lap_en - lap_st
+            if lap_dur <= 0.0:
+                continue
+            is_gt: bool = (str(truth_arr[idx_l]) == str(decoder_name_str))
+            if is_gt:
+                ax_post.add_patch(Rectangle((lap_st, post_y0 + post_ypad), lap_dur, max(post_yspan - (2.0 * post_ypad), 1e-6), fill=False, edgecolor='limegreen', linewidth=2.4, zorder=25.0, clip_on=True))
+                ax_rast.add_patch(Rectangle((lap_st, rast_y0 + rast_ypad), lap_dur, max(rast_yspan - (2.0 * rast_ypad), 1e-6), fill=False, edgecolor='limegreen', linewidth=1.8, zorder=25.0, clip_on=True))
+                lap_mid: float = 0.5 * (lap_st + lap_en)
+                if (lap_mid >= float(chunk_t0)) and (lap_mid < float(chunk_t1)):
+                    ax_post.text(lap_mid, post_y1 + (0.015 * post_yspan), f'Lap {lap_ids_arr[idx_l]}', ha='center', va='bottom', fontsize=6.5, fontweight='bold', color='#15803d', clip_on=False, zorder=30.0)
+            elif non_gt_dim_alpha > 0.0:
+                ax_post.add_patch(Rectangle((lap_st, post_y0), lap_dur, post_yspan, facecolor=(0.12, 0.05, 0.18, float(non_gt_dim_alpha)), edgecolor='none', zorder=12.0, clip_on=True))
+                ax_rast.add_patch(Rectangle((lap_st, rast_y0), lap_dur, rast_yspan, facecolor=(0.08, 0.05, 0.12, float(0.65 * non_gt_dim_alpha)), edgecolor='none', zorder=12.0, clip_on=True))
+        ## END for idx_l in overlap_idxs...
+
+    def _subfn_render_time_chunk_figure(chunk_idx: int, total_chunks: int, c_t0: float, c_t1: float) -> Image.Image:
+        """Render one contiguous `[c_t0, c_t1]` horizontal slice across all 9 tracks with exact fixed vertical geometry."""
+        is_first_chunk: bool = (chunk_idx == 0)
+        is_last_chunk: bool = (chunk_idx == (total_chunks - 1))
+        data_w_in: float = max((c_t1 - c_t0) * eff_inches_per_sec, 1.5)
+        left_pad_in: float = 1.25 if is_first_chunk else 0.0
+        right_pad_in: float = 0.35 if is_last_chunk else 0.0
+        fig_w_in: float = left_pad_in + data_w_in + right_pad_in
+        fig_h_in: float = float(figsize_height)
+
+        fig = plt.figure(figsize=(fig_w_in, fig_h_in), dpi=int(dpi), facecolor='white')
+        ## 13-slot GridSpec: 4x (posterior=2.2, raster=1.5) separated by 0.28 spacers + 0.35 spacer + bottom 75ms context=1.1:
+        gs_height_ratios = [
+            2.2, 1.5, 0.28,
+            2.2, 1.5, 0.28,
+            2.2, 1.5, 0.28,
+            2.2, 1.5, 0.35,
+            1.1,
+        ]
+        gs = GridSpec(nrows=len(gs_height_ratios), ncols=1, figure=fig, height_ratios=gs_height_ratios, hspace=0.03,
+                      left=(left_pad_in / fig_w_in), right=((fig_w_in - right_pad_in) / fig_w_in), top=0.965, bottom=0.045)
+
+        ## Slice measured position once for `[c_t0, c_t1]` (with 1-sample overhang so lines reach exact chunk edges):
+        p_i0: int = max(0, int(np.searchsorted(pos_t_all, c_t0, side='left')) - 1)
+        p_i1: int = min(len(pos_t_all), int(np.searchsorted(pos_t_all, c_t1, side='right')) + 1)
+        chunk_pos_t = pos_t_all[p_i0:p_i1]
+        chunk_pos_y = pos_y_all[p_i0:p_i1]
+
+        for dec_i, a_name in enumerate(decoder_names):
+            slot_post: int = dec_i * 3
+            slot_rast: int = slot_post + 1
+            ax_post = fig.add_subplot(gs[slot_post, 0])
+            ax_rast = fig.add_subplot(gs[slot_rast, 0])
+            ax_post.set_facecolor('black')
+            ax_rast.set_facecolor(raster_bg_color)
+
+            dec_info = continuous_4dec_data[a_name]
+            t_edges_d: NDArray = dec_info['t_edges']
+            post_mat_d: NDArray = dec_info['posterior']
+            xbin_d: NDArray = dec_info['xbin']
+            low_rgba_d: Optional[NDArray] = dec_info['low_firing_rgba']
+            post_ylim = (float(xbin_d[0]), float(xbin_d[-1]))
+
+            n_bins_d: int = int(post_mat_d.shape[1])
+            if (n_bins_d > 0) and (len(t_edges_d) == (n_bins_d + 1)):
+                b0: int = max(0, int(np.searchsorted(t_edges_d, c_t0, side='right')) - 1)
+                b1: int = min(n_bins_d, int(np.searchsorted(t_edges_d, c_t1, side='left')) + 1)
+                if b1 > b0:
+                    sub_ext = (float(t_edges_d[b0]), float(t_edges_d[b1]), post_ylim[0], post_ylim[1])
+                    ax_post.imshow(post_mat_d[:, b0:b1], origin='lower', aspect='auto', interpolation='nearest', cmap=posterior_cmap, vmin=float(posterior_masking_value), vmax=1.0, extent=sub_ext, animated=False, zorder=2.0)
+                    if (low_rgba_d is not None) and (low_rgba_d.shape[1] == n_bins_d):
+                        ax_post.imshow(low_rgba_d[:, b0:b1, :], origin='lower', aspect='auto', interpolation='nearest', extent=sub_ext, animated=False, zorder=11.0)
+
+            if len(chunk_pos_t) > 0:
+                ax_post.plot(chunk_pos_t, chunk_pos_y, color=measured_line_color, alpha=measured_line_alpha, linewidth=measured_line_linewidth, zorder=13.0)
+
+            ## Sorted spike raster for `a_name`:
+            rast_info = sorted_rasters_data[a_name]
+            n_cells_d: int = int(rast_info['n_cells'])
+            rast_ylim = (-0.5, float(max(n_cells_d, 1)) - 0.5)
+            spk_t_d: NDArray = rast_info['spk_t']
+            if (n_cells_d > 0) and (len(spk_t_d) > 0):
+                s0: int = int(np.searchsorted(spk_t_d, c_t0, side='left'))
+                s1: int = int(np.searchsorted(spk_t_d, c_t1, side='right'))
+                if s1 > s0:
+                    sub_t = spk_t_d[s0:s1]
+                    sub_y = rast_info['spk_y'][s0:s1]
+                    sub_rgba = rast_info['spk_rgba'][s0:s1]
+                    segs = np.empty((len(sub_t), 2, 2), dtype=float)
+                    segs[:, 0, 0] = sub_t
+                    segs[:, 1, 0] = sub_t
+                    segs[:, 0, 1] = sub_y - 0.42
+                    segs[:, 1, 1] = sub_y + 0.42
+                    lc = LineCollection(segs, colors=sub_rgba, linewidths=0.72, zorder=5.0)
+                    ax_rast.add_collection(lc)
+            if (low_rgba_d is not None) and (n_bins_d > 0) and (len(t_edges_d) == (n_bins_d + 1)):
+                b0_r: int = max(0, int(np.searchsorted(t_edges_d, c_t0, side='right')) - 1)
+                b1_r: int = min(n_bins_d, int(np.searchsorted(t_edges_d, c_t1, side='left')) + 1)
+                if b1_r > b0_r:
+                    rast_mask = low_rgba_d[:, b0_r:b1_r, :].copy()
+                    rast_mask[:, :, 3] = (rast_mask[:, :, 3].astype(float) * 0.55).astype(np.uint8)
+                    ax_rast.imshow(rast_mask, origin='lower', aspect='auto', interpolation='nearest', extent=(float(t_edges_d[b0_r]), float(t_edges_d[b1_r]), rast_ylim[0], rast_ylim[1]), animated=False, zorder=8.0)
+
+            ax_post.set_xlim(c_t0, c_t1)
+            ax_post.set_ylim(*post_ylim)
+            ax_rast.set_xlim(c_t0, c_t1)
+            ax_rast.set_ylim(*rast_ylim)
+
+            ## GT green boxes + non-GT lap dimming on both posterior and paired raster:
+            _subfn_draw_lap_gt_boxes_and_non_gt_dimming(ax_post=ax_post, ax_rast=ax_rast, laps_gt_df=laps_gt_df, decoder_name_str=a_name, chunk_t0=c_t0, chunk_t1=c_t1, post_ylim=post_ylim, rast_ylim=rast_ylim, non_gt_dim_alpha=non_gt_lap_dim_alpha)
+
+            if (t_delta is not None) and np.isfinite(float(t_delta)) and (c_t0 <= float(t_delta) <= c_t1):
+                ax_post.axvline(float(t_delta), color='white', linestyle='--', linewidth=1.2, alpha=0.85, zorder=22.0)
+                ax_rast.axvline(float(t_delta), color='white', linestyle='--', linewidth=1.2, alpha=0.85, zorder=22.0)
+
+            ax_post.xaxis.set_major_locator(MultipleLocator(major_tick_step))
+            ax_rast.xaxis.set_major_locator(MultipleLocator(major_tick_step))
+            ax_post.tick_params(axis='x', which='both', bottom=False, labelbottom=False)
+            ax_rast.tick_params(axis='x', which='both', bottom=False, labelbottom=False)
+
+            if is_first_chunk:
+                ax_post.set_ylabel(f'{a_name}\npos (cm)', fontsize=8.5, fontweight='bold')
+                ax_post.tick_params(axis='y', labelsize=7)
+                ax_rast.set_ylabel(f'{a_name}\naclus ({n_cells_d})', fontsize=7.5)
+                ax_rast.tick_params(axis='y', labelsize=6.5)
+            else:
+                ax_post.tick_params(axis='y', left=False, labelleft=False)
+                ax_rast.tick_params(axis='y', left=False, labelleft=False)
+                ax_post.spines['left'].set_visible(False)
+                ax_rast.spines['left'].set_visible(False)
+            if not is_last_chunk:
+                ax_post.spines['right'].set_visible(False)
+                ax_rast.spines['right'].set_visible(False)
+        ## END for dec_i, a_name in enumerate(decoder_names)...
+
+        ## Bottom row (slot 12): 75ms continuous `track_ID` marginal (`long` vs `short`):
+        ax_ctx = fig.add_subplot(gs[12, 0])
+        ax_ctx.set_facecolor('black')
+        n_ctx_bins: int = int(track_id_marginal_2d.shape[1])
+        if (n_ctx_bins > 0) and (len(ctx_t_edges) == (n_ctx_bins + 1)):
+            cb0: int = max(0, int(np.searchsorted(ctx_t_edges, c_t0, side='right')) - 1)
+            cb1: int = min(n_ctx_bins, int(np.searchsorted(ctx_t_edges, c_t1, side='left')) + 1)
+            if cb1 > cb0:
+                ax_ctx.imshow(track_id_marginal_2d[:, cb0:cb1], origin='lower', aspect='auto', interpolation='nearest', cmap=context_cmap, vmin=0.0, vmax=1.0, extent=(float(ctx_t_edges[cb0]), float(ctx_t_edges[cb1]), 0.0, 2.0), animated=False, zorder=2.0)
+        ax_ctx.axhline(1.0, color='white', linewidth=0.8, alpha=0.65, zorder=10.0)
+        if (t_delta is not None) and np.isfinite(float(t_delta)) and (c_t0 <= float(t_delta) <= c_t1):
+            ax_ctx.axvline(float(t_delta), color='white', linestyle='--', linewidth=1.4, alpha=0.9, zorder=22.0)
+        ax_ctx.set_xlim(c_t0, c_t1)
+        ax_ctx.set_ylim(0.0, 2.0)
+        ax_ctx.xaxis.set_major_locator(MultipleLocator(major_tick_step))
+        ax_ctx.xaxis.set_minor_locator(MultipleLocator(minor_tick_step))
+        ax_ctx.tick_params(axis='x', which='major', labelsize=7.5)
+
+        ## Suppress major x-tick labels right on interior chunk seams so text never clips at pixel 0 / W-1:
+        if total_chunks > 1:
+            seam_guard_sec: float = 0.35 / eff_inches_per_sec
+            raw_xticks = ax_ctx.get_xticks()
+            lo_bound: float = c_t0 if is_first_chunk else (c_t0 + seam_guard_sec)
+            hi_bound: float = c_t1 if is_last_chunk else (c_t1 - seam_guard_sec)
+            safe_xticks = raw_xticks[(raw_xticks >= lo_bound) & (raw_xticks <= hi_bound)]
+            ax_ctx.set_xticks(safe_xticks)
+
+        if is_first_chunk:
+            ctx_ms_label: int = int(round(eff_ctx_tbin * 1000.0))
+            ax_ctx.set_ylabel(f'Context\n({ctx_ms_label}ms)', fontsize=8.0, fontweight='bold')
+            ax_ctx.set_yticks([0.5, 1.5])
+            ax_ctx.set_yticklabels(['long', 'short'], fontsize=7.5, fontweight='bold')
+            try:
+                PlottingHelpers.helper_matplotlib_add_pseudo2D_marginal_labels(ax_ctx, y_bin_labels=['long', 'short'], enable_draw_decoder_colored_lines=False, enable_draw_separator_lines=False, additional_label_kwargs=dict(color='white', fontsize=8.5, fontweight='bold', bbox=dict(boxstyle='round,pad=0.15', facecolor=(0.0, 0.0, 0.0, 0.55), edgecolor='none')))
+            except Exception:
+                pass
+            ax_ctx.set_xlabel('Session Time (s)', fontsize=8.5, loc='left')
+            pos_ms_label: int = int(round(eff_pos_tbin * 1000.0))
+            fig.text(left_pad_in / fig_w_in, 0.978, f"{animal_exper_session} | Continuous 4-Decoder ({pos_ms_label}ms, {'held-out TrainTestSplit' if used_heldout_train_decoders else 'TrackTemplates'}) + Sorted Rasters + {ctx_ms_label}ms Context (long/short)", ha='left', va='bottom', fontsize=10.0, fontweight='bold')
+        else:
+            ax_ctx.tick_params(axis='y', left=False, labelleft=False)
+            ax_ctx.spines['left'].set_visible(False)
+        if not is_last_chunk:
+            ax_ctx.spines['right'].set_visible(False)
+
+        buf = io.BytesIO()
+        fig.savefig(buf, format='png', dpi=int(dpi), facecolor='white')
+        plt.close(fig)
+        buf.seek(0)
+        chunk_img = Image.open(buf).convert('RGBA')
+        chunk_img.load()
+        buf.close()
+        return chunk_img
+
+    ## Pop TrainTestSplit overrides & display styling overrides from kwargs:
+    if 'should_filter_inactive_bins_before_split' in kwargs:
+        should_filter_inactive_bins_before_split = bool(kwargs.pop('should_filter_inactive_bins_before_split'))
+    if 'train_test_full_lap' in kwargs:
+        train_test_full_lap = kwargs.pop('train_test_full_lap')
+    combined_image_basename: Optional[str] = kwargs.pop('combined_image_basename', None)
+    export_filename_extra_suffix_parts: Optional[List[str]] = kwargs.pop('export_filename_extra_suffix_parts', None)
+    measured_line_color: str = str(kwargs.pop('measured_line_color', '#ff0000'))
+    measured_line_alpha: float = float(kwargs.pop('measured_line_alpha', 0.45))
+    measured_line_linewidth: float = float(kwargs.pop('measured_line_linewidth', 0.8))
+    non_gt_lap_dim_alpha: float = float(kwargs.pop('non_gt_lap_dim_alpha', 0.25))
+    raster_bg_color: str = str(kwargs.pop('raster_bg_color', '#111318'))
+    posterior_cmap_name: str = str(kwargs.pop('cmap', 'viridis'))
+    context_cmap_name: str = str(kwargs.pop('context_cmap', 'viridis'))
+
+    print(f'figures_export_continuous_4decoder_rasters_and_context_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, active_laps_decoding_time_bin_size={active_laps_decoding_time_bin_size}, context_decoding_time_bin_size={context_decoding_time_bin_size}, ...)', flush=True)
+    callback_outputs: Dict[str, Any] = {
+        'out_path': None, 'output_dir': None, 'n_chunks': None, 'n_laps': None, 'image_size_px': None,
+        'session_time_bounds': None, 'active_laps_decoding_time_bin_size': float(active_laps_decoding_time_bin_size),
+        'context_decoding_time_bin_size': float(context_decoding_time_bin_size), 'used_heldout_train_decoders': False, 'error': None,
+    }
+    across_session_results_extended_dict['figures_export_continuous_4decoder_rasters_and_context_completion_function'] = callback_outputs
+
+    try:
+        assert self.collected_outputs_path.exists(), f"collected_outputs_path: '{self.collected_outputs_path}' does not exist!"
+        global_computation_results = curr_active_pipeline.global_computation_results
+
+        ## Ensure DirectionalLaps and DirectionalMergedDecoders exist:
+        missing_prereqs: List[str] = []
+        if 'DirectionalLaps' not in global_computation_results.computed_data:
+            missing_prereqs.append('split_to_directional_laps')
+        if 'DirectionalMergedDecoders' not in global_computation_results.computed_data:
+            missing_prereqs.append('merged_directional_placefields')
+        if len(missing_prereqs) > 0:
+            print(f'\tcomputing missing global prerequisites: {missing_prereqs}', flush=True)
+            curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=missing_prereqs, enabled_filter_names=None, fail_on_exception=True, debug_print=False)
+
+        ## Resolve TrainTestSplit (held-out 90%-train 4 directional decoders):
+        _requested_tt: Dict[str, Any] = {
+            'laps_decoding_time_bin_size': float(active_laps_decoding_time_bin_size),
+            'should_filter_inactive_bins_before_split': bool(should_filter_inactive_bins_before_split),
+            'min_num_spikes_per_bin_to_be_considered_active': int(min_num_spikes_per_bin_to_be_considered_active),
+            'min_num_unique_active_neurons_per_time_bin': min_num_unique_active_neurons_per_time_bin,
+        }
+        if train_test_full_lap is not None:
+            _requested_tt['train_test_full_lap'] = bool(train_test_full_lap)
+        _needs_tt_recompute, _tt_comp_kwargs = TrainTestLapsSplitting.resolve_needs_train_test_split_recompute(curr_active_pipeline, requested=_requested_tt)
+        if _needs_tt_recompute or ('TrainTestSplit' not in global_computation_results.computed_data):
+            print(f'\trecomputing directional_train_test_split (needs_recompute={_needs_tt_recompute}, kwargs={_tt_comp_kwargs})', flush=True)
+            try:
+                curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['directional_train_test_split'], computation_kwargs_list=[dict(_tt_comp_kwargs)], enabled_filter_names=None, fail_on_exception=False, debug_print=False)
+            except Exception as tt_err:
+                print(f'WARN: directional_train_test_split recompute failed: {tt_err}', flush=True)
+
+        rank_order_results = global_computation_results.computed_data.get('RankOrder', None)
+        if rank_order_results is not None:
+            minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
+            included_qclu_values: List[int] = rank_order_results.included_qclu_values
+        else:
+            minimum_inclusion_fr_Hz = global_computation_results.computation_config.rank_order_shuffle_analysis.minimum_inclusion_fr_Hz
+            included_qclu_values = global_computation_results.computation_config.rank_order_shuffle_analysis.included_qclu_values
+
+        directional_laps_results = global_computation_results.computed_data['DirectionalLaps']
+        track_templates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values)
+        tmpl_decoders_dict: Dict[str, BasePositionDecoder] = track_templates.get_decoders_dict()
+        decoder_names: List[str] = list(TrackTemplates.get_decoder_names())
+
+        train_test_split_result = global_computation_results.computed_data.get('TrainTestSplit', None)
+        active_decoders_dict: Optional[Dict[str, BasePositionDecoder]] = None
+        used_heldout_train_decoders: bool = False
+        if (train_test_split_result is not None) and (train_test_split_result.train_lap_specific_pf1D_Decoder_dict is not None) and (len(train_test_split_result.train_lap_specific_pf1D_Decoder_dict) > 0):
+            heldout_raw = train_test_split_result.train_lap_specific_pf1D_Decoder_dict
+            if curr_active_pipeline.is_kdiba_session():
+                cleaned_heldout: Dict[str, BasePositionDecoder] = {}
+                for dec_name, a_dec in heldout_raw.items():
+                    if (dec_name in tmpl_decoders_dict) and (a_dec is not None) and (getattr(a_dec, 'neuron_IDs', None) is not None) and (getattr(tmpl_decoders_dict[dec_name], 'neuron_IDs', None) is not None):
+                        allowed_ids = np.asarray(tmpl_decoders_dict[dec_name].neuron_IDs)
+                        curr_ids = np.asarray(a_dec.neuron_IDs)
+                        keep_ids = allowed_ids[np.isin(allowed_ids, curr_ids)]
+                        if not np.array_equal(curr_ids, keep_ids):
+                            a_dec = a_dec.get_by_id(keep_ids)
+                    cleaned_heldout[dec_name] = a_dec
+                ## END for dec_name, a_dec in heldout_raw.items()...
+
+                active_decoders_dict = cleaned_heldout
+            else:
+                active_decoders_dict = dict(heldout_raw)
+            used_heldout_train_decoders = True
+        else:
+            print('WARN: held-out TrainTestSplit decoders unavailable; falling back to TrackTemplates.get_decoders_dict() for continuous 4-decoder export', flush=True)
+            active_decoders_dict = dict(tmpl_decoders_dict)
+
+        ## Session time bounds, global position, laps GT, and filtered spikes:
+        long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+        global_pos_df: pd.DataFrame = deepcopy(curr_active_pipeline.filtered_sessions[global_epoch_name].position.to_dataframe())
+        pos_var_name: str = 'lin_pos' if ('lin_pos' in global_pos_df.columns) else 'x'
+        if curr_active_pipeline.is_kdiba_session():
+            t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
+        else:
+            t_start = float(np.nanmin(global_pos_df['t'].to_numpy(dtype=float)))
+            t_end = float(np.nanmax(global_pos_df['t'].to_numpy(dtype=float)))
+            t_delta = None
+        t_start = float(t_start)
+        t_end = float(t_end)
+        assert t_end > t_start, f'Invalid session bounds: t_start={t_start}, t_end={t_end}'
+        single_global_epoch = ensure_Epoch(pd.DataFrame({'start': [t_start], 'stop': [t_end], 'label': [0]}))
+
+        global_spikes_df: pd.DataFrame = deepcopy(get_proper_global_spikes_df(curr_active_pipeline, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values))
+        laps_gt_df: pd.DataFrame = _subfn_build_laps_gt_df(curr_active_pipeline, global_epoch_name_str=global_epoch_name, decoder_names_list=decoder_names)
+
+        ## 1) Continuous full-session decode for each of the 4 directional decoders at `active_laps_decoding_time_bin_size`:
+        eff_pos_tbin: float = float(active_laps_decoding_time_bin_size)
+        print(f'\tdecoding full session [{t_start:.2f}, {t_end:.2f}]s across 4 decoders at dt={eff_pos_tbin}s (heldout={used_heldout_train_decoders})...', flush=True)
+        continuous_4dec_data: Dict[str, Dict[str, Any]] = {}
+        for a_name in decoder_names:
+            a_decoder = active_decoders_dict[a_name]
+            dec_spikes_arg = None if is_clusterless_position_decoder(a_decoder) else deepcopy(global_spikes_df)
+            dec_res: DecodedFilterEpochsResult = a_decoder.decode_specific_epochs(spikes_df=dec_spikes_arg, filter_epochs=deepcopy(single_global_epoch), decoding_time_bin_size=eff_pos_tbin, debug_print=False)
+            tbin_container = dec_res.time_bin_containers[0]
+            t_centers = np.asarray(tbin_container.centers, dtype=float).reshape(-1)
+            t_edges = _subfn_extract_time_bin_edges(tbin_container, t_centers)
+            marg_x = dec_res.marginal_x_list[0]
+            posterior_mat = np.asarray(marg_x.p_x_given_n if hasattr(marg_x, 'p_x_given_n') else marg_x['p_x_given_n'], dtype=float)
+            xbin_edges = np.asarray(a_decoder.xbin if (getattr(a_decoder, 'xbin', None) is not None) else tmpl_decoders_dict[a_name].xbin, dtype=float).reshape(-1)
+            dec_neuron_ids = np.asarray(a_decoder.neuron_IDs, dtype=int) if ((not is_clusterless_position_decoder(a_decoder)) and (getattr(a_decoder, 'neuron_IDs', None) is not None)) else None
+            low_firing_rgba = _subfn_compute_low_firing_mask_rgba(spikes_df_in=global_spikes_df, time_bin_container=tbin_container, time_bin_edges=t_edges, min_spikes=int(min_num_spikes_per_bin_to_be_considered_active), min_unique_neurons=min_num_unique_active_neurons_per_time_bin, included_neuron_ids=dec_neuron_ids) if bool(should_dim_low_firing_bins) else None
+            continuous_4dec_data[a_name] = dict(posterior=posterior_mat, t_edges=t_edges, xbin=xbin_edges, low_firing_rgba=low_firing_rgba)
+        ## END for a_name in decoder_names...
+
+        ## 2) Decoder-sorted spike raster arrays:
+        sorted_rasters_data: Dict[str, Dict[str, Any]] = _subfn_prepare_decoder_sorted_spikes(decoders_map=active_decoders_dict, decoder_names_list=decoder_names, spikes_df_in=global_spikes_df)
+
+        ## 3) Continuous 75ms (`context_decoding_time_bin_size`) decoded `track_ID` marginal (`long` vs `short`) across full session:
+        eff_ctx_tbin: float = float(context_decoding_time_bin_size)
+        directional_merged_decoders_result = global_computation_results.computed_data['DirectionalMergedDecoders']
+        pseudo2D_decoder: BasePositionDecoder = directional_merged_decoders_result.all_directional_pf1D_Decoder
+        pseudo2D_cont_result: Optional[DecodedFilterEpochsResult] = None
+        existing_cont_decode = global_computation_results.computed_data.get('DirectionalDecodersDecoded', None)
+        if (existing_cont_decode is not None) and (getattr(existing_cont_decode, 'continuously_decoded_result_cache_dict', None) is not None):
+            ctx_cache_key = decoding_continuous_cache_key(eff_ctx_tbin, None)
+            cached_dict = existing_cont_decode.continuously_decoded_result_cache_dict.get(ctx_cache_key, None)
+            if isinstance(cached_dict, dict) and ('pseudo2D' in cached_dict):
+                pseudo2D_cont_result = cached_dict['pseudo2D']
+        if pseudo2D_cont_result is None:
+            print(f'\tdecoding full-session pseudo2D context at dt={eff_ctx_tbin}s...', flush=True)
+            pseudo2D_cont_result = pseudo2D_decoder.decode_specific_epochs(spikes_df=deepcopy(global_spikes_df), filter_epochs=deepcopy(single_global_epoch), decoding_time_bin_size=eff_ctx_tbin, debug_print=False)
+        ctx_tbin_container = pseudo2D_cont_result.time_bin_containers[0]
+        ctx_t_centers = np.asarray(ctx_tbin_container.centers, dtype=float).reshape(-1)
+        ctx_t_edges = _subfn_extract_time_bin_edges(ctx_tbin_container, ctx_t_centers)
+        track_id_marginal_2d: NDArray = np.asarray(DirectionalPseudo2DDecodersResult.build_custom_marginal_over_long_short(pseudo2D_cont_result)[0].p_x_given_n, dtype=float)
+
+        ## Pre-slice measured position arrays sorted by `t` for fast per-chunk plotting:
+        pos_t_all = global_pos_df['t'].to_numpy(dtype=float, copy=False)
+        pos_y_all = global_pos_df[pos_var_name].to_numpy(dtype=float, copy=False)
+        pos_sort_idx = np.argsort(pos_t_all, kind='mergesort')
+        pos_t_all = pos_t_all[pos_sort_idx]
+        pos_y_all = pos_y_all[pos_sort_idx]
+
+        posterior_cmap = get_heatmap_cmap(cmap=posterior_cmap_name, bad_color='black', under_color='black', over_color='white')
+        context_cmap = get_heatmap_cmap(cmap=context_cmap_name, bad_color='black', under_color='black', over_color='white')
+
+        ## Compute horizontal chunking so no single Matplotlib Agg canvas exceeds `max_chunk_width_px` (and always stays < 65,535 px):
+        session_duration_sec: float = float(t_end - t_start)
+        eff_inches_per_sec: float = max(float(inches_per_second), 0.005)
+        total_data_width_px: float = session_duration_sec * eff_inches_per_sec * float(dpi)
+        eff_max_chunk_px: int = max(2000, min(int(max_chunk_width_px), 60000))
+        n_chunks: int = max(1, int(math.ceil(total_data_width_px / float(eff_max_chunk_px))))
+        chunk_edges_sec: NDArray = np.linspace(t_start, t_end, n_chunks + 1, dtype=float)
+
+        ## Global major/minor x-tick steps so ticks align uniformly across chunk seams:
+        approx_sec_per_major_tick: float = 1.25 / eff_inches_per_sec
+        nice_tick_steps = np.array([1.0, 2.0, 5.0, 10.0, 20.0, 25.0, 30.0, 50.0, 60.0, 100.0, 120.0, 200.0, 300.0], dtype=float)
+        major_tick_step: float = float(nice_tick_steps[int(np.argmin(np.abs(nice_tick_steps - approx_sec_per_major_tick)))])
+        minor_tick_step: float = max(1.0, major_tick_step / 5.0)
+
+        _sess_ctx = curr_active_pipeline.get_session_context()
+        animal_exper_session: str = '_'.join([str(v) for v in _sess_ctx.to_dict(subset_includelist=['animal', 'exper_name', 'session_name']).values() if v is not None])
+        if len(animal_exper_session.strip()) == 0:
+            animal_exper_session = str(curr_active_pipeline.session_name)
+        extra_suffix_str: str = f"_{'_'.join([str(s) for s in export_filename_extra_suffix_parts if s])}" if export_filename_extra_suffix_parts else ''
+        pos_ms_tok: int = int(round(eff_pos_tbin * 1000.0))
+        if combined_image_basename is None:
+            combined_image_basename = f'{self.BATCH_DATE_TO_USE}-{animal_exper_session}{extra_suffix_str}_tbin_{pos_ms_tok}ms_continuous_4decoder_gt_boxed'
+
+        output_dir: Path = self.collected_outputs_path.resolve().joinpath('continuous_4decoder_rasters_and_context')
+        output_dir.mkdir(parents=True, exist_ok=True)
+        out_path: Path = output_dir.joinpath(f'{combined_image_basename}.png')
+
+        chunk_imgs: List[Image.Image] = []
+        for chunk_i in range(n_chunks):
+            c_t0 = float(chunk_edges_sec[chunk_i])
+            c_t1 = float(chunk_edges_sec[chunk_i + 1])
+            if debug_print or (n_chunks > 1):
+                print(f'\trendering chunk {chunk_i + 1}/{n_chunks}: [{c_t0:.1f}, {c_t1:.1f}]s...', flush=True)
+            chunk_imgs.append(_subfn_render_time_chunk_figure(chunk_idx=chunk_i, total_chunks=n_chunks, c_t0=c_t0, c_t1=c_t1))
+        ## END for chunk_i in range(n_chunks)...
+
+        combined_img: Image.Image = chunk_imgs[0] if (len(chunk_imgs) == 1) else horizontal_image_stack(chunk_imgs, padding=0)
+        final_rgb_img: Image.Image = combined_img.convert('RGB')
+        final_rgb_img.save(out_path, format='PNG', compress_level=4)
+        img_w_px, img_h_px = final_rgb_img.size
+        plt.close('all')
+
+        callback_outputs.update(dict(
+            out_path=out_path,
+            output_dir=output_dir,
+            n_chunks=int(n_chunks),
+            n_laps=int(len(laps_gt_df)),
+            image_size_px=(int(img_w_px), int(img_h_px)),
+            session_time_bounds=(float(t_start), float(t_end)),
+            used_heldout_train_decoders=bool(used_heldout_train_decoders),
+        ))
+        print(f'\tsaved continuous 4-decoder figure ({img_w_px}x{img_h_px} px, {n_chunks} chunk(s), {len(laps_gt_df)} laps) -> {out_path.resolve().as_uri()}', flush=True)
+    except Exception as e:
+        callback_outputs['error'] = str(e)
+        print(f'WARN: figures_export_continuous_4decoder_rasters_and_context_completion_function failed: {e}', flush=True)
+        print(traceback.format_exc(), flush=True)
+        if fail_on_exception_for_debugging or getattr(self, 'fail_on_exception', False):
+            raise
+    ## END try...
+
+    across_session_results_extended_dict['figures_export_continuous_4decoder_rasters_and_context_completion_function'] = callback_outputs
+    return across_session_results_extended_dict
+
+
 @function_attributes(short_name=None, tags=['figure', 'batch', 'position', '2D', 'trajectory', 'time-gradient', 'Agg', 'shuffles-indep', 'pure'], input_requires=[], output_provides=['figures_export_2d_position_over_time_completion_function'], uses=['plot_2d_xy_position_over_time'], used_by=[], creation_date='2026-11-23 20:15', related_items=['figures_export_laps_correct_decoder_side_by_side_completion_function'])
 def figures_export_2d_position_over_time_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, dpi: int = 150, max_points: Optional[int] = 50000, figsize=(10, 8), cmap: str = 'viridis', fail_on_exception_for_debugging: bool = False, debug_print: bool = False, **kwargs) -> dict:
     """Batch/SLURM headless Agg export: maze-plane (x, y) trajectory colored by time → collected_outputs PNG."""
@@ -5441,6 +6049,7 @@ def MAIN_get_template_string(BATCH_DATE_TO_USE: str, collected_outputs_path:Path
                                     'compute_and_export_kdiba_train_test_position_error_completion_function': compute_and_export_kdiba_train_test_position_error_completion_function,
                                     'figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function': figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function,
                                     'figures_export_laps_correct_decoder_side_by_side_completion_function': figures_export_laps_correct_decoder_side_by_side_completion_function,
+                                    'figures_export_continuous_4decoder_rasters_and_context_completion_function': figures_export_continuous_4decoder_rasters_and_context_completion_function,
                                     'figures_export_2d_position_over_time_completion_function': figures_export_2d_position_over_time_completion_function,
                                     # 'generalized_export_figures_customizazble_completion_function': generalized_export_figures_customizazble_completion_function,
                                     'compute_and_export_bapun_train_test_decoder_error_distance_completion_function': compute_and_export_bapun_train_test_decoder_error_distance_completion_function,
