@@ -25,7 +25,7 @@ import re
 from copy import deepcopy
 
 from pathlib import Path
-from typing import List, Dict, Optional, Tuple
+from typing import List, Dict, Optional, Tuple, Any
 import nptyping as ND
 from nptyping import NDArray
 import numpy as np
@@ -2434,6 +2434,228 @@ def parse_filename(path: Union[Path, str], should_print_unparsable_filenames: bo
             export_file_type = export_file_type[1:-1]
 
     return export_datetime, session_str, custom_replay_name, export_file_type, decoding_time_bin_size_str
+
+
+## Bapun collected_outputs underscore naming (do NOT force through KDIBA `-(file_type)` parse_filename):
+## `{BATCH_DATE_TO_USE}-{session_stem}_bapun_train_test_decoder_error.csv` etc.
+BAPUN_COLLECTED_OUTPUT_FILE_TYPES: Tuple[str, ...] = (
+    'bapun_train_test_decoder_error_agg',
+    'bapun_train_test_decoder_error',
+    'bapun_context_decoder_summary_agg',
+    'bapun_context_decoder_laps',
+)
+
+
+@function_attributes(short_name=None, tags=['bapun', 'parse', 'collected_outputs'], input_requires=[], output_provides=[], uses=[], used_by=['find_bapun_collected_output_csv_files', 'load_bapun_across_sessions_exported_files'], creation_date='2026-11-27 17:00', related_items=['parse_filename'])
+def parse_bapun_collected_output_filename(path: Union[Path, str], should_print_unparsable_filenames: bool = False) -> Tuple[Optional[datetime], Optional[str], Optional[str]]:
+    """Parse Bapun underscore CSV exports that KDIBA ``parse_filename`` rejects.
+
+    Expected stem: ``{BATCH_DATE_TO_USE}-{session_stem}_{file_type}`` where ``file_type`` is one of
+    ``BAPUN_COLLECTED_OUTPUT_FILE_TYPES`` (e.g. ``2026-11-27_Bapun_GL-RatNDay4OpenField_bapun_train_test_decoder_error``).
+
+    Returns:
+        (export_datetime, session_stem, file_type) or (None, None, None) if unparsable.
+    """
+    if isinstance(path, str):
+        filename_stem: str = Path(path).stem
+    else:
+        filename_stem = Path(path).stem
+
+    matched_file_type: Optional[str] = None
+    remainder: Optional[str] = None
+    for file_type in sorted(BAPUN_COLLECTED_OUTPUT_FILE_TYPES, key=len, reverse=True):
+        suffix: str = f'_{file_type}'
+        if filename_stem.endswith(suffix):
+            matched_file_type = file_type
+            remainder = filename_stem[:-len(suffix)]
+            break
+    ## END for file_type in sorted(BAPUN_COLLECTED_OUTPUT_FILE_TYPES, key=len, reverse=True)...
+
+    if (matched_file_type is None) or (remainder is None) or (len(remainder) == 0):
+        if should_print_unparsable_filenames:
+            print(f'ERR: parse_bapun_collected_output_filename could not match file_type for "{filename_stem}"')
+        return None, None, None
+
+    # `{YYYY-MM-DD[_tag...]}-{session_stem}` — batch tag may include `_Bapun_GL`
+    date_session_match = re.match(r'^(?P<date_tag>\d{4}-\d{2}-\d{2}(?:_[A-Za-z0-9]+)*)-(?P<session_stem>.+)$', remainder)
+    if date_session_match is None:
+        if should_print_unparsable_filenames:
+            print(f'ERR: parse_bapun_collected_output_filename could not split date/session for "{remainder}"')
+        return None, None, None
+
+    date_tag: str = date_session_match.group('date_tag')
+    session_stem: str = date_session_match.group('session_stem')
+    export_datetime: Optional[datetime] = None
+    # Prefer datetime with optional AM/PM time token: YYYY-MM-DD_0420PM[_Bapun_GL]
+    time_match = re.match(r'^(\d{4}-\d{2}-\d{2}_\d{3,4}(?:AM|PM))', date_tag)
+    if time_match is not None:
+        try:
+            export_datetime = datetime.strptime(time_match.group(1), '%Y-%m-%d_%I%M%p')
+        except ValueError:
+            export_datetime = None
+    if export_datetime is None:
+        try:
+            export_datetime = datetime.strptime(date_tag[:10], '%Y-%m-%d')
+        except ValueError:
+            if should_print_unparsable_filenames:
+                print(f'ERR: parse_bapun_collected_output_filename could not parse datetime from "{date_tag}"')
+            return None, None, None
+
+    return export_datetime, session_stem, matched_file_type
+
+
+def _infer_bapun_experiment_type_from_session_stem(session_stem: str) -> str:
+    stem_lower: str = str(session_stem).lower()
+    if 'twonovel' in stem_lower:
+        return 'TwoNovel'
+    if 'openfield' in stem_lower:
+        return 'OpenField'
+    return 'Unknown'
+
+
+def _infer_bapun_animal_and_session_name(session_stem: str) -> Tuple[Optional[str], Optional[str]]:
+    """Best-effort split of XML/pipeline session stem into (animal, session_name)."""
+    animal_match = re.match(r'^(Rat[A-Za-z0-9]+)[-_]?(.*)$', str(session_stem))
+    if animal_match is None:
+        return None, str(session_stem)
+    animal: str = animal_match.group(1)
+    rest: str = animal_match.group(2).strip('-_')
+    if len(rest) == 0:
+        return animal, None
+    return animal, rest
+
+
+@function_attributes(short_name=None, tags=['bapun', 'collected_outputs', 'csv'], input_requires=[], output_provides=[], uses=['parse_bapun_collected_output_filename'], used_by=['load_bapun_across_sessions_exported_files'], creation_date='2026-11-27 17:00', related_items=[])
+def find_bapun_collected_output_csv_files(collected_outputs_directory: Path, cuttoff_date: Optional[datetime] = None, debug_print: bool = False) -> pd.DataFrame:
+    """Glob Bapun underscore CSVs under ``collected_outputs_directory`` and keep most-recent per ``(session_stem, file_type)``.
+
+    Returns a DataFrame with columns:
+    ``export_datetime, session_stem, file_type, path, animal, session_name, experiment_type``.
+    """
+    collected_outputs_directory = Path(collected_outputs_directory).resolve()
+    assert collected_outputs_directory.exists(), f"collected_outputs_directory: {collected_outputs_directory} does not exist!"
+
+    glob_patterns: List[str] = [
+        '*_bapun_train_test_decoder_error*.csv',
+        '*_bapun_context_decoder_*.csv',
+    ]
+    candidate_paths: List[Path] = []
+    for pattern in glob_patterns:
+        candidate_paths.extend(list(collected_outputs_directory.glob(pattern)))
+    ## END for pattern in glob_patterns...
+    # de-dupe while preserving order
+    seen_paths = set()
+    unique_paths: List[Path] = []
+    for a_path in candidate_paths:
+        resolved = a_path.resolve()
+        if resolved not in seen_paths:
+            seen_paths.add(resolved)
+            unique_paths.append(resolved)
+    ## END for a_path in candidate_paths...
+
+    rows: List[Dict[str, Any]] = []
+    for a_path in unique_paths:
+        export_datetime, session_stem, file_type = parse_bapun_collected_output_filename(a_path, should_print_unparsable_filenames=debug_print)
+        if (export_datetime is None) or (session_stem is None) or (file_type is None):
+            continue
+        if (cuttoff_date is not None) and (export_datetime < cuttoff_date):
+            continue
+        animal, session_name = _infer_bapun_animal_and_session_name(session_stem)
+        rows.append(dict(
+            export_datetime=export_datetime,
+            session_stem=session_stem,
+            file_type=file_type,
+            path=a_path,
+            animal=animal,
+            session_name=session_name,
+            experiment_type=_infer_bapun_experiment_type_from_session_stem(session_stem if session_name is None else session_name),
+        ))
+    ## END for a_path in unique_paths...
+
+    parsed_df: pd.DataFrame = pd.DataFrame(rows)
+    if len(parsed_df) == 0:
+        return pd.DataFrame(columns=['export_datetime', 'session_stem', 'file_type', 'path', 'animal', 'session_name', 'experiment_type'])
+
+    parsed_df = parsed_df.sort_values(['export_datetime', 'session_stem', 'file_type'], ascending=[False, True, True]).reset_index(drop=True)
+    most_recent_df: pd.DataFrame = parsed_df.drop_duplicates(subset=['session_stem', 'file_type'], keep='first').reset_index(drop=True)
+    if debug_print:
+        print(f'find_bapun_collected_output_csv_files: {len(unique_paths)} candidates -> {len(parsed_df)} parsed -> {len(most_recent_df)} most-recent')
+    return most_recent_df
+
+
+@function_attributes(short_name=None, tags=['MAIN', 'bapun', 'across_sessions', 'collected_outputs'], input_requires=[], output_provides=[], uses=['find_bapun_collected_output_csv_files'], used_by=[], creation_date='2026-11-27 17:00', related_items=['load_across_sessions_exported_files'])
+def load_bapun_across_sessions_exported_files(collected_outputs_directory: Optional[Path] = None, cuttoff_date: Optional[datetime] = None, debug_print: bool = False) -> Tuple[Dict[str, pd.DataFrame], pd.DataFrame]:
+    """Load Bapun batch CSVs from ``collected_outputs`` using underscore filename conventions (no KDIBA rename).
+
+    Returns:
+        (dfs_dict, most_recent_parsed_files_df) where ``dfs_dict`` keys are:
+        ``bapun_train_test_decoder_error_df``, ``bapun_train_test_decoder_error_agg_df``,
+        ``bapun_context_decoder_laps_df``, ``bapun_context_decoder_summary_agg_df``.
+
+    Usage:
+        from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import load_bapun_across_sessions_exported_files
+        dfs_dict, most_recent_parsed_files_df = load_bapun_across_sessions_exported_files(collected_outputs_directory=collected_outputs_directory, cuttoff_date=cuttoff_date, debug_print=True)
+    """
+    from pyphocorehelpers.Filesystem.path_helpers import find_first_extant_path
+
+    if collected_outputs_directory is None:
+        known_collected_outputs_paths = [Path(v).resolve() for v in [
+            '/Users/pho/data/collected_outputs',
+            '/Volumes/SwapSSD/Data/collected_outputs',
+            r"K:/scratch/collected_outputs",
+            '/Users/pho/Dropbox (University of Michigan)/MED-DibaLabDropbox/Data/Pho/Outputs/output/collected_outputs',
+            r'C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/output/collected_outputs',
+            '/home/halechr/cloud/turbo/Data/Output/collected_outputs',
+            '/home/halechr/cloud/turbo/Pho/Output/collected_outputs',
+            '/home/halechr/FastData/collected_outputs/',
+        ]]
+        collected_outputs_directory = find_first_extant_path(known_collected_outputs_paths)
+
+    collected_outputs_directory = Path(collected_outputs_directory).resolve()
+    assert collected_outputs_directory.exists(), f"collected_outputs_directory: {collected_outputs_directory} does not exist!"
+    if debug_print:
+        print(f'load_bapun_across_sessions_exported_files: collected_outputs_directory={collected_outputs_directory}')
+
+    most_recent_parsed_files_df: pd.DataFrame = find_bapun_collected_output_csv_files(collected_outputs_directory=collected_outputs_directory, cuttoff_date=cuttoff_date, debug_print=debug_print)
+
+    file_type_to_df_key: Dict[str, str] = {
+        'bapun_train_test_decoder_error': 'bapun_train_test_decoder_error_df',
+        'bapun_train_test_decoder_error_agg': 'bapun_train_test_decoder_error_agg_df',
+        'bapun_context_decoder_laps': 'bapun_context_decoder_laps_df',
+        'bapun_context_decoder_summary_agg': 'bapun_context_decoder_summary_agg_df',
+    }
+    loaded_parts: Dict[str, List[pd.DataFrame]] = {v: [] for v in file_type_to_df_key.values()}
+
+    annotation_cols: List[str] = ['session_stem', 'animal', 'session_name', 'experiment_type', 'export_datetime', 'file_type', 'path']
+    for _, row in most_recent_parsed_files_df.iterrows():
+        file_type: str = row['file_type']
+        df_key: str = file_type_to_df_key[file_type]
+        csv_path: Path = Path(row['path'])
+        try:
+            a_df: pd.DataFrame = pd.read_csv(csv_path)
+        except Exception as e:
+            print(f'WARN: failed to read Bapun CSV "{csv_path}": {e}')
+            continue
+        for col_name in annotation_cols:
+            a_df[col_name] = row[col_name]
+        ## END for col_name in annotation_cols...
+        loaded_parts[df_key].append(a_df)
+    ## END for _, row in most_recent_parsed_files_df.iterrows()...
+
+    dfs_dict: Dict[str, pd.DataFrame] = {}
+    for df_key, parts in loaded_parts.items():
+        if len(parts) == 0:
+            dfs_dict[df_key] = pd.DataFrame()
+        else:
+            dfs_dict[df_key] = pd.concat(parts, ignore_index=True)
+    ## END for df_key, parts in loaded_parts.items()...
+
+    if debug_print:
+        for df_key, a_df in dfs_dict.items():
+            print(f'  {df_key}: {len(a_df)} rows')
+        ## END for df_key, a_df in dfs_dict.items()...
+
+    return dfs_dict, most_recent_parsed_files_df
 
 
 top_level_parts_separators = ['-', '__']
@@ -4961,6 +5183,15 @@ class AcrossSessionHelpers:
     
     
     """
+
+
+    @function_attributes(short_name=None, tags=['bapun', 'across_sessions', 'collected_outputs'], input_requires=[], output_provides=[], uses=['load_bapun_across_sessions_exported_files'], used_by=[], creation_date='2026-11-27 17:00', related_items=['load_bapun_across_sessions_exported_files'])
+    @classmethod
+    def load_bapun_across_sessions_exported_files(cls, collected_outputs_directory: Optional[Path] = None, cuttoff_date: Optional[datetime] = None, debug_print: bool = False) -> Tuple[Dict[str, pd.DataFrame], pd.DataFrame]:
+        """Thin wrapper around module-level ``load_bapun_across_sessions_exported_files`` for notebook discoverability."""
+        return load_bapun_across_sessions_exported_files(collected_outputs_directory=collected_outputs_directory, cuttoff_date=cuttoff_date, debug_print=debug_print)
+
+
     @function_attributes(short_name=None, tags=['shuffle', 'columns'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-10-28 12:48', related_items=['_subfn_perform_add_merged_complete_epoch_stats_df'])
     @classmethod
     def prepare_epoch_score_shuffle_transfer_columns(cls, shuffle_df: pd.DataFrame) -> Tuple[pd.DataFrame, List[str]]:
