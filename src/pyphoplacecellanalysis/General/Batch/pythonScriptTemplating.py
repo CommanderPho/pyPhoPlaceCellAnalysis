@@ -1882,9 +1882,28 @@ class GreatlakesTurboToScratchHelpers:
     CLEAN_RUN_PREFERRED_SESSION_SUFFIXES: Tuple[str, ...] = ('.spikes.mat',)
 
 
+    ## Bapun read-only session files (NeuroPy BapunDataSessionFormat required / common GEN sidecars):
+    BAPUN_READONLY_SESSION_SIDECAR_SUFFIXES: Tuple[str, ...] = (
+        '.xml', '.neurons.npy', '.position.npy', '.paradigm.npy', '.probegroup.npy',
+        '.ripple.npy', '.pbe.npy', '.mua.npy',
+        '.maze1.linear.npy', '.maze2.linear.npy', '.maze.linear.npy',
+    )
+
+
+    @classmethod
+    def session_relpath(cls, context: IdentifyingContext, basedir: Optional[Path] = None) -> Path:
+        """Relative path under a data root (`KDIBA/...` or `Bapun/...`). Prefer ``basedir.name`` for Bapun on-disk folder aliases."""
+        format_name: Optional[str] = getattr(context, 'format_name', None)
+        if format_name == 'bapun':
+            disk_folder: str = Path(basedir).name if (basedir is not None) else str(context.session_name)
+            return Path('Bapun').joinpath(context.animal, disk_folder)
+        return Path('KDIBA').joinpath(context.animal, context.exper_name, context.session_name)
+
+
     @classmethod
     def kdiba_session_relpath(cls, context: IdentifyingContext) -> Path:
-        return Path('KDIBA').joinpath(context.animal, context.exper_name, context.session_name)
+        """Backward-compatible KDIBA-only helper; prefer ``session_relpath`` for mixed formats."""
+        return cls.session_relpath(context)
 
 
     @classmethod
@@ -1899,9 +1918,9 @@ class GreatlakesTurboToScratchHelpers:
 
     @classmethod
     def find_turbo_session_basedir(cls, a_folder: ConcreteSessionFolder, source_data_root: Path) -> Path:
-        """Prefer Data/KDIBA/...; fall back to the sibling /KDIBA tree that Data/KDIBA often symlinks to. Do not resolve()."""
-        rel: Path = cls.kdiba_session_relpath(a_folder.context)
-        candidates: List[Path] = [Path(source_data_root).joinpath(rel), Path(a_folder.path), Path(source_data_root).parent.joinpath(rel), cls.TURBO_DATA_ROOT.parent.joinpath(rel)]
+        """Prefer extant ``a_folder.path``; else Data/<format>/... then sibling layout. Do not resolve()."""
+        rel: Path = cls.session_relpath(a_folder.context, basedir=Path(a_folder.path))
+        candidates: List[Path] = [Path(a_folder.path), Path(source_data_root).joinpath(rel), Path(source_data_root).parent.joinpath(rel), cls.TURBO_DATA_ROOT.parent.joinpath(rel)]
         for a_candidate in candidates:
             if a_candidate.exists():
                 return a_candidate
@@ -1911,26 +1930,38 @@ class GreatlakesTurboToScratchHelpers:
 
 
     @classmethod
+    def ensure_scratch_format_layout_symlink(cls, scratch_data_root: Path, format_folder_name: str) -> Path:
+        """One folder symlink matching Turbo: sibling ``{format}`` -> ``Data/{format}``. ``Data/{format}`` stays a real writable directory."""
+        scratch_data_root = Path(scratch_data_root)
+        scratch_format_dir: Path = scratch_data_root.joinpath(format_folder_name)
+        scratch_format_dir.mkdir(parents=True, exist_ok=True)
+        sibling_format_dir: Path = scratch_data_root.parent.joinpath(format_folder_name)
+        if sibling_format_dir.is_symlink():
+            current_target = Path(os.readlink(str(sibling_format_dir)))
+            if current_target.resolve() != scratch_format_dir.resolve():
+                sibling_format_dir.unlink()
+                sibling_format_dir.symlink_to(scratch_format_dir, target_is_directory=True)
+                print(f'[SCRATCH STAGE] {format_folder_name} symlink: {sibling_format_dir} -> {scratch_format_dir}')
+            else:
+                print(f'[SCRATCH STAGE] {format_folder_name} symlink exists: {sibling_format_dir} -> {scratch_format_dir}')
+        elif sibling_format_dir.exists():
+            print(f'[SCRATCH STAGE] {format_folder_name} sibling already exists (not a symlink): {sibling_format_dir}')
+        else:
+            sibling_format_dir.symlink_to(scratch_format_dir, target_is_directory=True)
+            print(f'[SCRATCH STAGE] {format_folder_name} symlink: {sibling_format_dir} -> {scratch_format_dir}')
+        return scratch_format_dir
+
+
+    @classmethod
     def ensure_scratch_kdiba_layout_symlink(cls, scratch_data_root: Path) -> Path:
         """One folder symlink matching Turbo: sibling KDIBA -> Data/KDIBA. Data/KDIBA stays a real writable directory."""
-        scratch_data_root = Path(scratch_data_root)
-        scratch_kdiba: Path = scratch_data_root.joinpath('KDIBA')
-        scratch_kdiba.mkdir(parents=True, exist_ok=True)
-        sibling_kdiba: Path = scratch_data_root.parent.joinpath('KDIBA')
-        if sibling_kdiba.is_symlink():
-            current_target = Path(os.readlink(str(sibling_kdiba)))
-            if current_target.resolve() != scratch_kdiba.resolve():
-                sibling_kdiba.unlink()
-                sibling_kdiba.symlink_to(scratch_kdiba, target_is_directory=True)
-                print(f'[SCRATCH STAGE] KDIBA symlink: {sibling_kdiba} -> {scratch_kdiba}')
-            else:
-                print(f'[SCRATCH STAGE] KDIBA symlink exists: {sibling_kdiba} -> {scratch_kdiba}')
-        elif sibling_kdiba.exists():
-            print(f'[SCRATCH STAGE] KDIBA sibling already exists (not a symlink): {sibling_kdiba}')
-        else:
-            sibling_kdiba.symlink_to(scratch_kdiba, target_is_directory=True)
-            print(f'[SCRATCH STAGE] KDIBA symlink: {sibling_kdiba} -> {scratch_kdiba}')
-        return scratch_kdiba
+        return cls.ensure_scratch_format_layout_symlink(scratch_data_root, format_folder_name='KDIBA')
+
+
+    @classmethod
+    def ensure_scratch_bapun_layout_symlink(cls, scratch_data_root: Path) -> Path:
+        """One folder symlink matching Turbo: sibling Bapun -> Data/Bapun. Data/Bapun stays a real writable directory."""
+        return cls.ensure_scratch_format_layout_symlink(scratch_data_root, format_folder_name='Bapun')
 
 
     @classmethod
@@ -1978,17 +2009,23 @@ class GreatlakesTurboToScratchHelpers:
 
     @classmethod
     def stage_mutable_session_outputs_to_scratch(cls, turbo_session_folders: List[ConcreteSessionFolder], source_data_root: Path, scratch_data_root: Path, load_only_relpath: str, writable_relpath: str, skip_if_dest_newer_or_equal: bool = True) -> Tuple[List[ConcreteSessionFolder], Dict[IdentifyingContext, Path], Dict[Path, Path]]:
-        """Copy the local pickle, the writable global pickle, tiny read-only sidecars (`READONLY_SESSION_SIDECAR_SUFFIXES`), and kdiba clean_run source files (`CLEAN_RUN_REQUIRED_SESSION_SUFFIXES` + preferred `.spikes.mat`) as real files. Never symlink to Turbo, never stage .h5 / .dat / .eeg."""
+        """Copy the local pickle, the writable global pickle, and format-specific read-only sidecars as real files. Never symlink to Turbo, never stage .h5 / .dat / .eeg.
+        KDIBA: `READONLY_SESSION_SIDECAR_SUFFIXES` + clean_run `.mat` sources. Bapun: `BAPUN_READONLY_SESSION_SIDECAR_SUFFIXES` (`.xml` / `.npy`).
+        """
         source_data_root = Path(source_data_root)
         scratch_data_root = Path(scratch_data_root)
-        cls.ensure_scratch_kdiba_layout_symlink(scratch_data_root)
+        _format_names: set = {getattr(a_folder.context, 'format_name', None) for a_folder in turbo_session_folders}
+        if ('kdiba' in _format_names) or (None in _format_names):
+            cls.ensure_scratch_kdiba_layout_symlink(scratch_data_root)
+        if 'bapun' in _format_names:
+            cls.ensure_scratch_bapun_layout_symlink(scratch_data_root)
         scratch_session_folders: List[ConcreteSessionFolder] = []
         scratch_basedirs: Dict[IdentifyingContext, Path] = {}
         all_copied: Dict[Path, Path] = {}
 
         for a_folder in turbo_session_folders:
             turbo_basedir: Path = cls.find_turbo_session_basedir(a_folder, source_data_root=source_data_root)
-            scratch_basedir: Path = scratch_data_root.joinpath(cls.kdiba_session_relpath(a_folder.context))
+            scratch_basedir: Path = scratch_data_root.joinpath(cls.session_relpath(a_folder.context, basedir=turbo_basedir))
             scratch_basedir.mkdir(parents=True, exist_ok=True)
             n_cleaned: int = cls.cleanup_leftover_scratch_symlinks(scratch_basedir)
             scratch_basedir.joinpath('output').mkdir(parents=True, exist_ok=True)
@@ -2024,12 +2061,19 @@ class GreatlakesTurboToScratchHelpers:
                 else:
                     print(f'  skipped global: {write_dest} (dest mtime newer)')
 
-            ## Tiny read-only sidecars re-read next to the pickle by post-load code (e.g. `{session}.position_info.mat` in FINAL_FIX_GRID_BIN_BOUNDS), plus kdiba clean_run source files (`{session}.spikeII.mat` required; `{session}.spikes.mat` preferred):
-            session_name: str = turbo_basedir.name  # matches `KDibaOldDataSessionFormat.get_session_name(basedir)`
-            _sidecar_suffixes_in_order: List[str] = list(cls.READONLY_SESSION_SIDECAR_SUFFIXES) + list(cls.CLEAN_RUN_REQUIRED_SESSION_SUFFIXES) + list(cls.CLEAN_RUN_PREFERRED_SESSION_SUFFIXES)
-            sidecar_names: List[str] = list(dict.fromkeys([f'{session_name}{a_suffix}' for a_suffix in _sidecar_suffixes_in_order] + list(cls.READONLY_SESSION_SIDECAR_STANDALONE_NAMES)))
-            required_sidecar_names: List[str] = list(dict.fromkeys([f'{session_name}{a_suffix}' for a_suffix in (cls.REQUIRED_SESSION_SIDECAR_SUFFIXES + cls.CLEAN_RUN_REQUIRED_SESSION_SUFFIXES)]))
-            preferred_sidecar_names: List[str] = [f'{session_name}{a_suffix}' for a_suffix in cls.CLEAN_RUN_PREFERRED_SESSION_SUFFIXES]
+            ## Format-specific tiny read-only sidecars (KDIBA `.mat` / clean_run sources; Bapun `.xml` / `.npy`):
+            session_name: str = turbo_basedir.name  # matches on-disk folder stem (KDIBA session name or Bapun Day* folder)
+            is_bapun: bool = (getattr(a_folder.context, 'format_name', None) == 'bapun')
+            if is_bapun:
+                _sidecar_suffixes_in_order: List[str] = list(cls.BAPUN_READONLY_SESSION_SIDECAR_SUFFIXES)
+                sidecar_names: List[str] = list(dict.fromkeys([f'{session_name}{a_suffix}' for a_suffix in _sidecar_suffixes_in_order]))
+                required_sidecar_names: List[str] = [f'{session_name}{a_suffix}' for a_suffix in ('.xml', '.neurons.npy', '.position.npy', '.paradigm.npy', '.probegroup.npy')]
+                preferred_sidecar_names: List[str] = []
+            else:
+                _sidecar_suffixes_in_order = list(cls.READONLY_SESSION_SIDECAR_SUFFIXES) + list(cls.CLEAN_RUN_REQUIRED_SESSION_SUFFIXES) + list(cls.CLEAN_RUN_PREFERRED_SESSION_SUFFIXES)
+                sidecar_names = list(dict.fromkeys([f'{session_name}{a_suffix}' for a_suffix in _sidecar_suffixes_in_order] + list(cls.READONLY_SESSION_SIDECAR_STANDALONE_NAMES)))
+                required_sidecar_names = list(dict.fromkeys([f'{session_name}{a_suffix}' for a_suffix in (cls.REQUIRED_SESSION_SIDECAR_SUFFIXES + cls.CLEAN_RUN_REQUIRED_SESSION_SUFFIXES)]))
+                preferred_sidecar_names = [f'{session_name}{a_suffix}' for a_suffix in cls.CLEAN_RUN_PREFERRED_SESSION_SUFFIXES]
             n_sidecars_copied: int = 0
             n_sidecars_skipped: int = 0
             missing_sidecar_names: List[str] = []
@@ -2038,10 +2082,11 @@ class GreatlakesTurboToScratchHelpers:
                 sidecar_dest = scratch_basedir.joinpath(a_sidecar_name)
                 if not sidecar_src.is_file():
                     missing_sidecar_names.append(a_sidecar_name)
-                    if a_sidecar_name.endswith('.position_info.mat') and (a_sidecar_name in required_sidecar_names):
+                    if (not is_bapun) and a_sidecar_name.endswith('.position_info.mat') and (a_sidecar_name in required_sidecar_names):
                         print(f'  WARN: required sidecar missing on turbo (FINAL post-load will fail without it): {sidecar_src}')
                     elif a_sidecar_name in required_sidecar_names:
-                        print(f'  WARN: required clean_run source missing on turbo (SessionFolderSpec / should_force_reload_all will fail without it): {sidecar_src}')
+                        _warn_kind: str = 'Bapun required session file' if is_bapun else 'required clean_run source'
+                        print(f'  WARN: {_warn_kind} missing on turbo: {sidecar_src}')
                     elif a_sidecar_name in preferred_sidecar_names:
                         print(f'  WARN: preferred clean_run spikes source missing on turbo (load falls back to .spikeII.mat): {sidecar_src}')
                     continue
@@ -2107,7 +2152,7 @@ class GreatlakesTurboToScratchHelpers:
     @classmethod
     def stage_sessions_for_scratch_run(cls, turbo_session_folders: List[ConcreteSessionFolder], source_data_root: Path, pickle_suffix: str, tbin_suffix: str = '', scratch_data_root: Optional[Path] = None, skip_if_dest_newer_or_equal: bool = True) -> Tuple[List[ConcreteSessionFolder], Dict[IdentifyingContext, Path], Path]:
         """Stage the sessions discovered on Turbo onto scratch and return the retargeted `(scratch_session_folders, session_global_data_root_parent_paths, scratch_write_root)` to feed `generate_batch_single_session_scripts`.
-        `scratch_data_root=None` uses the unresolved `cls.SCRATCH_DATA_ROOT` as the write root (and as the parent for the sibling KDIBA symlink).
+        `scratch_data_root=None` uses the unresolved `cls.SCRATCH_DATA_ROOT` as the write root (and as the parent for sibling KDIBA/Bapun layout symlinks).
         """
         source_data_root = Path(source_data_root)
         scratch_write_root: Path = Path(scratch_data_root) if (scratch_data_root is not None) else cls.SCRATCH_DATA_ROOT
