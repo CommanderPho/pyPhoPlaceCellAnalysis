@@ -215,7 +215,7 @@ SCORE_EXTREME_MODE: Dict[str, str] = {
     'mseq_len_ratio_ignoring_intrusions_and_repeats': 'greater',
     'mseq_tcov': 'greater',
     'mseq_dtrav': 'greater',
-    'forwardicity': 'greater',
+    'forwardicity': 'abs_greater',
     'ratio_major_aligned_bins': 'greater',
     'ratio_decoder_aligned_bins': 'greater',
     'avg_jump_cm': 'less',

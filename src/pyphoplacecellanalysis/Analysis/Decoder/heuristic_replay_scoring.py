@@ -39,14 +39,14 @@ from scipy.ndimage import convolve # used in `expand_peaks_mask`
 class HeuristicScoresTuple(UnpackableMixin, object):
     """ the specific heuristic measures for a single decoded epoch
     """
-    longest_sequence_length: int = field(default=1),
-    longest_sequence_length_ratio: float = field(default=None),
-    direction_change_bin_ratio: float = field(default=None),
-    congruent_dir_bins_ratio: float = field(default=None),
-    total_congruent_direction_change: float = field(default=None),
-    total_variation: float = field(default=None),
-    integral_second_derivative: float = field(default=None),
-    stddev_of_diff: float = field(default=None),
+    longest_sequence_length: int = field(default=1)
+    longest_sequence_length_ratio: float = field(default=None)
+    direction_change_bin_ratio: float = field(default=None)
+    congruent_dir_bins_ratio: float = field(default=None)
+    total_congruent_direction_change: float = field(default=None)
+    total_variation: float = field(default=None)
+    integral_second_derivative: float = field(default=None)
+    stddev_of_diff: float = field(default=None)
     position_derivatives_df: pd.DataFrame = field(default=None)
     
 
@@ -162,6 +162,7 @@ class SubsequencesPartitioningResult(ComputedResult):
     max_ignore_bins: int = serialized_attribute_field(default=2, metadata={'desc': "the maximum number of sequential time bins that can be merged over to form a larger subsequence."})
     same_thresh: float = serialized_attribute_field(default=4, metadata={'desc': "if the difference (in [cm]) between the positions of two sequential time bins is less than this value, it will be treated as a non-changing direction and effectively treated as a single bin."})
     max_jump_distance_cm: Optional[float] = serialized_attribute_field(default=None, metadata={'desc': 'The maximum allowed distance between adjacent bins'})
+    decoder_track_length: Optional[float] = serialized_attribute_field(default=None, metadata={'desc': 'Decoder-specific track length (Long≈214 / Short≈144) for coverage normalization'})
     
     flat_time_window_centers: Optional[NDArray] = serialized_field(default=None)
     flat_time_window_edges: Optional[NDArray] = serialized_field(default=None)
@@ -198,9 +199,8 @@ class SubsequencesPartitioningResult(ComputedResult):
 
     def __attrs_post_init__(self):
         if self.main_subsequence_ranking_columns is None:
-            # self.main_subsequence_ranking_columns = ['len', 'len_excluding_both', 'len_excluding_intrusions', 'len_excluding_repeats'] ## full length
-            self.main_subsequence_ranking_columns = ['len_excluding_intrusions', 'len_excluding_repeats', 'len', 'len_excluding_both'] ## -- uses the length excluding intrusions but COUNTS repeats
-            # self.main_subsequence_ranking_columns = ['len_excluding_both', 'len_excluding_intrusions', 'len_excluding_repeats', 'len'] ## -- uses the length excluding both intrusions and repeats
+            # Prefer spatial progress (non-repeat, non-intrusion length) so stationary hovers do not outrank sweeps
+            self.main_subsequence_ranking_columns = ['len_excluding_both', 'len_excluding_intrusions', 'len_excluding_repeats', 'len']
             
 
         if isinstance(self.flat_positions, list):
@@ -522,13 +522,13 @@ class SubsequencesPartitioningResult(ComputedResult):
 
     @function_attributes(short_name=None, tags=['sequence'], input_requires=[], output_provides=[], uses=['partition_subsequences_ignoring_repeated_similar_positions', 'partition_subsequences', 'merge_intrusions', 'rebuild_sequence_info_df'], used_by=['bin_wise_continuous_sequence_sort_score_fn'], creation_date='2024-11-27 11:12', related_items=[])
     @classmethod
-    def init_from_positions_list(cls, a_most_likely_positions_list: NDArray, pos_bin_edges: NDArray, max_ignore_bins: int = 2, same_thresh: float = 4, max_jump_distance_cm: Optional[float]=None, flat_time_window_centers=None, flat_time_window_edges=None, debug_print:bool=False, enable_debug_step_logging: bool=True) -> "SubsequencesPartitioningResult":
+    def init_from_positions_list(cls, a_most_likely_positions_list: NDArray, pos_bin_edges: NDArray, max_ignore_bins: int = 2, same_thresh: float = 4, max_jump_distance_cm: Optional[float]=None, flat_time_window_centers=None, flat_time_window_edges=None, decoder_track_length: Optional[float]=None, debug_print:bool=False, enable_debug_step_logging: bool=True) -> "SubsequencesPartitioningResult":
         """ main initializer """
         
         if isinstance(a_most_likely_positions_list, list):
             a_most_likely_positions_list = np.array(a_most_likely_positions_list)
         
-        partition_result = cls(flat_positions=deepcopy(a_most_likely_positions_list), pos_bin_edges=deepcopy(pos_bin_edges), max_ignore_bins=max_ignore_bins, same_thresh=same_thresh, max_jump_distance_cm=max_jump_distance_cm, flat_time_window_centers=flat_time_window_centers, flat_time_window_edges=flat_time_window_edges,
+        partition_result = cls(flat_positions=deepcopy(a_most_likely_positions_list), pos_bin_edges=deepcopy(pos_bin_edges), max_ignore_bins=max_ignore_bins, same_thresh=same_thresh, max_jump_distance_cm=max_jump_distance_cm, decoder_track_length=decoder_track_length, flat_time_window_centers=flat_time_window_centers, flat_time_window_edges=flat_time_window_edges,
                                first_order_diff_lst=None, diff_split_indicies=None, split_indicies=None, low_magnitude_change_indicies=None, defer_initial_df_build=True,
                             )
         
@@ -575,10 +575,9 @@ class SubsequencesPartitioningResult(ComputedResult):
                     curr_accum_value_equiv_group_idxs = [i, ]
                     initial_v = v
                 else:
-                    # continue this group
+                    # continue this group; keep initial_v anchored at the plateau start
                     curr_accum_value_equiv_group.append(v) ## add to equiv group
                     curr_accum_value_equiv_group_idxs.append(i)
-                    initial_v = v
 
         ## end for i, v ...
         # end any open groups:
@@ -675,8 +674,9 @@ class SubsequencesPartitioningResult(ComputedResult):
                         # prev_accum_dir = None # reset the accum_dir
                 else:
                     # direction changed but it didn't exceed the threshold, a so-called "low-magnitude" change
+                    # Keep prev_accum_dir so small reverse jitter stays inside the current subsequence;
+                    # only |Δ| > same_thresh reversals split.
                     sub_change_threshold_change_indicies.append(i)
-                    prev_accum_dir = None ## HACK fixes index after low-magnitude change
                 # END if (np.abs(v) > same_thresh)
                 
                 ## accumulate the new entry, and potentially the change direction
@@ -804,119 +804,59 @@ class SubsequencesPartitioningResult(ComputedResult):
                 final_out_subsequences = deepcopy(original_split_positions_arrays)
 
             else:
-                # try to merge over intrusions
-                for a_subsequence_idx, a_subsequence, a_n_tbins, is_potentially_ignored_intrusion in zip(np.arange(len(n_tbins_list)), original_split_positions_arrays, n_tbins_list, is_subsequence_potential_intrusion):
-                    ## loop through ignored subsequences (the tiny fragments between the larger sequences) to find out if we can merge adjacent subsequences
-                    #TODO 2024-11-27 08:36: - [ ] 
-                    if (not is_potentially_ignored_intrusion):
-                        # for an_ignored_subsequence_idx in ignored_subsequence_idxs:
-                        active_subsequence_pos = deepcopy(original_split_positions_arrays[a_subsequence_idx])
-                        # active_ignored_subsequence_indicies = deepcopy(self.split_indicies[a_subsequence_idx])
-                        len_active_subsequence: int = len(active_subsequence_pos)
-                        final_is_subsequence_intrusion: bool = False
-                        
+                # Iterate potential intrusions and bridge congruent longer flanks
+                for intrusion_idx in ignored_subsequence_idxs:
+                    active_intrusion_pos = deepcopy(original_split_positions_arrays[intrusion_idx])
+                    len_intrusion: int = len(active_intrusion_pos)
+                    if debug_print:
+                        print(f'intrusion_idx: {intrusion_idx}, active_intrusion: {active_intrusion_pos}')
+                    (left_congruent_flanking_sequence, left_congruent_flanking_index), (right_congruent_flanking_sequence, right_congruent_flanking_index) = self._compute_sequences_spanning_ignored_intrusions(original_split_positions_arrays,
+                                                                                                                                            n_tbins_list, target_subsequence_idx=int(intrusion_idx), max_ignore_bins=max_ignore_bins)
+                    if left_congruent_flanking_sequence is None:
+                        left_congruent_flanking_sequence = []
+                    if right_congruent_flanking_sequence is None:
+                        right_congruent_flanking_sequence = []
+                    len_left_flank: int = len(left_congruent_flanking_sequence)
+                    len_right_flank: int = len(right_congruent_flanking_sequence)
+
+                    ## Require both flanks, and at least one flank longer than the intrusion itself
+                    if (len_left_flank == 0) or (len_right_flank == 0):
                         if debug_print:
-                            print(f'an_ignored_subsequence_idx: {a_subsequence_idx}, active_ignored_subsequence: {active_subsequence_pos}')
-                        (left_congruent_flanking_sequence, left_congruent_flanking_index), (right_congruent_flanking_sequence, right_congruent_flanking_index) = self._compute_sequences_spanning_ignored_intrusions(original_split_positions_arrays,
-                                                                                                                                                n_tbins_list, target_subsequence_idx=a_subsequence_idx, max_ignore_bins=max_ignore_bins)
-                        if left_congruent_flanking_sequence is None:
-                            left_congruent_flanking_sequence = []
-                        if right_congruent_flanking_sequence is None:
-                            right_congruent_flanking_sequence = []
-                        len_left_congruent_flanking_sequence: int = len(left_congruent_flanking_sequence)
-                        len_right_congruent_flanking_sequence: int = len(right_congruent_flanking_sequence)
+                            print(f'\tWARN: merge NULL, missing flank. Skipping intrusion_idx={intrusion_idx}')
+                        continue
+                    if (len_left_flank <= len_intrusion) and (len_right_flank <= len_intrusion):
+                        if debug_print:
+                            print(f'\tWARN: merge NULL, both flanks <= intrusion length ({len_intrusion}). Skipping')
+                        continue
 
-                        ## impose reasonable size rule
-                        # bridging over intrusions only be done when at least one of the adjacent portions to be bridged exceeds a minimum size? This prevents piecing together bad sequences.
-                        required_minimum_flanking_sequence_length: int = int((len_active_subsequence) * 2) # one must be at least twice as large as the bridged gap
-                        # required_minimum_flanking_sequence_length: int = int((len_active_ignored_subsequence) + 1) # must be at least one larger than the bridged gap                    
-                        are_both_flanking_sequences_too_short: bool = ((len_left_congruent_flanking_sequence < required_minimum_flanking_sequence_length) and (len_right_congruent_flanking_sequence < required_minimum_flanking_sequence_length))
-                        if are_both_flanking_sequences_too_short:
-                            if debug_print:
-                                print(f'flanking sequences are too short required_minimum_flanking_sequence_length: {required_minimum_flanking_sequence_length}!\n\t (len_left_congruent_flanking_sequence: {len_left_congruent_flanking_sequence}, len_active_ignored_subsequence: {len_active_subsequence}, len_right_congruent_flanking_sequence: {len_right_congruent_flanking_sequence})')
+                    left_dir = self._subsequence_travel_direction(left_congruent_flanking_sequence)
+                    right_dir = self._subsequence_travel_direction(right_congruent_flanking_sequence)
+                    if (left_dir == 0) or (right_dir == 0) or (left_dir != right_dir):
+                        if debug_print:
+                            print(f'\tWARN: merge NULL, flank directions incongruent (left={left_dir}, right={right_dir}). Skipping')
+                        continue
 
-                        if (are_both_flanking_sequences_too_short or ((len_left_congruent_flanking_sequence == 0) and (len_right_congruent_flanking_sequence == 0))):
-                            ## do nothing
-                            if debug_print:
-                                print(f'\tWARN: merge NULL, both flanking sequences are empty or too short. Skipping')
-                        else:
-                            is_merge_jump_distance_too_large: bool = False
-                            # decide on subsequence to merge                    
-                            if len_left_congruent_flanking_sequence > len_right_congruent_flanking_sequence:
-                                # merge LEFT sequence ________________________________________________________________________________________________ #
-                                if debug_print:
-                                    print(f'\tmerge LEFT: left_congruent_flanking_sequence: {left_congruent_flanking_sequence}, left_congruent_flanking_index: {left_congruent_flanking_index}')
-                                new_subsequence = np.array([*left_congruent_flanking_sequence, *active_subsequence_pos])
-                                
-                                ## test to see if the jump distance introduced by merging exceeeds the allowed value
-                                if max_jump_distance_cm is not None:
-                                    if (len_right_congruent_flanking_sequence > 0):
-                                        ## have a flanking right sequence to "bridge over" -- make sure that the last bin of the left seq and the first bin of the right seq don't exceed the jump dist thresh
-                                        merge_bridge_edges_jump_distance: float = np.abs(right_congruent_flanking_sequence[0] - left_congruent_flanking_sequence[-1])
-                                        is_merge_jump_distance_too_large = (merge_bridge_edges_jump_distance > max_jump_distance_cm)
-                                    else:
-                                        ## no right sequence, just merging self (the intrusion bins) onto the left flanking sequence (from the right) 
-                                        # not relevant, the distance between the longest adj subsequence and the intrusion value:
-                                        merge_edge_jump_distance: float = np.abs(left_congruent_flanking_sequence[-1] - active_subsequence_pos[0])
-                                        is_merge_jump_distance_too_large = (merge_edge_jump_distance > max_jump_distance_cm)
+                    is_merge_jump_distance_too_large: bool = False
+                    if max_jump_distance_cm is not None:
+                        merge_bridge_edges_jump_distance: float = np.abs(right_congruent_flanking_sequence[0] - left_congruent_flanking_sequence[-1])
+                        is_merge_jump_distance_too_large = (merge_bridge_edges_jump_distance > max_jump_distance_cm)
 
-                                if (not is_merge_jump_distance_too_large):
-                                    ## remove old
-                                    for an_idx_to_remove in np.arange(left_congruent_flanking_index, (a_subsequence_idx+1)):                    
-                                        subsequences_to_remove.append(original_split_positions_arrays[an_idx_to_remove])
-                                    # _tmp_merge_split_positions_arrays[left_congruent_flanking_index:(a_subsequence_idx+1)] = [] # new_subsequence ## or [] to clear it?
-                                    subsequences_to_add.append(new_subsequence)
-                                    # subsequence_replace_dict[tuple([original_split_positions_arrays[an_idx_to_remove] for an_idx_to_remove in np.arange(left_congruent_flanking_index, (a_subsequence_idx+1))])] = new_subsequence
-                                    subsequence_replace_dict[tuple(np.arange(left_congruent_flanking_index, (a_subsequence_idx+1)).tolist())] = (a_subsequence_idx, new_subsequence)
-                                    final_is_subsequence_intrusion = True
-                                    
+                    if is_merge_jump_distance_too_large:
+                        if debug_print:
+                            print(f'\tWARN: merge NULL, bridge jump too large. Skipping')
+                        continue
 
-                            else:
-                                # merge RIGHT, be biased towards merging right (due to lack of >= above) _____________________________________________ #
-                                if debug_print:
-                                    print(f'\tmerge RIGHT: right_congruent_flanking_sequence: {right_congruent_flanking_sequence}, right_congruent_flanking_index: {right_congruent_flanking_index}')
-                                new_subsequence = np.array([*active_subsequence_pos, *right_congruent_flanking_sequence])
-                                
-                                ## test to see if the jump distance introduced by merging exceeeds the allowed value
-                                if max_jump_distance_cm is not None:
-                                    
-                                    if (len_left_congruent_flanking_sequence > 0):
-                                        ## have a flanking left sequence to "bridge over" -- make sure that the last bin of the left seq and the first bin of the right seq don't exceed the jump dist thresh
-                                        merge_bridge_edges_jump_distance: float = np.abs(right_congruent_flanking_sequence[0] - left_congruent_flanking_sequence[-1]) ## this seems the same in both left or right longer
-                                        is_merge_jump_distance_too_large = (merge_bridge_edges_jump_distance > max_jump_distance_cm)
-                                    else:
-                                        ## no left sequence, just merging self (the intrusion bins) onto the right flanking sequence                                    
-                                        ## not relevant, the distance between the longest adj subsequence and the intrusion value:
-                                        merge_edge_jump_distance: float = np.abs(active_subsequence_pos[-1] - right_congruent_flanking_sequence[0])
-                                        is_merge_jump_distance_too_large = (merge_edge_jump_distance > max_jump_distance_cm)
-                                        
-
-                                if (not is_merge_jump_distance_too_large):
-                                    ## remove old
-                                    for an_idx_to_remove in np.arange(a_subsequence_idx, (right_congruent_flanking_index+1)):                    
-                                        subsequences_to_remove.append(original_split_positions_arrays[an_idx_to_remove])
-                                    # _tmp_merge_split_positions_arrays[a_subsequence_idx:(right_congruent_flanking_index+1)] = [] # new_subsequence ## or [] to clear it?
-                                    subsequences_to_add.append(new_subsequence)
-                                    # subsequence_replace_dict[tuple([original_split_positions_arrays[an_idx_to_remove] for an_idx_to_remove in np.arange(a_subsequence_idx, (right_congruent_flanking_index+1))])] = new_subsequence
-                                    subsequence_replace_dict[tuple(np.arange(a_subsequence_idx, (right_congruent_flanking_index+1)).tolist())] = (a_subsequence_idx, new_subsequence)
-                                    final_is_subsequence_intrusion = True
-                                    
-
-                            ## END if len_left_congruent_flanking_sequ...
-                                
-                            #TODO 2024-12-04 04:55: - [ ] Why can't we merge both left AND then right?
-
-                            if final_is_subsequence_intrusion:
-                                # final_intrusion_idxs.append(deepcopy(active_ignored_subsequence_indicies))
-                                final_intrusion_idxs.append(active_subsequence_pos)
-                            
-                            if debug_print:
-                                print(f'\tnew_subsequence: {new_subsequence}')
-                    else:
-                        ## not ignored, include?
-                        pass
-                    
-                # END for a_subsequence_idx, a_subsequence,...
+                    ## Bridge left + intrusion + right
+                    new_subsequence = np.array([*left_congruent_flanking_sequence, *active_intrusion_pos, *right_congruent_flanking_sequence])
+                    replace_idx_tuple = tuple(np.arange(left_congruent_flanking_index, (right_congruent_flanking_index + 1)).tolist())
+                    for an_idx_to_remove in replace_idx_tuple:
+                        subsequences_to_remove.append(original_split_positions_arrays[an_idx_to_remove])
+                    subsequences_to_add.append(new_subsequence)
+                    subsequence_replace_dict[replace_idx_tuple] = (left_congruent_flanking_index, new_subsequence)
+                    final_intrusion_idxs.append(active_intrusion_pos)
+                    if debug_print:
+                        print(f'\tbridged new_subsequence: {new_subsequence}')
+                ## END for intrusion_idx in ignored_subsequence_idxs...
                 ## detect and prevent overlaps in the replacements, could also fix by finding and replacing iteratively?    
                 if debug_print:
                     print(f'subsequence_replace_dict: {subsequence_replace_dict}')
@@ -1065,9 +1005,12 @@ class SubsequencesPartitioningResult(ComputedResult):
             a_subsequence_first_order_diff = np.diff(a_subsequence, n=1) ## these diffs are AFTER the bin they should split on. A split on the last bin should always be neglected (right?)
             does_diff_jump_exceed_max = (np.abs(a_subsequence_first_order_diff) > max_jump_distance_cm)
             num_jumps_exceeding_max: int = np.count_nonzero(does_diff_jump_exceed_max)
-            _subseq_rel_jump_exceeds_max_diff_edge_idxs = np.where(does_diff_jump_exceed_max)[0] ## subsequence relative, these diff_edge indicies happen to align with the split indicies for regular positions
+            _subseq_rel_jump_exceeds_max_diff_edge_idxs = np.where(does_diff_jump_exceed_max)[0] ## subsequence-relative diff edges (between i and i+1)
+            ## Split after the jump so the destination bin starts the new fragment (diff_idx + 1)
+            _subseq_rel_split_idxs = _subseq_rel_jump_exceeds_max_diff_edge_idxs + 1
+            _subseq_rel_split_idxs = _subseq_rel_split_idxs[_subseq_rel_split_idxs < len(a_subsequence_flatindicies)]
             
-            abs_flatindicies_jump_exceeds_max = a_subsequence_flatindicies[_subseq_rel_jump_exceeds_max_diff_edge_idxs]
+            abs_flatindicies_jump_exceeds_max = a_subsequence_flatindicies[_subseq_rel_split_idxs]
             if debug_print:
                 print(f'abs_flatindicies_jump_exceeds_max: {abs_flatindicies_jump_exceeds_max}')
             
@@ -1203,69 +1146,38 @@ class SubsequencesPartitioningResult(ComputedResult):
     
 
 
-    @function_attributes(short_name=None, tags=['merge', 'intrusion', 'subsequences', 'ISSUE'], input_requires=[], output_provides=[], uses=[], used_by=['self.merge_over_ignored_intrusions'], creation_date='2024-12-04 04:43', related_items=[])
+    @classmethod
+    def _subsequence_travel_direction(cls, subseq) -> int:
+        """Net travel sign of a position subsequence: -1, 0, or +1. Ignores NaNs."""
+        arr = np.asarray(subseq, dtype=float)
+        finite = arr[np.isfinite(arr)]
+        if len(finite) < 2:
+            return 0
+        return int(np.sign(finite[-1] - finite[0]))
+
+
+    @function_attributes(short_name=None, tags=['merge', 'intrusion', 'subsequences'], input_requires=[], output_provides=[], uses=[], used_by=['self.merge_over_ignored_intrusions'], creation_date='2024-12-04 04:43', related_items=[])
     @classmethod
     def _compute_sequences_spanning_ignored_intrusions(cls, subsequence_list, continuous_sequence_lengths, target_subsequence_idx: int, max_ignore_bins: int = 2):
-        """ an "intrusion" refers to one or more time bins that interrupt a longer sequence that would be monotonic if the intrusions were removed.
+        """Return immediate left/right flanks around an intrusion at `target_subsequence_idx`.
 
-        We aren't just trying to arbitrarily merge short subsequences, we're only trying to bridge over short "intrusions"
-        
-        The quintessential example would be a straight ramp that is interrupted by a single point discontinuity intrusion.  
-
-        iNPUTS:
-            split_first_order_diff_arrays: a list of split arrays of 1st order differences.
-            continuous_sequence_lengths: a list of integer sequence lengths
-            longest_sequence_start_idx: int - the sequence start index to start the scan in each direction
-            max_ignore_bins: int = 2 - this means to disolve sequences shorter than 2 time bins if the sequences on each side are in the same direction
-
-            
-        Usage:
-        
-
+        `target_subsequence_idx` must be a short intrusion (`len <= max_ignore_bins`). Flanks are the
+        adjacent subsequences at idx±1 (not further neighbors).
         """
-        ## INPUTS: split_first_order_diff_arrays, continuous_sequence_lengths, max_ignore_bins
         assert len(subsequence_list) == len(continuous_sequence_lengths), f"subsequence_list and continuous_sequence_lengths must be the same length, got {len(subsequence_list)} vs {len(continuous_sequence_lengths)}"
-        
+
         left_congruent_flanking_index = None
         left_congruent_flanking_sequence = None
-
         right_congruent_flanking_index = None
-        right_congruent_flanking_sequence = None        
+        right_congruent_flanking_sequence = None
 
-        ## from the location of the longest sequence, check for flanking sequences <= `max_ignore_bins` in each direction.
-        # Scan left:
-        if is_valid_sequence_index(subsequence_list, (target_subsequence_idx-1)):
-            left_flanking_index = (target_subsequence_idx-1)
-            left_flanking_seq_length = continuous_sequence_lengths[left_flanking_index]
-            if (left_flanking_seq_length <= max_ignore_bins):
-                ## only if shorter than the max_ignore_bins can the left flanking sequence can be considered -- #TODO 2024-12-04 07:52: - [ ] Logic Error introduced here. I was imaginging a long sequence being potentially joined to shorter "intrusion" sequences, but this is the opposite of how I use the code. 
-                # left_congruent_flanking_sequence = [*subsequence_list[left_flanking_index]]
-                ### Need to look even FURTHER to the left to see the prev sequence:
-                if is_valid_sequence_index(subsequence_list, (target_subsequence_idx-2)):
-                    left_congruent_flanking_index = (target_subsequence_idx-2)
-                    ## Have a sequence to concatenate with
-                    left_congruent_flanking_sequence = [*subsequence_list[left_congruent_flanking_index], *subsequence_list[left_flanking_index]]
-                    # left_congruent_flanking_sequence.extend(subsequence_list[left_congruent_flanking_index])
-                    # left_congruent_flanking_sequence = subsequence_list[left_congruent_flanking_index]
-                # else:
-                #     left_congruent_flanking_index = left_flanking_index
-                
-        # Scan right:
-        if is_valid_sequence_index(subsequence_list, (target_subsequence_idx+1)):
-            right_flanking_index = (target_subsequence_idx+1)
-            right_flanking_seq_length = continuous_sequence_lengths[right_flanking_index]
-            if (right_flanking_seq_length <= max_ignore_bins):
-                # right_congruent_flanking_sequence = [*subsequence_list[right_flanking_index]]
-                
-                ### Need to look even FURTHER to the left to see the prev sequence:
-                if is_valid_sequence_index(subsequence_list, (target_subsequence_idx+2)):
-                    right_congruent_flanking_index = (target_subsequence_idx+2)
-                    ## Have a sequence to concatenate with
-                    right_congruent_flanking_sequence = [*subsequence_list[right_flanking_index], *subsequence_list[right_congruent_flanking_index]]
-                    # right_congruent_flanking_sequence.extend(subsequence_list[right_congruent_flanking_index])
-                    # right_congruent_flanking_sequence = subsequence_list[right_congruent_flanking_index]
-                # else:
-                #     right_congruent_flanking_index = right_flanking_index
+        if is_valid_sequence_index(subsequence_list, (target_subsequence_idx - 1)):
+            left_congruent_flanking_index = (target_subsequence_idx - 1)
+            left_congruent_flanking_sequence = list(subsequence_list[left_congruent_flanking_index])
+
+        if is_valid_sequence_index(subsequence_list, (target_subsequence_idx + 1)):
+            right_congruent_flanking_index = (target_subsequence_idx + 1)
+            right_congruent_flanking_sequence = list(subsequence_list[right_congruent_flanking_index])
 
         return (left_congruent_flanking_sequence, left_congruent_flanking_index), (right_congruent_flanking_sequence, right_congruent_flanking_index)
 
@@ -1340,20 +1252,8 @@ class SubsequencesPartitioningResult(ComputedResult):
         # flat_positions_list = deepcopy(partition_result.flat_positions.tolist())
         self.bridged_intrusion_bin_indicies = deepcopy(final_intrusion_values_list) # np.array([flat_positions_list.index(v) for v in final_intrusion_idxs])
         
-        if self.max_jump_distance_cm is not None:
-            # new_merged_split_positions_arrays, first_order_diff_value_exceeeding_jump_distance_indicies = self.new_simple_split_main_subsequence_on_max_jump_distance(debug_print=debug_print)
-            new_merged_split_positions_arrays, first_order_diff_value_exceeeding_jump_distance_indicies = self.enforce_max_jump_distance(max_jump_distance_cm=self.max_jump_distance_cm, debug_print=debug_print, enable_debug_step_logging=enable_debug_step_logging)
-    
-
-        else:
-            first_order_diff_value_exceeeding_jump_distance_indicies = None
-        
-        # ## since we don't store an analogue to `self.split_indicies` for the merged array, reverse derive them
-        # split_lengths = [len(v) for v in self.merged_split_positions_arrays]
-        # merged_split_indicies = np.cumsum(split_lengths)
-        # self.merged_split_position_flatindicies_arrays = NumpyHelpers.split(self.flat_position_indicies, merged_split_indicies) # exclude empty subsequences
-
-        ## Common Post-hoc:
+        # Do not call enforce_max_jump_distance here — it re-splits including bridged intrusion bins and undoes merges.
+        # Jump enforcement runs later via new_simple_split_main_subsequence_on_max_jump_distance after DF rebuild.
 
         ## Drop empty subsequences
         self.merged_split_positions_arrays = [x for x in self.merged_split_positions_arrays if len(x) > 0] ## only non-zero entries
@@ -1383,7 +1283,7 @@ class SubsequencesPartitioningResult(ComputedResult):
 
 
     @classmethod
-    def compute_shuffle_scalar_scores(cls, positions, pos_bin_edges, max_ignore_bins: int = 2, same_thresh: float = 6.0, max_jump_distance_cm: Optional[float] = 60.0) -> Tuple[Dict[str, float], NDArray]:
+    def compute_shuffle_scalar_scores(cls, positions, pos_bin_edges, max_ignore_bins: int = 2, same_thresh: float = 6.0, max_jump_distance_cm: Optional[float] = 60.0, decoder_track_length: Optional[float] = None) -> Tuple[Dict[str, float], NDArray]:
         """Shuffle-only partition scalars and main-sequence positions; never builds info DataFrames."""
         def _subfn_rank_merged_subsequences(merged_split_positions_arrays: List[NDArray], is_intrusion_flat: NDArray) -> Tuple[int, Dict[str, NDArray], NDArray]:
             """Rank merged subsequences with the same descending lexsort keys as `post_compute_subsequence_properties`, without pandas.
@@ -1404,6 +1304,7 @@ class SubsequencesPartitioningResult(ComputedResult):
 
             pos_bin_edges: NDArray = partition_result.pos_bin_edges
             same_thresh_cm: float = partition_result.same_thresh
+            a_decoder_track_length = partition_result.decoder_track_length
             for a_subsequence_idx, (a_subsequence, a_subsequence_is_non_intrusion_bin) in enumerate(zip(merged_split_positions_arrays, split_subsequence_is_non_intrusion_bin_list)):
                 _, value_equiv_group_idxs_list = cls.find_value_equiv_groups(a_subsequence, same_thresh_cm=same_thresh_cm)
                 a_subsequence_non_intrusion_pos = a_subsequence[a_subsequence_is_non_intrusion_bin]
@@ -1412,8 +1313,9 @@ class SubsequencesPartitioningResult(ComputedResult):
                 len_excluding_repeats[a_subsequence_idx] = len(value_equiv_group_idxs_list)
                 len_excluding_intrusions[a_subsequence_idx] = len(a_subsequence_non_intrusion_pos)
                 len_excluding_both[a_subsequence_idx] = len(non_intrusion_value_equiv_group_idxs_list)
-                total_distance_traveled[a_subsequence_idx] = SequenceScoringComputations.total_distance_traveled(a_subsequence)
-                track_coverage_score[a_subsequence_idx] = SequenceScoringComputations.track_coverage_score(a_subsequence, pos_bin_edges=pos_bin_edges)
+                ## Score bridged subsequences on non-intrusion positions only (exclude bridged outliers)
+                total_distance_traveled[a_subsequence_idx] = SequenceScoringComputations.total_distance_traveled(a_subsequence_non_intrusion_pos)
+                track_coverage_score[a_subsequence_idx] = SequenceScoringComputations.track_coverage_score(a_subsequence_non_intrusion_pos, pos_bin_edges=pos_bin_edges, a_decoder_track_length=a_decoder_track_length)
             ## END for a_subsequence_idx, (a_subsequence, a_subsequence_is_non_intrusion_bin) in enumerate(zip(merged_split_positions_arrays, split_subsequence_is_non_intrusion_bin_list))....
 
             col_arrays: Dict[str, NDArray] = {
@@ -1425,7 +1327,8 @@ class SubsequencesPartitioningResult(ComputedResult):
                 'total_distance_traveled': total_distance_traveled,
                 'track_coverage_score': track_coverage_score,
             }
-            rank_keys = [*partition_result.main_subsequence_ranking_columns, 'subsequence_idx', 'total_distance_traveled', 'track_coverage_score', 'subsequence_idx']
+            # subsequence_idx last so total_distance_traveled / track_coverage_score can break ties
+            rank_keys = [*partition_result.main_subsequence_ranking_columns, 'total_distance_traveled', 'track_coverage_score', 'subsequence_idx']
             lex_keys = tuple(-np.asarray(col_arrays[col]) for col in reversed(rank_keys))
             order = np.lexsort(lex_keys)
             main_rank = np.empty(n_subseq, dtype=np.int64)
@@ -1495,7 +1398,7 @@ class SubsequencesPartitioningResult(ComputedResult):
 
 
         positions = np.asarray(positions, dtype=float).copy() ## copy so the caller's MAP array is not aliased
-        partition_result = cls(flat_positions=positions, pos_bin_edges=pos_bin_edges, max_ignore_bins=max_ignore_bins, same_thresh=same_thresh, max_jump_distance_cm=max_jump_distance_cm, defer_initial_df_build=True)
+        partition_result = cls(flat_positions=positions, pos_bin_edges=pos_bin_edges, max_ignore_bins=max_ignore_bins, same_thresh=same_thresh, max_jump_distance_cm=max_jump_distance_cm, decoder_track_length=decoder_track_length, defer_initial_df_build=True)
         partition_result._partition_merge_and_enforce(debug_print=False, enable_debug_step_logging=False)
         return _subfn_main_rank_jump_split_scalars()
 
@@ -1540,7 +1443,7 @@ class SubsequencesPartitioningResult(ComputedResult):
         max_jump_distance_cm = self.max_jump_distance_cm
                 
         # computation_fn_kwargs_dict: passed to each score function to specify additional required parameters
-        _shared_score_kwargs = dict(same_thresh_cm=same_thresh_cm, max_ignore_bins=max_ignore_bins, same_thresh_fraction_of_track=None, max_jump_distance_cm=max_jump_distance_cm, pos_bin_edges=xbin_edges)
+        _shared_score_kwargs = dict(same_thresh_cm=same_thresh_cm, max_ignore_bins=max_ignore_bins, same_thresh_fraction_of_track=None, max_jump_distance_cm=max_jump_distance_cm, pos_bin_edges=xbin_edges, a_decoder_track_length=self.decoder_track_length)
         computation_fn_kwargs_dict = {
             'track_coverage_score': _shared_score_kwargs,
             'total_distance_traveled': _shared_score_kwargs,
@@ -1612,8 +1515,13 @@ class SubsequencesPartitioningResult(ComputedResult):
 
 
             all_subsequences_scores_dict[a_subsequence_idx] = {'subsequence_idx': a_subsequence_idx, 'len': total_num_values, 'len_excluding_repeats': total_num_values_excluding_repeats, 'len_excluding_intrusions': total_num_values_excluding_intrusions, 'len_excluding_both': total_num_values_excluding_intrusions_and_repeats, 'n_repeated_bins': total_num_repeated_values,
-                                                                'positions': a_subsequence.tolist()} 
-            all_subsequences_scores_dict[a_subsequence_idx] = all_subsequences_scores_dict[a_subsequence_idx] | {score_computation_name:computation_fn(a_subsequence, times=a_subsequence_times, **computation_fn_kwargs_dict.get(score_computation_name, {})) for score_computation_name, computation_fn in all_score_computations_fn_dict.items()}
+                                                                'positions': a_subsequence.tolist()}
+            ## Score coverage/distance on non-intrusion positions; other metrics keep full subsequence + times
+            _score_pos_for_fn = {
+                'track_coverage_score': a_subsequence_non_intrusion_pos,
+                'total_distance_traveled': a_subsequence_non_intrusion_pos,
+            }
+            all_subsequences_scores_dict[a_subsequence_idx] = all_subsequences_scores_dict[a_subsequence_idx] | {score_computation_name: computation_fn(_score_pos_for_fn.get(score_computation_name, a_subsequence), times=a_subsequence_times, **computation_fn_kwargs_dict.get(score_computation_name, {})) for score_computation_name, computation_fn in all_score_computations_fn_dict.items()}
 
         ## END for a_subseq....
 
@@ -1623,8 +1531,8 @@ class SubsequencesPartitioningResult(ComputedResult):
         ## once done with all scores for this decoder, have `_a_separate_decoder_new_scores_dict`:
         all_subsequences_scores_df = pd.DataFrame.from_dict(all_subsequences_scores_dict, orient='index')
         n_subseq: int = len(all_subsequences_scores_df)
-        ## add the ['main_rank', 'is_main'] columns via the same descending multi-key order as sort_values (subsequence_idx is unique so later keys never apply)
-        rank_keys = [*main_subsequence_ranking_columns, 'subsequence_idx', 'total_distance_traveled', 'track_coverage_score', 'subsequence_idx']
+        ## add the ['main_rank', 'is_main'] columns; subsequence_idx last so spatial tie-breakers apply
+        rank_keys = [*main_subsequence_ranking_columns, 'total_distance_traveled', 'track_coverage_score', 'subsequence_idx']
         lex_keys = tuple(-np.asarray(all_subsequences_scores_df[col].to_numpy()) for col in reversed(rank_keys))
         order = np.lexsort(lex_keys)
         main_rank = np.empty(n_subseq, dtype=np.int64)
@@ -2532,9 +2440,11 @@ class SequenceScoringComputations:
 
     @classmethod
     @function_attributes(short_name='track_coverage', tags=['score'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-13 07:07', related_items=[])
-    def track_coverage_score(cls, positions: NDArray, pos_bin_edges: NDArray=None, **kwargs) -> float:
+    def track_coverage_score(cls, positions: NDArray, pos_bin_edges: NDArray=None, a_decoder_track_length: Optional[float]=None, **kwargs) -> float:
         """
         Computes the track_coverage score, which measures the fraction of the track that the trajectory sweeps across
+
+        Denominator prefers decoder track length (Long≈214 / Short≈144) when provided so Short and Long are fair.
 
         Returns:
             float: The sweep score, ranging from 0 to 1.
@@ -2544,13 +2454,16 @@ class SequenceScoringComputations:
         finite_positions = finite_positions[np.isfinite(finite_positions)]
         if (len(finite_positions) < 2):
             return 0.0 # single bin sequences have no coverage
-        
-        possible_track_pos_bounds = [np.min(pos_bin_edges), np.max(pos_bin_edges)] # [37.0773897438341, 253.98616538463315]
-        possible_track_pos_range: float = np.abs(possible_track_pos_bounds[1] - possible_track_pos_bounds[0]) ## analagous to length
 
-        # sequence_pos_bounds = [np.min(positions), np.max(positions)] # [37.0773897438341, 253.98616538463315]
+        if a_decoder_track_length is None:
+            a_decoder_track_length = kwargs.get('decoder_track_length', None)
 
-        # sequence_start_end_pos = [positions[0], positions[1]]
+        if (a_decoder_track_length is not None) and np.isfinite(a_decoder_track_length) and (float(a_decoder_track_length) > 0):
+            possible_track_pos_range: float = float(a_decoder_track_length)
+        else:
+            possible_track_pos_bounds = [np.min(pos_bin_edges), np.max(pos_bin_edges)] # [37.0773897438341, 253.98616538463315]
+            possible_track_pos_range = np.abs(possible_track_pos_bounds[1] - possible_track_pos_bounds[0]) ## shared Long edges fallback
+
         sequence_pos_bounds = [np.min(finite_positions), np.max(finite_positions)]
 
         sequence_pos_range: float = sequence_pos_bounds[1] - sequence_pos_bounds[0]
@@ -2860,7 +2773,7 @@ class SubsequencesPartitioningResultScoringComputations:
         
         ## Begin computations:
         return SubsequencesPartitioningResult.init_from_positions_list(a_most_likely_positions_list, pos_bin_edges=pos_bin_edges, max_ignore_bins=max_ignore_bins, same_thresh=same_thresh_cm, max_jump_distance_cm=max_jump_distance_cm,
-                                                                                                                    flat_time_window_centers=np.asarray(time_window_centers, dtype=float).copy(), flat_time_window_edges=np.asarray(time_bin_edges, dtype=float).copy(), enable_debug_step_logging=enable_debug_step_logging)
+                                                                                                                    flat_time_window_centers=np.asarray(time_window_centers, dtype=float).copy(), flat_time_window_edges=np.asarray(time_bin_edges, dtype=float).copy(), decoder_track_length=a_decoder_track_length, enable_debug_step_logging=enable_debug_step_logging)
     
     
     @function_attributes(short_name=None, tags=['bin_wise', 'all_fns'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-25 22:15', related_items=[])
@@ -3084,8 +2997,16 @@ class HeuristicReplayScoring:
         """
         time_window_centers, bin_by_bin_jump_distance = cls.bin_by_bin_position_jump_distance(a_result=a_result, an_epoch_idx=an_epoch_idx, a_decoder_track_length=a_decoder_track_length)
         assert len(time_window_centers) == len(bin_by_bin_jump_distance)
-        ## convert to cm/sec (jump velocity) by dividing by time_bin_size
-        bin_by_bin_jump_velocity = deepcopy(bin_by_bin_jump_distance) / time_window_centers
+        ## convert to cm/sec (jump velocity) by dividing by bin duration Δt, not absolute time_window_centers
+        if len(time_window_centers) >= 2:
+            dt = np.diff(time_window_centers, n=1, prepend=time_window_centers[0])
+            ## first prepended dt is 0; use median positive Δt as a stand-in so velocity[0] stays defined
+            positive_dt = dt[dt > 0]
+            fill_dt = float(np.nanmedian(positive_dt)) if len(positive_dt) > 0 else 1.0
+            dt = np.where(dt > 0, dt, fill_dt)
+            bin_by_bin_jump_velocity = deepcopy(bin_by_bin_jump_distance) / dt
+        else:
+            bin_by_bin_jump_velocity = deepcopy(bin_by_bin_jump_distance)
         
         return time_window_centers, bin_by_bin_jump_velocity
 
@@ -3129,10 +3050,15 @@ class HeuristicReplayScoring:
         # avg_bin_by_bin_jump_distance: float = np.nanmean(bin_by_bin_jump_distance) # avg jump distance
 
 
-        ## convert to cm/sec (jump velocity) by dividing by time_bin_size
-        # bin_by_bin_jump_velocity = deepcopy(bin_by_bin_jump_distance) / time_window_centers
+        ## Exclude synthetic prepended zero jump at index 0 from large-jump counting
         is_included_idx = (np.abs(bin_by_bin_jump_distance) <= max_position_jump_distance_cm)
+        if len(is_included_idx) > 0:
+            is_included_idx = is_included_idx.copy()
+            is_included_idx[0] = False ## first entry is not a real transition
         does_transition_exceeds_max_jump_distance = np.logical_not(is_included_idx)
+        if len(does_transition_exceeds_max_jump_distance) > 0:
+            does_transition_exceeds_max_jump_distance = does_transition_exceeds_max_jump_distance.copy()
+            does_transition_exceeds_max_jump_distance[0] = False ## do not count prepend as a large jump either
         # is_included_idx = np.logical_not(does_transition_exceeds_max_jump_distance)
 
         # max_excluded_bin_ratio
@@ -3154,20 +3080,19 @@ class HeuristicReplayScoring:
         """ 
         """
         an_epoch_n_tbins: int = a_result.nbins[an_epoch_idx]
+        if an_epoch_n_tbins <= 1:
+            return 1.0
         time_window_centers_arr_masked, arr_masked = cls.bin_by_bin_large_jump_filtering_fn(a_result=a_result, an_epoch_idx=an_epoch_idx, a_decoder_track_length=a_decoder_track_length)
-        # n_valid_time_bins = len(time_window_centers_arr_masked)
-        # if n_valid_time_bins < 2:
-        #     return np.inf ## return infinity, meaning it never resolves position appropriately
-        ## extract the mask
+        ## extract the mask; index 0 is the synthetic prepend and is excluded from both counts
         does_transition_exceeds_max_jump_distance = deepcopy(time_window_centers_arr_masked.mask)
         is_included_idx = np.logical_not(does_transition_exceeds_max_jump_distance)
         
-        total_n_valid_tbin_transitions: int = np.sum(is_included_idx)
-        total_n_bad_tbins: int = np.sum(does_transition_exceeds_max_jump_distance)
-        
-        assert an_epoch_n_tbins == (total_n_valid_tbin_transitions + total_n_bad_tbins), f"an_epoch_n_tbins: {an_epoch_n_tbins} should equal = (total_n_valid_tbin_transitions: {total_n_valid_tbin_transitions} + total_n_bad_tbins: {total_n_bad_tbins})"
+        total_n_valid_tbin_transitions: int = int(np.sum(is_included_idx))
+        total_n_bad_tbins: int = int(np.sum(does_transition_exceeds_max_jump_distance))
+        n_real_transitions: int = an_epoch_n_tbins - 1
+        assert n_real_transitions == (total_n_valid_tbin_transitions + total_n_bad_tbins), f"n_real_transitions: {n_real_transitions} should equal = (total_n_valid_tbin_transitions: {total_n_valid_tbin_transitions} + total_n_bad_tbins: {total_n_bad_tbins})"
 
-        ratio_valid_tbins: float = float(total_n_valid_tbin_transitions) / float(an_epoch_n_tbins) # a valid between 0.0-1.0
+        ratio_valid_tbins: float = float(total_n_valid_tbin_transitions) / float(n_real_transitions) # a valid between 0.0-1.0
         return ratio_valid_tbins
 
 
@@ -3224,12 +3149,14 @@ class HeuristicReplayScoring:
         is_higher_than_diffusion = (cum_pos_bin_probs > uniform_diffusion_cumprob_all_bins)
 
         num_bins_higher_than_diffusion_across_time: int = np.nansum(is_higher_than_diffusion, axis=0)
-        ratio_bins_higher_than_diffusion_across_time: float = (float(num_bins_higher_than_diffusion_across_time) / float(n_pos_bins))
+        ## Shared Long grid: scale denominator by decoder track length vs Long reference so Short full-coverage ≈ 1
+        long_track_length_ref: float = 214.0
+        if (a_decoder_track_length is not None) and np.isfinite(a_decoder_track_length) and (float(a_decoder_track_length) > 0):
+            effective_n_pos_bins: float = float(n_pos_bins) * (float(a_decoder_track_length) / long_track_length_ref)
+        else:
+            effective_n_pos_bins = float(n_pos_bins)
+        ratio_bins_higher_than_diffusion_across_time: float = (float(num_bins_higher_than_diffusion_across_time) / max(1.0, effective_n_pos_bins))
 
-        ## convert to a score
-        # track_portion_covered: float = (ratio_bins_higher_than_diffusion_across_time * float(a_decoder_track_length))
-        # normalize by the track length (long v. short) to allow fair comparison of the two (so the long track decoders don't intrinsically have a larger score).
-        # total_first_order_change_score = total_first_order_change_score / a_decoder_track_length
         ## RETURNS: ratio_bins_higher_than_diffusion_across_time
         return ratio_bins_higher_than_diffusion_across_time
 
@@ -3247,10 +3174,10 @@ class HeuristicReplayScoring:
             ## only a single bin, return 0.0 (perfect, no jumps)
             return 0.0
         else:
-            # compute the 1st-order diff of all positions
+            # compute the 1st-order diff of all positions; exclude synthetic prepended zero jump
             a_first_order_diff = np.diff(a_most_likely_positions_list, n=1, prepend=[a_most_likely_positions_list[0]]) # bin_by_bin_jump_distance
-            ## average jump distance 
-            avg_bin_by_bin_jump_distance: float = np.nanmean(np.abs(a_first_order_diff)) # avg jump distance
+            ## average jump distance over N-1 real transitions
+            avg_bin_by_bin_jump_distance: float = np.nanmean(np.abs(a_first_order_diff[1:])) # avg jump distance
 
             #TODO 2024-11-26 19:56: - [ ] return the non-normalized (non-score/absolute) version
             return avg_bin_by_bin_jump_distance
@@ -3544,12 +3471,14 @@ class HeuristicReplayScoring:
     @function_attributes(short_name=None, tags=['heuristic', 'shuffle', 'computation'], input_requires=[], output_provides=[],
                          uses=['SubsequencesPartitioningResult.compute_shuffle_scalar_scores', 'forwardicity_score', 'cls.build_all_bin_wise_computation_fn_dict'],
                          used_by=['DecodedEpochScoreShuffle._shuffle_and_decode_scores'], creation_date='2026-10-26 00:00', related_items=[])
-    def compute_shuffle_heuristic_score_arrays(cls, track_templates: TrackTemplates, a_decoded_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult], use_bin_units_instead_of_realworld: bool=False, max_ignore_bins: float=2, same_thresh_cm: float=6.0, max_jump_distance_cm: float=60.0, decoder_names: Optional[List[str]]=None, **kwargs) -> Dict[str, NDArray]:
+    def compute_shuffle_heuristic_score_arrays(cls, track_templates: TrackTemplates, a_decoded_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult], use_bin_units_instead_of_realworld: bool=False, max_ignore_bins: float=2, same_thresh_cm: Optional[float]=None, max_jump_distance_cm: float=60.0, decoder_names: Optional[List[str]]=None, **kwargs) -> Dict[str, NDArray]:
         """Lightweight heuristic scores for shuffle nulls.
 
         Uses the shuffle-only scalar path (no info DataFrames) per decoder×epoch, then MAP-only scores (`travel`, `coverage`, `avg_jump_cm`).
 
         Does **not** call `compute_pho_heuristic_replay_scores` (OLDER re-partition path) and does **not** mutate `filter_epochs`.
+
+        `same_thresh_cm` defaults to 5% of Long track length (≈10.7), matching real pipeline heuristic scoring.
 
         Returns:
             Dict[metric_name, NDArray] with each array shape (n_epochs, n_decoders).
@@ -3561,6 +3490,9 @@ class HeuristicReplayScoring:
         n_epochs: int = int(first_result.num_filter_epochs)
         xbin_edges: NDArray = deepcopy(track_templates.long_LR_decoder.xbin)
         decoder_track_length_dict = track_templates.get_track_length_dict()
+        if same_thresh_cm is None:
+            ## Align with real pipeline: 5% of Long track length (≈10.7), not the old default 6.0
+            same_thresh_cm = float(0.05 * float(decoder_track_length_dict.get('long_LR', 214.0)))
 
         partition_score_fn_dict = SubsequencesPartitioningResultScoringComputations.build_all_bin_wise_subseq_partitioning_computation_fn_dict()
         partition_metric_names: List[str] = [name for name in partition_score_fn_dict.keys() if name not in FORWARDICITY_SCORE_COL_NAMES]
@@ -3579,7 +3511,7 @@ class HeuristicReplayScoring:
             most_likely_decoder_direction: Optional[float] = DECODER_DIRECTION_MAP.get(a_name)
             for an_epoch_idx in np.arange(n_this_epochs):
                 try:
-                    scalar_dict, main_positions = SubsequencesPartitioningResult.compute_shuffle_scalar_scores(a_result.most_likely_positions_list[int(an_epoch_idx)], pos_bin_edges=xbin_edges, max_ignore_bins=int(max_ignore_bins), same_thresh=same_thresh_cm, max_jump_distance_cm=max_jump_distance_cm)
+                    scalar_dict, main_positions = SubsequencesPartitioningResult.compute_shuffle_scalar_scores(a_result.most_likely_positions_list[int(an_epoch_idx)], pos_bin_edges=xbin_edges, max_ignore_bins=int(max_ignore_bins), same_thresh=same_thresh_cm, max_jump_distance_cm=max_jump_distance_cm, decoder_track_length=a_decoder_track_length)
                 except Exception:
                     continue
                 for score_computation_name in partition_metric_names:

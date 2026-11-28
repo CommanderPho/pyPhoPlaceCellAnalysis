@@ -488,6 +488,97 @@ class TestNaNTolerantHeuristicSequencePartitioning(unittest.TestCase):
         self.assertFalse(np.any(changes_df['direction'].to_numpy() == np.iinfo(np.int32).min))
 
 
+class TestHeuristicBugFixes(unittest.TestCase):
+    """Focused regressions for the concrete heuristic partitioning/scoring bug fixes."""
+
+
+    def setUp(self):
+        self.pos_bin_edges = np.array([37.0774, 40.8828, 44.6882, 48.4936, 52.2991, 56.1045, 59.9099, 63.7153, 67.5207, 71.3261, 75.1316, 78.937, 82.7424, 86.5478, 90.3532, 94.1586, 97.9641, 101.769, 105.575, 109.38, 113.186, 116.991, 120.797, 124.602, 128.407, 132.213, 136.018, 139.824, 143.629, 147.434, 151.24, 155.045, 158.851, 162.656, 166.462, 170.267, 174.072, 177.878, 181.683, 185.489, 189.294, 193.099, 196.905, 200.71, 204.516, 208.321, 212.127, 215.932, 219.737, 223.543, 227.348, 231.154, 234.959, 238.764, 242.57, 246.375, 250.181, 253.986])
+        self.same_thresh = 10.7
+        self.max_ignore_bins = 2
+        self.max_jump_distance_cm = 60.0
+        self.long_track_length = 214.0
+        self.short_track_length = 144.0
+
+
+    def test_subthreshold_reverse_jitter_does_not_split(self):
+        ## Forward sweep with a small reverse jitter (< same_thresh) mid-sequence
+        positions = np.array([100.0, 110.0, 120.0, 115.0, 125.0, 135.0], dtype=float)  # -5 cm reverse
+        result = SubsequencesPartitioningResult.init_from_positions_list(a_most_likely_positions_list=positions, pos_bin_edges=self.pos_bin_edges, max_ignore_bins=self.max_ignore_bins, same_thresh=self.same_thresh, max_jump_distance_cm=self.max_jump_distance_cm)
+        self.assertEqual(len(result.split_positions_arrays), 1)
+
+
+    def test_above_threshold_turnaround_does_split(self):
+        ## Real turnaround: reverse by more than same_thresh
+        positions = np.array([100.0, 120.0, 140.0, 120.0, 100.0, 80.0], dtype=float)  # -20 cm reverse
+        result = SubsequencesPartitioningResult.init_from_positions_list(a_most_likely_positions_list=positions, pos_bin_edges=self.pos_bin_edges, max_ignore_bins=self.max_ignore_bins, same_thresh=self.same_thresh, max_jump_distance_cm=self.max_jump_distance_cm)
+        self.assertGreaterEqual(len(result.split_positions_arrays), 2)
+
+
+    def test_find_value_equiv_groups_anchors_plateau_start(self):
+        ## Smooth +8 cm/bin sweep: anchoring initial_v yields multiple groups (old bug collapsed to 1)
+        smooth_sweep = np.array([100.0, 108.0, 116.0, 124.0, 132.0, 140.0], dtype=float)
+        groups_sweep, _ = SubsequencesPartitioningResult.find_value_equiv_groups(smooth_sweep, same_thresh_cm=self.same_thresh)
+        self.assertGreater(len(groups_sweep), 1)
+        self.assertGreaterEqual(len(groups_sweep), 3)
+
+        ## Flat plateau within same_thresh collapses to one group
+        plateau = np.array([100.0, 102.0, 101.0, 103.0, 100.5], dtype=float)
+        groups_plateau, _ = SubsequencesPartitioningResult.find_value_equiv_groups(plateau, same_thresh_cm=self.same_thresh)
+        self.assertEqual(len(groups_plateau), 1)
+
+
+    def test_symmetric_same_direction_intrusion_bridges(self):
+        ## 5 + 1 + 5 same-direction flanks with steps > same_thresh so direction is established
+        left = np.array([100.0, 120.0, 140.0, 160.0, 180.0])
+        intrusion = np.array([40.0])  # reverse into, then forward out → own 1-bin subsequence
+        right = np.array([200.0, 220.0, 240.0, 250.0, 251.0])  # continue +; bridge 180→200 = 20 < max_jump
+        positions = np.concatenate([left, intrusion, right])
+        result = SubsequencesPartitioningResult.init_from_positions_list(a_most_likely_positions_list=positions, pos_bin_edges=self.pos_bin_edges, max_ignore_bins=self.max_ignore_bins, same_thresh=self.same_thresh, max_jump_distance_cm=self.max_jump_distance_cm)
+        self.assertGreaterEqual(len(result.split_positions_arrays), 3)
+        ## After merge, expect a single bridged subsequence containing the intrusion bin
+        self.assertEqual(len(result.merged_split_positions_arrays), 1)
+        self.assertEqual(len(result.merged_split_positions_arrays[0]), len(positions))
+
+
+    def test_opposite_direction_flanks_do_not_merge(self):
+        ## Same lengths but opposite travel direction on the two sides
+        left = np.array([100.0, 120.0, 140.0, 160.0, 180.0])   # +
+        intrusion = np.array([40.0])
+        right = np.array([160.0, 140.0, 120.0, 100.0, 80.0])  # -
+        positions = np.concatenate([left, intrusion, right])
+        result = SubsequencesPartitioningResult.init_from_positions_list(a_most_likely_positions_list=positions, pos_bin_edges=self.pos_bin_edges, max_ignore_bins=self.max_ignore_bins, same_thresh=self.same_thresh, max_jump_distance_cm=self.max_jump_distance_cm)
+        ## Should remain unmerged (at least 3 fragments: left, intrusion, right)
+        self.assertGreaterEqual(len(result.merged_split_positions_arrays), 3)
+
+
+    def test_bridged_outlier_does_not_inflate_mseq_tcov_dtrav(self):
+        ## Smooth forward sequence with a far outlier intrusion that is bridged
+        left = np.array([100.0, 120.0, 140.0, 160.0, 180.0])
+        intrusion = np.array([40.0])
+        right = np.array([200.0, 220.0, 240.0, 250.0, 251.0])
+        positions = np.concatenate([left, intrusion, right])
+        scalar_dict, _ = SubsequencesPartitioningResult.compute_shuffle_scalar_scores(positions, pos_bin_edges=self.pos_bin_edges, max_ignore_bins=self.max_ignore_bins, same_thresh=self.same_thresh, max_jump_distance_cm=self.max_jump_distance_cm, decoder_track_length=self.long_track_length)
+        non_intrusion = np.concatenate([left, right])
+        expected_dtrav = SequenceScoringComputations.total_distance_traveled(non_intrusion)
+        expected_tcov = SequenceScoringComputations.track_coverage_score(non_intrusion, pos_bin_edges=self.pos_bin_edges, a_decoder_track_length=self.long_track_length)
+        self.assertAlmostEqual(float(scalar_dict['mseq_dtrav']), float(expected_dtrav), places=5)
+        self.assertAlmostEqual(float(scalar_dict['mseq_tcov']), float(expected_tcov), places=5)
+        ## Full-sequence dtrav is inflated by the detour through the outlier
+        inflated_dtrav = SequenceScoringComputations.total_distance_traveled(positions)
+        self.assertLess(float(scalar_dict['mseq_dtrav']), float(inflated_dtrav))
+
+
+    def test_short_vs_long_track_coverage_normalized_by_track_length(self):
+        ## Full Long traversal ≈ track length 214; full Short ≈ 144
+        long_positions = np.linspace(40.0, 40.0 + self.long_track_length, 12)
+        short_positions = np.linspace(40.0, 40.0 + self.short_track_length, 12)
+        long_tcov = SequenceScoringComputations.track_coverage_score(long_positions, pos_bin_edges=self.pos_bin_edges, a_decoder_track_length=self.long_track_length)
+        short_tcov = SequenceScoringComputations.track_coverage_score(short_positions, pos_bin_edges=self.pos_bin_edges, a_decoder_track_length=self.short_track_length)
+        self.assertAlmostEqual(long_tcov, 1.0, places=2)
+        self.assertAlmostEqual(short_tcov, 1.0, places=2)
+
+
 if __name__ == '__main__':
     unittest.main()
 
