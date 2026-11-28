@@ -495,6 +495,38 @@ class wcorr_shuffle_analysis_Parameters(HDF_SerializationMixin, AttrsBasedClassH
 epoch_score_shuffle_analysis_Parameters = wcorr_shuffle_analysis_Parameters
 
 @define(slots=False, eq=False, repr=False)
+class pbe_flickering_analysis_Parameters(HDF_SerializationMixin, AttrsBasedClassHelperMixin, BaseGlobalComputationParameters):
+    """ Parameters for within-PBE Long/Short context flickering analysis (Dragoi 2024 + pause/resume). """
+    decoding_time_bin_size: float = serialized_attribute_field(default=0.025)
+    conf_thresh: float = serialized_attribute_field(default=0.65)
+    strict_conf_thresh: float = serialized_attribute_field(default=0.75)
+    min_num_unique_active_neurons_per_time_bin: int = serialized_attribute_field(default=2)
+    min_num_spikes_per_bin: int = serialized_attribute_field(default=1)
+    min_valid_bins: int = serialized_attribute_field(default=4)
+    num_within_shuffles: int = serialized_attribute_field(default=500)
+    num_pool_shuffles: int = serialized_attribute_field(default=500)
+    num_neuron_id_shuffles: int = serialized_attribute_field(default=0)
+    include_laps_control: bool = serialized_attribute_field(default=True)
+    drop_previous_result_and_compute_fresh: bool = serialized_attribute_field(default=False)
+    ## PARAMS - these are class properties
+    decoding_time_bin_size_PARAM = param.Number(default=0.025, doc='decoding_time_bin_size param', label='decoding_time_bin_size')
+    conf_thresh_PARAM = param.Number(default=0.65, doc='conf_thresh param', label='conf_thresh')
+    strict_conf_thresh_PARAM = param.Number(default=0.75, doc='strict_conf_thresh param', label='strict_conf_thresh')
+    min_num_unique_active_neurons_per_time_bin_PARAM = param.Integer(default=2, doc='min_num_unique_active_neurons_per_time_bin param', label='min_num_unique_active_neurons_per_time_bin')
+    min_num_spikes_per_bin_PARAM = param.Integer(default=1, doc='min_num_spikes_per_bin param', label='min_num_spikes_per_bin')
+    min_valid_bins_PARAM = param.Integer(default=4, doc='min_valid_bins param', label='min_valid_bins')
+    num_within_shuffles_PARAM = param.Integer(default=500, doc='num_within_shuffles param', label='num_within_shuffles')
+    num_pool_shuffles_PARAM = param.Integer(default=500, doc='num_pool_shuffles param', label='num_pool_shuffles')
+    num_neuron_id_shuffles_PARAM = param.Integer(default=0, doc='num_neuron_id_shuffles param', label='num_neuron_id_shuffles')
+    include_laps_control_PARAM = param.Boolean(default=True, doc='include_laps_control param', label='include_laps_control')
+    drop_previous_result_and_compute_fresh_PARAM = param.Boolean(default=False, doc='drop_previous_result_and_compute_fresh param', label='drop_previous_result_and_compute_fresh')
+    # HDFMixin Conformances ______________________________________________________________________________________________ #
+    def to_hdf(self, file_path, key: str, **kwargs):
+        """ Saves the object to key in the hdf5 file specified by file_path"""
+        super().to_hdf(file_path, key=key, **kwargs)
+
+
+@define(slots=False, eq=False, repr=False)
 class non_PBE_epochs_results_Parameters(HDF_SerializationMixin, AttrsBasedClassHelperMixin, BaseGlobalComputationParameters):
     """ Docstring for non_PBE_epochs_results_Parameters. 
     """
@@ -628,6 +660,7 @@ class ComputationKWargParameters(BaseContainerAttrsParameterizedParametersToDict
     long_short_rate_remapping: long_short_rate_remapping_Parameters = serialized_field(default=Factory(long_short_rate_remapping_Parameters))	
     long_short_inst_spike_rate_groups: long_short_inst_spike_rate_groups_Parameters = serialized_field(default=Factory(long_short_inst_spike_rate_groups_Parameters))	
     wcorr_shuffle_analysis: wcorr_shuffle_analysis_Parameters = serialized_field(default=Factory(wcorr_shuffle_analysis_Parameters))	
+    pbe_flickering_analysis: pbe_flickering_analysis_Parameters = serialized_field(default=Factory(pbe_flickering_analysis_Parameters))
     non_pbe_epochs_results: non_PBE_epochs_results_Parameters = serialized_field(default=Factory(non_PBE_epochs_results_Parameters))    
     position_decoding: position_decoding_Parameters = serialized_field(default=Factory(position_decoding_Parameters))	
     perform_specific_epochs_decoding: perform_specific_epochs_decoding_Parameters = serialized_field(default=Factory(perform_specific_epochs_decoding_Parameters))	

@@ -3535,6 +3535,8 @@ def _new_process_csv_files(parsed_csv_files_df: pd.DataFrame, t_delta_dict: Dict
                                                             'fig5_occupancy': {},
                                                             'train_test_pos_err': {},
                                                             'train_test_pos_err_agg': {},
+                                                            'pbe_flickering_df': {},
+                                                            'pbe_flickering_bouts_df': {},
                                            }
     final_sessions_loaded_extra_dfs: Dict[str, pd.DataFrame] = {'ripple_EpochScoreShuffle_df': None,
                                                                 'ripple_WCorrShuffle_df': None,
@@ -3542,6 +3544,8 @@ def _new_process_csv_files(parsed_csv_files_df: pd.DataFrame, t_delta_dict: Dict
                                                                 'fig5_occupancy': None,
                                                                 'train_test_pos_err': None,
                                                                 'train_test_pos_err_agg': None,
+                                                                'pbe_flickering_df': None,
+                                                                'pbe_flickering_bouts_df': None,
                                       }
     
     basic_marginals_file_types = ['laps_marginals_df', 'ripple_marginals_df', 'laps_time_bin_marginals_df', 'ripple_time_bin_marginals_df',]
@@ -3667,6 +3671,11 @@ def _new_process_csv_files(parsed_csv_files_df: pd.DataFrame, t_delta_dict: Dict
                 _curr_dict = final_sessions_loaded_extra_df_dict[file_type]
                 _tt_time_key = 't' if (file_type == 'train_test_pos_err') else None
                 _is_file_valid = _subfn_new_df_process_and_load_exported_file(path, _curr_dict, session_name, curr_session_t_delta, time_key=_tt_time_key, **additional_columns_dict)
+                final_sessions_loaded_extra_df_dict[file_type] = _curr_dict
+            elif file_type in ('pbe_flickering_df', 'pbe_flickering_bouts_df'):
+                ## within-PBE context flickering epoch/bout metrics; time_key='start' for delta_aligned_start_t / pre_post_delta_category
+                _curr_dict = final_sessions_loaded_extra_df_dict[file_type]
+                _is_file_valid = _subfn_new_df_process_and_load_exported_file(path, _curr_dict, session_name, curr_session_t_delta, time_key='start', **additional_columns_dict)
                 final_sessions_loaded_extra_df_dict[file_type] = _curr_dict
             elif file_type == 'FAT':
                 # 2025-03-01 - a bulk export .CSV format where all results are stacked vertically and fields duplicated as needed (no attentioned paid to disk
@@ -5086,6 +5095,155 @@ class AcrossSessionHelpers:
         n_matched: int = int(fat_df.loc[left_df.index[is_pbe_row], transfer_col_names[0]].notna().sum())
         if debug_print:
             print(f'merge_epoch_score_shuffle_onto_fat_df: matched {n_matched}/{n_pbe_rows} PBE/ripple rows using left start col "{left_join_col}" and join keys {join_keys}; added {len(transfer_col_names)} columns.')
+        return fat_df
+
+
+    @function_attributes(short_name=None, tags=['flickering', 'FAT', 'merge', 'PBE'], input_requires=[], output_provides=[], uses=['ExportValueNameCleaner'], used_by=[], creation_date='2026-11-27 17:40', related_items=['merge_epoch_score_shuffle_onto_fat_df'])
+    @classmethod
+    def merge_pbe_flickering_onto_fat_df(cls, fat_df: pd.DataFrame, pbe_flickering_df: Optional[pd.DataFrame], preferred_source_tbin: float = 0.025, start_tol_sec: float = 0.05, debug_print: bool = True) -> pd.DataFrame:
+        """Left-merge PBE flickering epoch metrics onto FAT rows by session/replay/start, with cross-tbin asof fallback.
+
+        Exact match on `(session_name, custom_replay_name, time_bin_size, start)` when the FAT row's tbin exists in
+        `pbe_flickering_df`. Otherwise nearest-start asof merge from `preferred_source_tbin` (default 0.025) so 25 ms
+        flickering labels annotate 75 ms Figure-4 PBE rows without changing FAT row counts.
+        """
+        if (fat_df is None) or (len(fat_df) == 0) or (pbe_flickering_df is None) or (len(pbe_flickering_df) == 0):
+            return fat_df
+
+        fat_df = deepcopy(fat_df)
+        n_rows_before: int = len(fat_df)
+        right_df: pd.DataFrame = deepcopy(pbe_flickering_df)
+        if 'epoch_type' in right_df.columns:
+            right_df = right_df[right_df['epoch_type'].astype(str).str.lower().isin(['pbe', 'ripple'])].copy()
+        if len(right_df) == 0:
+            if debug_print:
+                print('WARN: merge_pbe_flickering_onto_fat_df: no pbe/ripple rows in pbe_flickering_df; skipping.')
+            return fat_df
+
+        reserved_join_cols = {'session_name', 'custom_replay_name', 'time_bin_size', 'start', 'stop', 'epoch_type', 'label', 'epoch_idx',
+                              'delta_aligned_start_t', 'pre_post_delta_category', 'session', 'animal', 'exper_name', 'day_date'}
+        transfer_col_names: List[str] = [c for c in right_df.columns if (c not in reserved_join_cols) and (c not in fat_df.columns) and (not str(c).startswith('Unnamed'))]
+        if len(transfer_col_names) == 0:
+            if debug_print:
+                print('WARN: merge_pbe_flickering_onto_fat_df: no new flickering transfer columns to add; skipping.')
+            return fat_df
+
+        left_df: pd.DataFrame = deepcopy(fat_df)
+        for a_df in (left_df, right_df):
+            if 'session_name' in a_df.columns:
+                a_df['session_name'] = a_df['session_name'].astype(str).str.replace('_', '-')
+            if 'custom_replay_name' in a_df.columns:
+                a_df['custom_replay_name'] = a_df['custom_replay_name'].astype(str)
+                a_df['custom_replay_name'] = ExportValueNameCleaner.clean_all(name_list=a_df['custom_replay_name'].to_list(), return_only_unique=False)
+                a_df['custom_replay_name'] = a_df['custom_replay_name'].str.replace('_', '-')
+            if 'time_bin_size' in a_df.columns:
+                a_df['time_bin_size'] = pd.to_numeric(a_df['time_bin_size'], errors='coerce')
+        ## END for a_df in (left_df, right_df)....
+
+        left_join_col: Optional[str] = None
+        for a_candidate_col in ('parent_epoch_start_t', 'epoch_start_t', 'ripple_start_t', 'start'):
+            if a_candidate_col in left_df.columns:
+                left_join_col = a_candidate_col
+                break
+        ## END for a_candidate_col in ('parent_epoch_start_t', 'epoch_start_t', 'ripple_start_t', 'start')....
+        if left_join_col is None:
+            if debug_print:
+                print('WARN: merge_pbe_flickering_onto_fat_df: FAT_df missing epoch-start join column; skipping.')
+            return fat_df
+        if 'start' not in right_df.columns:
+            if debug_print:
+                print('WARN: merge_pbe_flickering_onto_fat_df: pbe_flickering_df missing "start"; skipping.')
+            return fat_df
+
+        left_df['_flicker_join_start'] = pd.to_numeric(left_df[left_join_col], errors='coerce')
+        right_df['_flicker_join_start'] = pd.to_numeric(right_df['start'], errors='coerce')
+
+        if 'known_named_decoding_epochs_type' in left_df.columns:
+            is_pbe_row = left_df['known_named_decoding_epochs_type'].isin(['pbe', 'ripple'])
+        else:
+            if debug_print:
+                print('WARN: merge_pbe_flickering_onto_fat_df: FAT_df missing known_named_decoding_epochs_type; merging all rows.')
+            is_pbe_row = pd.Series(True, index=left_df.index)
+
+        n_pbe_rows: int = int(is_pbe_row.sum())
+        if n_pbe_rows == 0:
+            if debug_print:
+                print('WARN: merge_pbe_flickering_onto_fat_df: no PBE/ripple rows on FAT_df; skipping.')
+            return fat_df
+
+        for a_col in transfer_col_names:
+            fat_df[a_col] = np.nan
+        ## END for a_col in transfer_col_names....
+
+        left_pbe: pd.DataFrame = left_df.loc[is_pbe_row].copy()
+        left_pbe = left_pbe.reset_index(names='_orig_index')
+        merged_values = pd.DataFrame(index=left_pbe.index, columns=transfer_col_names, data=np.nan)
+        matched_exact = pd.Series(False, index=left_pbe.index)
+
+        exact_join_keys: List[str] = ['_flicker_join_start']
+        for a_key in ('session_name', 'custom_replay_name', 'time_bin_size'):
+            if (a_key in left_pbe.columns) and (a_key in right_df.columns):
+                exact_join_keys.append(a_key)
+        ## END for a_key in ('session_name', 'custom_replay_name', 'time_bin_size')....
+
+        right_exact = right_df[exact_join_keys + transfer_col_names].drop_duplicates(subset=exact_join_keys, keep='first')
+        exact_merged = left_pbe[exact_join_keys + ['_orig_index']].merge(right_exact, how='left', on=exact_join_keys)
+        if len(exact_merged) != len(left_pbe):
+            raise ValueError(f'merge_pbe_flickering_onto_fat_df: exact left-merge changed PBE row count ({len(left_pbe)} -> {len(exact_merged)}); refusing to apply')
+        exact_hit = exact_merged[transfer_col_names[0]].notna()
+        matched_exact.loc[exact_hit.to_numpy()] = True
+        merged_values.loc[exact_hit.to_numpy(), transfer_col_names] = exact_merged.loc[exact_hit.to_numpy(), transfer_col_names].to_numpy()
+
+        # Cross-tbin asof fallback from preferred_source_tbin for unmatched rows
+        unmatched = ~matched_exact
+        n_unmatched: int = int(unmatched.sum())
+        n_asof_matched: int = 0
+        if n_unmatched > 0:
+            preferred_tbin = float(preferred_source_tbin)
+            if 'time_bin_size' in right_df.columns:
+                right_asof_src = right_df[np.isclose(right_df['time_bin_size'].to_numpy(dtype=float), preferred_tbin, atol=1e-9, equal_nan=False)].copy()
+            else:
+                right_asof_src = right_df.copy()
+            if len(right_asof_src) > 0:
+                asof_group_keys = [k for k in ('session_name', 'custom_replay_name') if (k in left_pbe.columns) and (k in right_asof_src.columns)]
+                left_unmatched = left_pbe.loc[unmatched].copy()
+                left_unmatched = left_unmatched.sort_values(asof_group_keys + ['_flicker_join_start'], kind='mergesort')
+                right_asof_src = right_asof_src.sort_values(asof_group_keys + ['_flicker_join_start'], kind='mergesort')
+                asof_merged = pd.merge_asof(
+                    left_unmatched[['_orig_index', '_flicker_join_start'] + asof_group_keys],
+                    right_asof_src[['_flicker_join_start'] + asof_group_keys + transfer_col_names],
+                    on='_flicker_join_start', by=asof_group_keys if len(asof_group_keys) else None,
+                    direction='nearest', tolerance=float(start_tol_sec),
+                )
+                if len(asof_merged) != len(left_unmatched):
+                    raise ValueError(f'merge_pbe_flickering_onto_fat_df: asof merge changed unmatched row count ({len(left_unmatched)} -> {len(asof_merged)}); refusing to apply')
+                asof_hit = asof_merged[transfer_col_names[0]].notna()
+                n_asof_matched = int(asof_hit.sum())
+                if n_asof_matched > 0:
+                    hit_orig = asof_merged.loc[asof_hit, '_orig_index'].to_numpy()
+                    # map orig index -> left_pbe row position
+                    orig_to_pos = {int(o): i for i, o in enumerate(left_pbe['_orig_index'].to_numpy())}
+                    hit_positions = [orig_to_pos[int(o)] for o in hit_orig]
+                    merged_values.iloc[hit_positions, :] = asof_merged.loc[asof_hit, transfer_col_names].to_numpy()
+                ## END if n_asof_matched > 0...
+            ## END if len(right_asof_src) > 0...
+        ## END if n_unmatched > 0...
+
+        for a_col in transfer_col_names:
+            fat_df.loc[left_pbe['_orig_index'].to_numpy(), a_col] = merged_values[a_col].to_numpy()
+        ## END for a_col in transfer_col_names....
+
+        # Convenience boolean flags for DataFrameFilter
+        if 'conf_dynamic_class' in fat_df.columns and 'is_flickering_pbe' not in fat_df.columns:
+            fat_df['is_flickering_pbe'] = fat_df['conf_dynamic_class'].astype(str).str.lower().eq('flicker')
+        if 'has_paused_resumed_trajectory' in fat_df.columns and 'is_paused_resumed_pbe' not in fat_df.columns:
+            fat_df['is_paused_resumed_pbe'] = fat_df['has_paused_resumed_trajectory'].fillna(False).astype(bool)
+
+        if len(fat_df) != n_rows_before:
+            raise ValueError(f'merge_pbe_flickering_onto_fat_df: FAT row count changed ({n_rows_before} -> {len(fat_df)}); refusing to apply')
+        n_matched: int = int(fat_df.loc[left_df.index[is_pbe_row], transfer_col_names[0]].notna().sum())
+        if debug_print:
+            print(f'merge_pbe_flickering_onto_fat_df: matched {n_matched}/{n_pbe_rows} PBE/ripple rows (exact={int(matched_exact.sum())}, asof={n_asof_matched}) using left start col "{left_join_col}"; added {len(transfer_col_names)} columns.')
         return fat_df
 
 

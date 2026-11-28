@@ -3285,6 +3285,93 @@ def export_decoded_variables_evaluation_completion_function(self, global_data_ro
     return across_session_results_extended_dict
 
 
+@function_attributes(short_name=None, tags=['flickering', 'PBE', 'context', 'CSV', 'batch', 'export', 'Dragoi2024'], input_requires=['DirectionalMergedDecoders'], output_provides=['compute_and_export_pbe_flickering_completion_function'], uses=['PBEFlickeringAnalyzer', 'batch_extended_computations'], used_by=[], creation_date='2026-11-27 17:20', related_items=['pbe_flickering_analysis'])
+def compute_and_export_pbe_flickering_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict,
+        decoding_time_bin_size: float = 0.025, conf_thresh: float = 0.65, strict_conf_thresh: float = 0.75,
+        min_num_unique_active_neurons_per_time_bin: int = 2, min_num_spikes_per_bin: int = 1, min_valid_bins: int = 4,
+        num_within_shuffles: int = 500, num_pool_shuffles: int = 500, num_neuron_id_shuffles: int = 0,
+        include_laps_control: bool = True, force_recompute: bool = False, drop_previous_result_and_compute_fresh: bool = False,
+        debug_print: bool = False, export_filename_extra_suffix_parts: Optional[List[str]] = None) -> dict:
+    """Compute/export within-PBE context flickering CSVs into collected_outputs.
+
+    Writes:
+      `{BATCH_DATE_TO_USE}-{session_id}-(pbe_flickering_df)_tbin-{tbin}.csv`
+      `{BATCH_DATE_TO_USE}-{session_id}-(pbe_flickering_bouts_df)_tbin-{tbin}.csv`
+    """
+    from pyphocorehelpers.assertion_helpers import Assert
+    from pyphocorehelpers.print_helpers import get_now_rounded_time_str
+    from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import apply_export_filename_extra_suffix_parts_to_pipeline
+    from pyphoplacecellanalysis.General.Batch.NonInteractiveProcessing import batch_extended_computations
+    from pyphoplacecellanalysis.Analysis.Decoder.pbe_flickering import PBEFlickeringResult
+
+    _callback_key = 'compute_and_export_pbe_flickering_completion_function'
+    print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
+    print(f'compute_and_export_pbe_flickering_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, decoding_time_bin_size: {decoding_time_bin_size}, ...)')
+    apply_export_filename_extra_suffix_parts_to_pipeline(curr_active_pipeline, export_filename_extra_suffix_parts=export_filename_extra_suffix_parts)
+
+    active_export_parent_output_path = self.collected_outputs_path.resolve()
+    Assert.path_exists(active_export_parent_output_path)
+
+    computation_kwargs_dict = {
+        'pbe_flickering_analysis': dict(
+            decoding_time_bin_size=float(decoding_time_bin_size),
+            conf_thresh=float(conf_thresh),
+            strict_conf_thresh=float(strict_conf_thresh),
+            min_num_unique_active_neurons_per_time_bin=int(min_num_unique_active_neurons_per_time_bin),
+            min_num_spikes_per_bin=int(min_num_spikes_per_bin),
+            min_valid_bins=int(min_valid_bins),
+            num_within_shuffles=int(num_within_shuffles),
+            num_pool_shuffles=int(num_pool_shuffles),
+            num_neuron_id_shuffles=int(num_neuron_id_shuffles),
+            include_laps_control=bool(include_laps_control),
+            drop_previous_result_and_compute_fresh=bool(drop_previous_result_and_compute_fresh),
+        ),
+    }
+    extended_computations_include_includelist = ['split_to_directional_laps', 'merged_directional_placefields', 'pbe_flickering_analysis']
+    force_recompute_override_computations_includelist = ['pbe_flickering_analysis'] if (force_recompute or drop_previous_result_and_compute_fresh) else []
+
+    newly_computed_values = batch_extended_computations(
+        curr_active_pipeline, include_includelist=extended_computations_include_includelist, include_global_functions=True, fail_on_exception=False, progress_print=True,
+        force_recompute=bool(force_recompute), force_recompute_override_computations_includelist=force_recompute_override_computations_includelist,
+        computation_kwargs_dict=computation_kwargs_dict, debug_print=bool(debug_print),
+    )
+    if debug_print:
+        print(f'\tnewly_computed_values: {newly_computed_values}')
+
+    flickering_result: PBEFlickeringResult = curr_active_pipeline.global_computation_results.computed_data.get('PBEFlickering', None)
+    assert flickering_result is not None, 'PBEFlickering global result missing after computation'
+    epoch_df = deepcopy(flickering_result.epoch_df) if flickering_result.epoch_df is not None else pd.DataFrame()
+    bouts_df = deepcopy(flickering_result.bouts_df) if flickering_result.bouts_df is not None else pd.DataFrame()
+
+    tbin_str = f'{float(decoding_time_bin_size)}'
+    output_date_str: str = getattr(self, 'BATCH_DATE_TO_USE', None) or get_now_rounded_time_str(rounded_minutes=10)
+
+    def _subfn_export(export_df: pd.DataFrame, data_identifier_str: str):
+        out_path, out_filename, out_basename = curr_active_pipeline.build_complete_session_identifier_filename_string(
+            output_date_str=output_date_str, data_identifier_str=data_identifier_str, parent_output_path=active_export_parent_output_path, out_extension='.csv',
+        )
+        # Ensure _tbin- suffix for across-session parsers
+        if f'_tbin-{tbin_str}' not in out_path.name:
+            out_path = out_path.with_name(out_path.stem + f'_tbin-{tbin_str}' + out_path.suffix)
+        export_df.to_csv(out_path)
+        return out_path
+
+    epoch_csv_path = _subfn_export(epoch_df, data_identifier_str='(pbe_flickering_df)') if len(epoch_df) else None
+    bouts_csv_path = _subfn_export(bouts_df, data_identifier_str='(pbe_flickering_bouts_df)') if len(bouts_df) else None
+    print(f'\tpbe_flickering_df CSV: {epoch_csv_path}')
+    print(f'\tpbe_flickering_bouts_df CSV: {bouts_csv_path}')
+
+    across_session_results_extended_dict[_callback_key] = {
+        'pbe_flickering_df_path': epoch_csv_path,
+        'pbe_flickering_bouts_df_path': bouts_csv_path,
+        'n_epochs': int(len(epoch_df)),
+        'n_bouts': int(len(bouts_df)),
+        'decoding_time_bin_size': float(decoding_time_bin_size),
+    }
+    print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
+    return across_session_results_extended_dict
+
+
 @function_attributes(short_name=None, tags=['TrainTestSplit', 'position', 'error', 'CSV', 'KDIBA', 'batch', 'export', 'shuffles-indep', 'pure'], input_requires=[], output_provides=['compute_and_export_kdiba_train_test_position_error_completion_function'], uses=['export_kdiba_train_test_position_error_csvs'], used_by=['figures_export_laps_correct_decoder_side_by_side_completion_function'], creation_date='2026-11-20 18:00', related_items=['generalized_decode_epochs_dict_and_export_results_completion_function', 'export_kdiba_train_test_position_error_csvs', 'figures_export_laps_correct_decoder_side_by_side_completion_function'])
 def compute_and_export_kdiba_train_test_position_error_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict,
         active_laps_decoding_time_bin_size: float = 0.025, force_recompute_directional_train_test_split_result: bool = False,
